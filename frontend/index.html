@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM - تسجيل الدخول</title>
+    <style>
+        body { font-family: Tahoma, sans-serif; background-color: #f4f7f6; padding: 50px; text-align: center; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); display: inline-block; width: 300px; }
+        input { width: 90%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; }
+        button { background: #007BFF; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; width: 100%; }
+        button:hover { background: #0056b3; }
+        #result { margin-top: 15px; font-size: 14px; word-break: break-all; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h2>تسجيل الدخول</h2>
+        <input type="email" id="email" placeholder="البريد الإلكتروني">
+        <input type="password" id="password" placeholder="كلمة المرور">
+        <button onclick="login()">دخول</button>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        async function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const resultDiv = document.getElementById('result');
+
+            try {
+                const response = await fetch('http://127.0.0.1:8000/auth/login', { 
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json' 
+                    },
+                    body: JSON.stringify({
+                        email: email,
+                        password: password,
+                        name: "Ahmed",
+                        role: "admin"
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    resultDiv.style.color = 'green';
+                    resultDiv.innerText = 'تم تسجيل الدخول بنجاح! جاري التحويل...';
+                    
+                    localStorage.setItem('token', data.access_token);
+
+                    setTimeout(() => {
+                        window.location.href = 'dashboard.html';
+                    }, 1000);
+                } else {
+                    resultDiv.style.color = 'red';
+                    let errorMsg = typeof data.detail === 'object' ? JSON.stringify(data.detail) : data.detail;
+                    resultDiv.innerText = 'خطأ: ' + (errorMsg || 'بيانات الدخول غير صحيحة');
+                }
+            } catch (error) {
+                resultDiv.style.color = 'red';
+                resultDiv.innerText = 'حدث خطأ في الاتصال بالـ Server، تأكد من تشغيل Uvicorn';
+            }
+        }
+    </script>
+
+</body>
+</html>

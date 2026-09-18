@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Roving Travel - CRM & Management System</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            --roving-orange: #D94A26;
+            --roving-green: #203A2B;
+            --roving-bg: #F9F6EE;
+            --roving-dark-green: #14251B;
+            --roving-light-orange: #F39C12;
+        }
+
+        body { 
+            background-color: var(--roving-bg); 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            color: #2D3748;
+        }
+
+        .sidebar { 
+            min-height: 100vh; 
+            background: var(--roving-green); 
+            color: #ffffff; 
+        }
+
+        .sidebar a { 
+            color: #E2E8F0; 
+            text-decoration: none; 
+            padding: 12px 18px; 
+            display: block; 
+            border-radius: 8px; 
+            margin-bottom: 6px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar a:hover, .sidebar a.active { 
+            background: var(--roving-orange); 
+            color: #ffffff; 
+        }
+
+        .card-custom { 
+            border: none; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05); 
+            background: #ffffff;
+        }
+
+        .btn-primary, .bg-primary-custom {
+            background-color: var(--roving-orange) !important;
+            border-color: var(--roving-orange) !important;
+        }
+
+        .btn-primary:hover {
+            background-color: #B83A1B !important;
+            border-color: #B83A1B !important;
+        }
+
+        .text-roving-green { color: var(--roving-green) !important; }
+        .text-roving-orange { color: var(--roving-orange) !important; }
+
+        .notif-box { 
+            background: var(--roving-dark-green); 
+            border-radius: 8px; 
+            padding: 10px; 
+            max-height: 200px; 
+            overflow-y: auto; 
+        }
+
+        .notif-item { 
+            font-size: 0.85rem; 
+            border-bottom: 1px solid #2D4A38; 
+            padding: 8px 0; 
+            color: #E2E8F0;
+        }
+
+        .login-card { 
+            max-width: 420px; 
+            margin: 80px auto; 
+            border-radius: 16px; 
+            border: none; 
+            box-shadow: 0 10px 30px rgba(32, 58, 43, 0.15); 
+            background: #ffffff;
+        }
+
+        .table-custom-header {
+            background-color: var(--roving-green) !important;
+            color: #ffffff !important;
+        }
+    </style>
+</head>
+<body>
+
+<!-- 1. LOGIN SECTION -->
+<div id="loginSection" class="container">
+    <div class="card login-card p-4">
+        <div class="text-center mb-4">
+            <h3 class="fw-bold text-roving-orange"><i class="fa-solid fa-plane-departure me-2"></i>Roving Travel</h3>
+            <p class="text-muted">System Login</p>
+        </div>
+        <form id="loginForm">
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Email Address</label>
+                <input type="email" id="loginEmail" class="form-control" placeholder="name@roving.com" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Password</label>
+                <input type="password" id="loginPassword" class="form-control" placeholder="••••••••" required>
+            </div>
+            <div id="loginError" class="alert alert-danger py-2 d-none" role="alert"></div>
+            <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">Sign In</button>
+        </form>
+    </div>
+</div>
+
+<!-- 2. MAIN APPLICATION DASHBOARD -->
+<div id="appSection" class="container-fluid d-none">
+    <div class="row">
+        <!-- Sidebar Navigation -->
+        <div class="col-md-2 sidebar p-3">
+            <h4 class="text-center my-3 text-roving-orange fw-bold"><i class="fa-solid fa-plane-departure"></i> Roving CRM</h4>
+            <hr class="border-secondary">
+            
+            <div class="mb-3 text-center bg-dark p-2 rounded bg-opacity-25">
+                <small class="text-light opacity-75 d-block">Current User:</small>
+                <strong id="userDisplayName" class="text-truncate d-block small text-white">...</strong>
+                <div><span id="userRoleBadge" class="badge mt-1"></span></div>
+            </div>
+
+            <!-- Notifications Drawer -->
+            <div class="mb-3">
+                <button class="btn btn-outline-light w-100 position-relative d-flex justify-content-between align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#notifCollapse">
+                    <span><i class="fa-solid fa-bell text-roving-orange me-2"></i> Notifications</span>
+                    <span id="notifBadge" class="badge bg-danger rounded-pill">0</span>
+                </button>
+                <div class="collapse mt-2" id="notifCollapse">
+                    <div class="notif-box text-light" id="notifList">
+                        <small class="text-muted">No notifications</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Navigation Links -->
+            <nav class="mt-3">
+                <a href="#" id="navClients" class="active" onclick="switchTab('clients')"><i class="fa-solid fa-users me-2"></i> Clients</a>
+                <a href="#" id="navFollowups" onclick="switchTab('followups')"><i class="fa-solid fa-phone-volume me-2"></i> Follow-ups</a>
+                <a href="#" id="navBookings" onclick="switchTab('bookings')"><i class="fa-solid fa-receipt me-2"></i> Bookings</a>
+                <a href="#" id="navCommissions" onclick="switchTab('commissions')"><i class="fa-solid fa-hand-holding-dollar me-2"></i> Commissions</a>
+                <a href="#" id="navReports" onclick="switchTab('reports')"><i class="fa-solid fa-chart-line me-2"></i> Reports</a>
+                <a href="#" id="pendingDeleteNav" class="d-none text-warning" onclick="switchTab('pendingDeletes')">
+                    <i class="fa-solid fa-shield-halved me-2"></i> Deletion Requests <span id="pendingBadge" class="badge bg-danger">0</span>
+                </a>
+                <a href="#" class="text-danger mt-4" onclick="handleLogout()"><i class="fa-solid fa-right-from-bracket me-2"></i> Logout</a>
+            </nav>
+        </div>
+
+        <!-- Main Dashboard View -->
+        <div class="col-md-10 p-4">
+            
+            <!-- Tab 1: Clients -->
+            <div id="tabClients" class="tab-content-item">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2 class="fw-bold text-roving-green">Client Directory</h2>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addClientModal"><i class="fa-solid fa-plus me-1"></i> Add Client</button>
+                </div>
+                <div class="card card-custom p-3">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Phone</th>
+                                    <th>Service</th>
+                                    <th>Created By</th>
+                                    <th>Assigned To</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="clientsTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 2: Follow-ups -->
+            <div id="tabFollowups" class="tab-content-item d-none">
+                <h2 class="fw-bold text-roving-green mb-4">Follow-ups & Tasks Schedule</h2>
+                <div class="card card-custom p-3">
+                    <div class="table-responsive">
+                        <table class="table align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Client</th>
+                                    <th>Follow-up Date</th>
+                                    <th>Notes</th>
+                                    <th>Assigned Agent</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="followupsTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 3: Bookings -->
+            <div id="tabBookings" class="tab-content-item d-none">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2 class="fw-bold text-roving-green">Confirmed Trips & Bookings</h2>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addBookingModal"><i class="fa-solid fa-plus me-1"></i> New Booking</button>
+                </div>
+                <div class="card card-custom p-3">
+                    <div class="table-responsive">
+                        <table class="table align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Client</th>
+                                    <th>Trip Details</th>
+                                    <th>Total Price</th>
+                                    <th>Net Profit</th>
+                                    <th>Trip End Date</th>
+                                    <th>Sales Representative</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bookingsTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 4: Commissions -->
+            <div id="tabCommissions" class="tab-content-item d-none">
+                <h2 class="fw-bold text-roving-green mb-4">Commissions & Revenue Overview</h2>
+                <div class="row mb-4 g-3">
+                    <div class="col-md-4">
+                        <div class="card card-custom p-3 border-start border-4 border-success">
+                            <h6 class="text-muted">Total Net Revenue</h6>
+                            <h3 id="totalSalesAmount" class="fw-bold text-roving-green">EGP 0</h3>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card card-custom p-3 border-start border-4 border-warning">
+                            <h6 class="text-muted">Released Commissions (Trip Completed)</h6>
+                            <h3 id="totalCommissionAmount" class="fw-bold text-roving-orange">EGP 0</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="card card-custom p-3">
+                    <div class="table-responsive">
+                        <table class="table align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Agent</th>
+                                    <th>Trip Details</th>
+                                    <th>Trip End Date</th>
+                                    <th>Commission Value</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="commissionsTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 5: Reports -->
+            <div id="tabReports" class="tab-content-item d-none">
+                <h2 class="fw-bold text-roving-green mb-4">Performance Reports</h2>
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <div class="card card-custom p-3 text-center">
+                            <h6 class="text-muted">Total Clients</h6>
+                            <h2 id="reportTotalClients" class="fw-bold text-roving-green">0</h2>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card card-custom p-3 text-center">
+                            <h6 class="text-muted">Completed Bookings</h6>
+                            <h2 id="reportTotalBookings" class="fw-bold text-roving-orange">0</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 6: Pending Deletions (Admin Only) -->
+            <div id="tabPendingDeletes" class="tab-content-item d-none">
+                <h2 class="fw-bold text-danger mb-4">Pending Deletion Requests</h2>
+                <div class="card card-custom p-3 border-danger">
+                    <div class="table-responsive">
+                        <table class="table align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Client Name</th>
+                                    <th>Requested By</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pendingDeleteTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Add Client -->
+<div class="modal fade" id="addClientModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title fw-bold text-roving-green">Add New Client</h5></div>
+            <div class="modal-body">
+                <form id="addClientForm">
+                    <div class="mb-2"><label class="form-label">Client Name</label><input type="text" id="clientName" class="form-control" required></div>
+                    <div class="mb-2"><label class="form-label">Phone</label><input type="tel" id="clientPhone" class="form-control" required></div>
+                    <div class="mb-2"><label class="form-label">Service Required</label><input type="text" id="clientService" class="form-control" required></div>
+                    <div class="mb-3"><label class="form-label">Assign To</label><select id="clientAssignedTo" class="form-select" required></select></div>
+                    <button type="submit" class="btn btn-primary w-100">Save Client</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Add Booking -->
+<div class="modal fade" id="addBookingModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title fw-bold text-roving-green">Create Trip Booking</h5></div>
+            <div class="modal-body">
+                <form id="addBookingForm">
+                    <div class="mb-2"><label class="form-label">Select Client</label><select id="bookingClientSelect" class="form-select" required></select></div>
+                    <div class="mb-2"><label class="form-label">Trip Details</label><input type="text" id="bookingDetails" class="form-control" placeholder="Flight / Hotel Package..." required></div>
+                    <div class="mb-2"><label class="form-label">Total Booking Amount (EGP)</label><input type="number" id="bookingAmount" class="form-control" required></div>
+                    <div class="mb-2"><label class="form-label">Net Profit Amount (EGP)</label><input type="number" id="bookingProfit" class="form-control" required></div>
+                    <div class="mb-3"><label class="form-label">Trip End Date (For Commission Release)</label><input type="date" id="bookingEndDate" class="form-control" required></div>
+                    <button type="submit" class="btn btn-primary w-100">Save Booking</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Transfer Client -->
+<div class="modal fade" id="transferModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title fw-bold text-roving-green">Transfer Client Ownership</h5></div>
+            <div class="modal-body">
+                <input type="hidden" id="transferClientId">
+                <div class="mb-3"><label class="form-label">Select New Agent</label><select id="transferSelectUser" class="form-select"></select></div>
+                <button type="button" class="btn btn-warning w-100 fw-bold" onclick="confirmTransfer()">Confirm Transfer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Authorized Admin Accounts
+const adminEmails = [
+    "asmaa.ashraf.1312002@gmail.com", 
+    "ahmedashraf88513@gmail.com",
+    "ahmedwanas11@gmail.com"
+];
+
+// Employee Directory
+const allEmployees = [
+    { email: "asmaa.ashraf.1312002@gmail.com", name: "Asmaa Ashraf (Admin)" },
+    { email: "ahmedashraf88513@gmail.com", name: "Ahmed Ashraf (Admin)" },
+    { email: "ahmedwanas11@gmail.com", name: "Ahmed Wanas (Admin)" },
+    { email: "sales1@roving.com", name: "Sales Agent 1" }
+];
+
+let currentUser = null;
+let notifications = [];
+let clients = [
+    { id: 1, name: "Mohamed Ali", phone: "01000000001", service: "Dubai Trip", createdBy: "sales1@roving.com", assignedTo: "sales1@roving.com", status: "New", deleteRequested: false },
+    { id: 2, name: "Omar Khaled", phone: "01000000002", service: "Europe Visa", createdBy: "asmaa.ashraf.1312002@gmail.com", assignedTo: "ahmedashraf88513@gmail.com", status: "In Follow-up", deleteRequested: false }
+];
+
+let followups = [
+    { clientId: 1, clientName: "Mohamed Ali", date: "2026-09-25", note: "Call to confirm flight dates", assignedTo: "sales1@roving.com", status: "Pending" }
+];
+
+// Demo Bookings (Including Trip End Date & Profit)
+let bookings = [
+    { id: 101, clientName: "Mohamed Ali", details: "Dubai 5 Stars Hotel", amount: 30000, profit: 5000, tripEndDate: "2026-09-10", assignedTo: "sales1@roving.com" }, // Completed trip
+    { id: 102, clientName: "Omar Khaled", details: "Europe Tour", amount: 60000, profit: 10000, tripEndDate: "2026-10-15", assignedTo: "ahmedashraf88513@gmail.com" } // Upcoming trip
+];
+
+// Login Handling
+document.getElementById('loginForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+    
+    const foundUser = allEmployees.find(emp => emp.email.toLowerCase() === email);
+    
+    if (foundUser) {
+        currentUser = { 
+            email: foundUser.email, 
+            role: adminEmails.map(a => a.toLowerCase()).includes(foundUser.email) ? 'Admin' : 'Sales' 
+        };
+        document.getElementById('loginSection').classList.add('d-none');
+        document.getElementById('appSection').classList.remove('d-none');
+        document.getElementById('loginError').classList.add('d-none');
+        initApp();
+    } else {
+        const errorDiv = document.getElementById('loginError');
+        errorDiv.innerText = "Email address not authorized.";
+        errorDiv.classList.remove('d-none');
+    }
+});
+
+function handleLogout() {
+    currentUser = null;
+    document.getElementById('loginSection').classList.remove('d-none');
+    document.getElementById('appSection').classList.add('d-none');
+}
+
+function initApp() {
+    document.getElementById('userDisplayName').innerText = currentUser.email;
+    document.getElementById('userRoleBadge').innerText = currentUser.role;
+    
+    if (currentUser.role === 'Admin') {
+        document.getElementById('userRoleBadge').className = "badge bg-danger mt-1";
+        document.getElementById('pendingDeleteNav').classList.remove('d-none');
+    } else {
+        document.getElementById('userRoleBadge').className = "badge bg-warning text-dark mt-1";
+        document.getElementById('pendingDeleteNav').classList.add('d-none');
+    }
+
+    populateDropdowns();
+    renderClients();
+    renderFollowups();
+    renderBookings();
+    renderCommissions();
+    renderReports();
+    renderNotifications();
+}
+
+function switchTab(tabName) {
+    document.querySelectorAll('.tab-content-item').forEach(el => el.classList.add('d-none'));
+    document.querySelectorAll('.sidebar a').forEach(el => el.classList.remove('active'));
+
+    if (tabName === 'clients') { document.getElementById('tabClients').classList.remove('d-none'); document.getElementById('navClients').classList.add('active'); }
+    if (tabName === 'followups') { document.getElementById('tabFollowups').classList.remove('d-none'); document.getElementById('navFollowups').classList.add('active'); }
+    if (tabName === 'bookings') { document.getElementById('tabBookings').classList.remove('d-none'); document.getElementById('navBookings').classList.add('active'); }
+    if (tabName === 'commissions') { document.getElementById('tabCommissions').classList.remove('d-none'); document.getElementById('navCommissions').classList.add('active'); }
+    if (tabName === 'reports') { document.getElementById('tabReports').classList.remove('d-none'); document.getElementById('navReports').classList.add('active'); }
+    if (tabName === 'pendingDeletes') { document.getElementById('tabPendingDeletes').classList.remove('d-none'); document.getElementById('pendingDeleteNav').classList.add('active'); renderPendingDeletes(); }
+}
+
+function populateDropdowns() {
+    const addSelect = document.getElementById('clientAssignedTo');
+    const transferSelect = document.getElementById('transferSelectUser');
+    const bookingClientSelect = document.getElementById('bookingClientSelect');
+    
+    addSelect.innerHTML = ''; transferSelect.innerHTML = ''; bookingClientSelect.innerHTML = '';
+
+    allEmployees.forEach(emp => {
+        addSelect.innerHTML += `<option value="${emp.email}">${emp.name}</option>`;
+        if (emp.email.toLowerCase() !== currentUser.email) transferSelect.innerHTML += `<option value="${emp.email}">${emp.name}</option>`;
+    });
+
+    let filteredClients = currentUser.role === 'Sales' ? clients.filter(c => c.assignedTo === currentUser.email) : clients;
+    filteredClients.forEach(c => {
+        bookingClientSelect.innerHTML += `<option value="${c.name}">${c.name}</option>`;
+    });
+}
+
+function renderClients() {
+    const tbody = document.getElementById('clientsTableBody');
+    tbody.innerHTML = '';
+    let list = currentUser.role === 'Sales' ? clients.filter(c => c.createdBy === currentUser.email || c.assignedTo === currentUser.email) : clients;
+
+    list.forEach(c => {
+        tbody.innerHTML += `
+            <tr>
+                <td><strong>${c.name}</strong></td>
+                <td>${c.phone}</td>
+                <td>${c.service}</td>
+                <td><small class="text-muted">${c.createdBy}</small></td>
+                <td><span class="badge bg-light text-dark border">${c.assignedTo}</span></td>
+                <td><span class="badge bg-success">${c.status}</span></td>
+                <td>
+                    ${c.deleteRequested ? '<span class="badge bg-warning text-dark">Deletion Pending</span>' : `
+                        <button class="btn btn-sm btn-outline-warning" onclick="openTransferModal(${c.id})"><i class="fa-solid fa-arrow-right-arrow-left"></i></button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="requestDelete(${c.id})"><i class="fa-solid fa-trash"></i></button>
+                    `}
+                </td>
+            </tr>
+        `;
+    });
+}
+
+function renderFollowups() {
+    const tbody = document.getElementById('followupsTableBody');
+    tbody.innerHTML = '';
+    let list = currentUser.role === 'Sales' ? followups.filter(f => f.assignedTo === currentUser.email) : followups;
+
+    list.forEach(f => {
+        tbody.innerHTML += `
+            <tr>
+                <td><strong>${f.clientName}</strong></td>
+                <td>${f.date}</td>
+                <td>${f.note}</td>
+                <td>${f.assignedTo}</td>
+                <td><span class="badge bg-warning text-dark">${f.status}</span></td>
+            </tr>
+        `;
+    });
+}
+
+function renderBookings() {
+    const tbody = document.getElementById('bookingsTableBody');
+    tbody.innerHTML = '';
+    let list = currentUser.role === 'Sales' ? bookings.filter(b => b.assignedTo === currentUser.email) : bookings;
+
+    list.forEach(b => {
+        tbody.innerHTML += `
+            <tr>
+                <td><strong>${b.clientName}</strong></td>
+                <td>${b.details}</td>
+                <td>EGP ${b.amount.toLocaleString()}</td>
+                <td>EGP ${b.profit.toLocaleString()}</td>
+                <td><span class="badge bg-secondary">${b.tripEndDate}</span></td>
+                <td>${b.assignedTo}</td>
+            </tr>
+        `;
+    });
+}
+
+// Dynamic Commission Logic tied to Trip Completion Date
+function renderCommissions() {
+    const tbody = document.getElementById('commissionsTableBody');
+    tbody.innerHTML = '';
+    let list = currentUser.role === 'Sales' ? bookings.filter(b => b.assignedTo === currentUser.email) : bookings;
+
+    let totalProfit = 0;
+    let releasedCommissions = 0;
+    const today = new Date().toISOString().split('T')[0];
+
+    list.forEach(b => {
+        totalProfit += b.profit;
+        // Calculation: 10% of profit (without rendering the percentage string directly)
+        const commValue = b.profit * 0.10; 
+        const isCompleted = b.tripEndDate <= today;
+
+        if (isCompleted) {
+            releasedCommissions += commValue;
+        }
+
+        tbody.innerHTML += `
+            <tr>
+                <td>${b.assignedTo}</td>
+                <td>${b.details}</td>
+                <td>${b.tripEndDate}</td>
+                <td><strong class="text-roving-orange">EGP ${commValue.toLocaleString()}</strong></td>
+                <td>
+                    ${isCompleted ? 
+                        '<span class="badge bg-success"><i class="fa-solid fa-check me-1"></i> Released</span>' : 
+                        '<span class="badge bg-warning text-dark"><i class="fa-solid fa-clock me-1"></i> Pending Trip Completion</span>'
+                    }
+                </td>
+            </tr>
+        `;
+    });
+
+    document.getElementById('totalSalesAmount').innerText = "EGP " + totalProfit.toLocaleString();
+    document.getElementById('totalCommissionAmount').innerText = "EGP " + releasedCommissions.toLocaleString();
+}
+
+function renderReports() {
+    let clientCount = currentUser.role === 'Sales' ? clients.filter(c => c.assignedTo === currentUser.email).length : clients.length;
+    let bookingCount = currentUser.role === 'Sales' ? bookings.filter(b => b.assignedTo === currentUser.email).length : bookings.length;
+
+    document.getElementById('reportTotalClients').innerText = clientCount;
+    document.getElementById('reportTotalBookings').innerText = bookingCount;
+}
+
+function renderNotifications() {
+    const notifList = document.getElementById('notifList');
+    const myNotifs = notifications.filter(n => n.targetEmail === currentUser.email);
+    document.getElementById('notifBadge').innerText = myNotifs.length;
+    notifList.innerHTML = myNotifs.length === 0 ? '<small class="text-muted d-block p-2">No notifications</small>' : '';
+    myNotifs.forEach(n => {
+        notifList.innerHTML += `<div class="notif-item"><div>${n.text}</div></div>`;
+    });
+}
+
+function openTransferModal(id) {
+    document.getElementById('transferClientId').value = id;
+    new bootstrap.Modal(document.getElementById('transferModal')).show();
+}
+
+function confirmTransfer() {
+    const id = parseInt(document.getElementById('transferClientId').value);
+    const target = document.getElementById('transferSelectUser').value;
+    const client = clients.find(c => c.id === id);
+    if (client) {
+        client.assignedTo = target;
+        notifications.push({ targetEmail: target, text: `Client (${client.name}) transferred to you.` });
+        bootstrap.Modal.getInstance(document.getElementById('transferModal')).hide();
+        initApp();
+    }
+}
+
+function requestDelete(id) {
+    const client = clients.find(c => c.id === id);
+    if (!client) return;
+
+    if (currentUser.role === 'Admin') {
+        if (confirm('Permanently delete this record?')) { clients = clients.filter(c => c.id !== id); initApp(); }
+    } else {
+        if (confirm('Send deletion request to Admin?')) {
+            client.deleteRequested = true;
+            adminEmails.forEach(a => notifications.push({ targetEmail: a, text: `Delete request for client (${client.name})` }));
+            initApp();
+        }
+    }
+}
+
+function renderPendingDeletes() {
+    const tbody = document.getElementById('pendingDeleteTableBody');
+    tbody.innerHTML = '';
+    const pending = clients.filter(c => c.deleteRequested);
+    pending.forEach(c => {
+        tbody.innerHTML += `
+            <tr>
+                <td>${c.name}</td>
+                <td>${c.createdBy}</td>
+                <td>
+                    <button class="btn btn-sm btn-success me-1" onclick="approveDelete(${c.id})">Approve</button>
+                    <button class="btn btn-sm btn-secondary" onclick="rejectDelete(${c.id})">Reject</button>
+                </td>
+            </tr>
+        `;
+    });
+}
+
+function approveDelete(id) { clients = clients.filter(c => c.id !== id); initApp(); renderPendingDeletes(); }
+function rejectDelete(id) { const c = clients.find(x => x.id === id); if (c) c.deleteRequested = false; initApp(); renderPendingDeletes(); }
+
+document.getElementById('addClientForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    clients.push({
+        id: Date.now(),
+        name: document.getElementById('clientName').value,
+        phone: document.getElementById('clientPhone').value,
+        service: document.getElementById('clientService').value,
+        createdBy: currentUser.email,
+        assignedTo: document.getElementById('clientAssignedTo').value,
+        status: "New",
+        deleteRequested: false
+    });
+    bootstrap.Modal.getInstance(document.getElementById('addClientModal')).hide();
+    this.reset();
+    initApp();
+});
+
+document.getElementById('addBookingForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    bookings.push({
+        id: Date.now(),
+        clientName: document.getElementById('bookingClientSelect').value,
+        details: document.getElementById('bookingDetails').value,
+        amount: parseFloat(document.getElementById('bookingAmount').value),
+        profit: parseFloat(document.getElementById('bookingProfit').value),
+        tripEndDate: document.getElementById('bookingEndDate').value,
+        assignedTo: currentUser.email
+    });
+    bootstrap.Modal.getInstance(document.getElementById('addBookingModal')).hide();
+    this.reset();
+    initApp();
+});
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
