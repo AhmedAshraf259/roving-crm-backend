@@ -10,8 +10,6 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Chart.js للرسومات البيانية -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
         :root {
@@ -24,14 +22,10 @@
 
         body { 
             background-color: var(--roving-bg); 
-            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            font-family: 'Inter', sans-serif; 
             color: #2D3748;
             letter-spacing: -0.01em;
             -webkit-font-smoothing: antialiased;
-        }
-
-        h1, h2, h3, h4, h5, h6, .fw-bold, .fw-semibold {
-            font-family: 'Inter', sans-serif;
         }
 
         .sidebar { 
@@ -122,13 +116,16 @@
 </head>
 <body>
 
+<!-- BROADCAST ANNOUNCEMENT BANNER -->
+<div id="broadcastBanner" class="alert alert-warning text-center rounded-0 mb-0 d-none fw-bold" role="alert">
+    <i class="fa-solid fa-bullhorn me-2"></i> <span id="broadcastText"></span>
+</div>
+
 <!-- 1. LOGIN SECTION -->
 <div id="loginSection" class="container">
     <div class="card login-card p-4">
         <div class="text-center mb-4">
-            <div class="d-flex justify-content-center align-items-center mb-2">
-                <h3 class="fw-bold text-roving-orange m-0">Roving Travel</h3>
-            </div>
+            <h3 class="fw-bold text-roving-orange m-0">Roving Travel</h3>
             <p class="text-muted">System Login</p>
         </div>
         <form id="loginForm">
@@ -152,10 +149,8 @@
         <!-- Sidebar Navigation -->
         <div class="col-md-2 sidebar p-3" id="sidebarContainer">
             <div class="d-flex justify-content-between align-items-center my-2">
-                <div class="d-flex align-items-center">
-                    <h4 class="text-roving-orange fw-bold m-0" style="font-size: 1rem;">Roving CRM</h4>
-                </div>
-                <button class="btn btn-sm btn-outline-light" onclick="toggleSidebar()" title="إخفاء القائمة">
+                <h4 class="text-roving-orange fw-bold m-0" style="font-size: 1rem;">Roving CRM</h4>
+                <button class="btn btn-sm btn-outline-light" onclick="toggleSidebar()" title="Toggle Sidebar">
                     <i class="fa-solid fa-bars"></i>
                 </button>
             </div>
@@ -174,7 +169,7 @@
                     <i class="fa-solid fa-phone-volume me-2"></i> Follow-ups 
                     <span id="sidebarFollowupBadge" class="badge bg-danger ms-2 d-none" style="font-size: 10px;">0</span>
                 </a>
-                <a href="#" id="navBookings" onclick="switchTab('bookings')"><i class="fa-solid fa-receipt me-2"></i> Bookings & Installments</a>
+                <a href="#" id="navBookings" onclick="switchTab('bookings')"><i class="fa-solid fa-receipt me-2"></i> Bookings</a>
                 <a href="#" id="navCommissions" onclick="switchTab('commissions')"><i class="fa-solid fa-hand-holding-dollar me-2"></i> Commissions</a>
                 <a href="#" id="navReports" onclick="switchTab('reports')"><i class="fa-solid fa-chart-line me-2"></i> Reports</a>
                 <a href="#" id="navSettings" onclick="switchTab('settings')"><i class="fa-solid fa-gear me-2"></i> Settings</a>
@@ -184,35 +179,30 @@
 
         <!-- Main Dashboard View -->
         <div class="col-md-10 p-4" id="mainContentArea">
-            <!-- Top Bar with Notifications Bell -->
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <button class="btn btn-outline-dark d-none fw-bold shadow-sm" id="showSidebarBtn" onclick="toggleSidebar()">
-                    <i class="fa-solid fa-bars me-2 text-roving-orange"></i> إظهار القائمة الجانبية
+                    <i class="fa-solid fa-bars me-2 text-roving-orange"></i> Show Sidebar
                 </button>
                 <div></div>
                 
-                <!-- زر الجرس والإشعارات -->
+                <!-- Notifications Bell -->
                 <div class="dropdown">
                     <button class="btn btn-light position-relative border shadow-sm px-3 py-2 rounded-pill" type="button" id="notificationDropdownBtn" data-bs-toggle="dropdown" aria-expanded="false" onclick="markAllNotificationsRead()">
                         <i class="fa-solid fa-bell text-roving-orange fa-lg"></i>
-                        <span id="notificationBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">
-                            0
-                        </span>
+                        <span id="notificationBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">0</span>
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end notification-dropdown p-2 shadow" aria-labelledby="notificationDropdownBtn">
-                        <li><h6 class="dropdown-header fw-bold text-roving-green">الإشعارات والتحديثات الفورية</h6></li>
+                        <li><h6 class="dropdown-header fw-bold text-roving-green">System Notifications</h6></li>
                         <li><hr class="dropdown-divider"></li>
                         <div id="notificationListContainer">
-                            <li class="text-center text-muted small py-3">لا توجد إشعارات جديدة</li>
+                            <li class="text-center text-muted small py-3">No new notifications</li>
                         </div>
                     </ul>
                 </div>
             </div>
 
-            <!-- منطقة التنبيهات العاجلة -->
+            <!-- Urgent Followup Alerts -->
             <div id="urgentFollowupAlertContainer"></div>
-
-            <!-- Toast Alert Area -->
             <div id="notificationArea"></div>
 
             <!-- Tab 1: Clients -->
@@ -225,8 +215,8 @@
                 <div class="card card-custom p-3 mb-3 bg-light">
                     <div class="row align-items-center">
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold mb-1"><i class="fa-solid fa-magnifying-glass me-1 text-roving-orange"></i> بحث برقم الهاتف</label>
-                            <input type="text" id="clientPhoneSearch" class="form-control" placeholder="اكتب رقم الهاتف للبحث..." oninput="renderClients()">
+                            <label class="form-label fw-semibold mb-1"><i class="fa-solid fa-magnifying-glass me-1 text-roving-orange"></i> Search by Phone</label>
+                            <input type="text" id="clientPhoneSearch" class="form-control" placeholder="Type phone number..." oninput="renderClients()">
                         </div>
                     </div>
                 </div>
@@ -253,7 +243,7 @@
                 </div>
             </div>
 
-            <!-- Tab 2: Follow-ups & Tasks Schedule -->
+            <!-- Tab 2: Follow-ups -->
             <div id="tabFollowups" class="tab-content-item d-none">
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h2 class="fw-bold text-roving-green">Follow-ups & Tasks Schedule</h2>
@@ -269,7 +259,7 @@
                                 <tr>
                                     <th>Client Name</th>
                                     <th>Phone</th>
-                                    <th>Task Type (Action)</th>
+                                    <th>Task Type</th>
                                     <th>Scheduled Date & Time</th>
                                     <th>Assigned To</th>
                                     <th>Priority</th>
@@ -279,17 +269,17 @@
                                 </tr>
                             </thead>
                             <tbody id="followupsTableBody">
-                                <tr><td colspan="9" class="text-center text-muted py-4">لا توجد متابعات مسجلة حالياً</td></tr>
+                                <tr><td colspan="9" class="text-center text-muted py-4">No follow-ups recorded</td></tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
             </div>
 
-            <!-- Tab 3: Confirmed Trips & Bookings (with Installments) -->
+            <!-- Tab 3: Bookings -->
             <div id="tabBookings" class="tab-content-item d-none">
                 <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h2 class="fw-bold text-roving-green">Bookings & Installments (الحجوزات والأقساط)</h2>
+                    <h2 class="fw-bold text-roving-green">Bookings & Installments</h2>
                     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addBookingModal" onclick="openAddBookingModal()">
                         <i class="fa-solid fa-plus me-1"></i> Add New Booking
                     </button>
@@ -312,112 +302,99 @@
                                 </tr>
                             </thead>
                             <tbody id="bookingsTableBody">
-                                <tr><td colspan="9" class="text-center text-muted py-4">لا توجد حجوزات مسجلة حالياً</td></tr>
+                                <tr><td colspan="9" class="text-center text-muted py-4">No bookings recorded</td></tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
             </div>
 
-            <!-- Tab 4: Commissions Overview (New Dynamic Integration) -->
+            <!-- Tab 4: Commissions -->
             <div id="tabCommissions" class="tab-content-item d-none">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h2 class="fw-bold text-roving-green">Commissions Overview (سجل العمولات والكوميشن)</h2>
-                    <button class="btn btn-outline-secondary btn-sm" onclick="renderCommissions()"><i class="fa-solid fa-rotate me-1"></i> تحديث البيانات</button>
-                </div>
-
-                <!-- تحكم الأدمن لفلترة الموظفين -->
-                <div id="commissionAdminFilterContainer" class="card card-custom p-3 mb-4 d-none">
-                    <div class="row align-items-center">
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold mb-1">لوحة الأدمن - عرض بيانات موظف:</label>
-                            <select id="commissionSalesSelect" class="form-select" onchange="renderCommissions()">
-                                <option value="all">كل موظفي الشركة (Overview)</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- مؤشرات الأداء (KPIs) -->
-                <div class="row g-3 mb-4">
-                    <div class="col-md-3">
-                        <div class="card card-custom p-3 border-start border-4 border-success">
-                            <small class="text-muted fw-semibold">إجمالي المستحق (جاهز للصرف)</small>
-                            <h3 id="kpiReady" class="text-success fw-bold mt-1 mb-0">0 ج.م</h3>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card card-custom p-3 border-start border-4 border-warning">
-                            <small class="text-muted fw-semibold">الكوميشن المعلق (Pending)</small>
-                            <h3 id="kpiPending" class="text-warning fw-bold mt-1 mb-0">0 ج.م</h3>
-                            <small class="text-muted" style="font-size:10px;">بانتظار انتهاء الرحلة</small>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card card-custom p-3 border-start border-4 border-primary">
-                            <small class="text-muted fw-semibold">إجمالي المسحوب (Paid)</small>
-                            <h3 id="kpiPaid" class="text-primary fw-bold mt-1 mb-0">0 ج.م</h3>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card card-custom p-3 border-start border-4 border-info">
-                            <small class="text-muted fw-semibold">إجمالي المبيعات المحققة</small>
-                            <h3 id="kpiSales" class="text-info fw-bold mt-1 mb-0">0 ج.م</h3>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- جدول العمولات والربط الذكي بتواريخ الرحلات -->
+                <h2 class="fw-bold text-roving-green mb-4">Commissions Overview</h2>
                 <div class="card card-custom p-3">
-                    <p class="text-muted small mb-3">يتحول الكوميشن تلقائياً إلى حالة (مستحق Eligible) بمجرد تجاوز تاريخ انتهاء الرحلة.</p>
                     <div class="table-responsive">
                         <table class="table table-hover align-middle">
                             <thead class="table-light">
                                 <tr>
-                                    <th>رقم الحجز والعميل</th>
-                                    <th>المسؤول (Sales)</th>
-                                    <th>تواريخ الرحلة (من - إلى)</th>
-                                    <th>قيمة الرحلة</th>
-                                    <th>نسبة الكوميشن</th>
-                                    <th>حالة الكوميشن</th>
+                                    <th>Staff Name</th>
+                                    <th>Role</th>
+                                    <th>Assigned Commission Rate</th>
+                                    <th>Total Profit Generated</th>
+                                    <th>Estimated Commission Payout</th>
                                 </tr>
                             </thead>
                             <tbody id="commissionsTableBody">
-                                <tr><td colspan="6" class="text-center text-muted py-4">لا توجد عمولات مسجلة حالياً</td></tr>
+                                <tr><td colspan="5" class="text-center text-muted py-4">No data available</td></tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
             </div>
 
-            <!-- Tab 5: Reports & Analytics (Integrated Chart.js) -->
+            <!-- Tab 5: Reports -->
             <div id="tabReports" class="tab-content-item d-none">
-                <div class="mb-4">
-                    <h2 class="fw-bold text-roving-green">Reports & Analytics</h2>
-                    <p class="text-muted">متابعة معدلات النمو، مقارنة الأداء العام، وتوزيع حالات الكوميشن والمستحقات.</p>
-                </div>
-
-                <div class="row g-4">
-                    <div class="col-md-6">
-                        <div class="card card-custom p-4">
-                            <h5 class="fw-bold text-roving-green mb-3"><i class="fa-solid fa-chart-line me-2 text-roving-orange"></i> معدل نمو وتطور المبيعات</h5>
-                            <div style="height: 280px; position: relative;">
-                                <canvas id="salesChart"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="card card-custom p-4">
-                            <h5 class="fw-bold text-roving-green mb-3"><i class="fa-solid fa-chart-pie me-2 text-roving-orange"></i> توزيع حالات الكوميشن والمستحقات</h5>
-                            <div style="height: 280px; position: relative;">
-                                <canvas id="statusChart"></canvas>
-                            </div>
-                        </div>
-                    </div>
+                <h2 class="fw-bold text-roving-green mb-4">Reports & Analytics</h2>
+                <div class="card card-custom p-4">
+                    <p class="text-muted">Analytics and metrics overview based on system activities.</p>
                 </div>
             </div>
 
-            <div id="tabSettings" class="tab-content-item d-none"><h2 class="fw-bold text-roving-green">Settings</h2></div>
+            <!-- Tab 6: Settings -->
+            <div id="tabSettings" class="tab-content-item d-none">
+                <h2 class="fw-bold text-roving-green mb-4">System Settings</h2>
+                
+                <!-- Admin Password Change Section -->
+                <div class="card card-custom p-4 mb-4">
+                    <h4 class="text-roving-green fw-bold mb-3">Change Password</h4>
+                    <form id="changePasswordForm" onsubmit="handlePasswordChange(event)">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Current Password</label>
+                                <input type="password" id="currentPasswordInput" class="form-control" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">New Password</label>
+                                <input type="password" id="newPasswordInput" class="form-control" required>
+                            </div>
+                            <div class="col-md-4 d-flex align-items-end">
+                                <button type="submit" class="btn btn-primary w-100 fw-bold">Update Password</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Admin Broadcast Message Section -->
+                <div id="adminBroadcastCard" class="card card-custom p-4 mb-4 d-none">
+                    <h4 class="text-roving-green fw-bold mb-3">Broadcast Announcement (Message for Everyone)</h4>
+                    <form id="broadcastForm" onsubmit="handleBroadcast(event)">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Announcement Text</label>
+                            <textarea id="broadcastInputText" class="form-control" rows="2" placeholder="Type message to display for all users..." required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary fw-bold">Publish Announcement</button>
+                    </form>
+                </div>
+
+                <!-- Admin Commission Management Section -->
+                <div id="adminCommissionCard" class="card card-custom p-4 d-none">
+                    <h4 class="text-roving-green fw-bold mb-3">User Commissions Management</h4>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>User Name</th>
+                                    <th>Email</th>
+                                    <th>Role</th>
+                                    <th>Commission Rate ($ or %)</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminCommissionTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -433,13 +410,11 @@
             <div class="modal-body">
                 <form id="addClientForm">
                     <input type="hidden" id="editingClientId" value="">
-                    
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">Client Name <span class="text-danger">*</span></label>
                             <input type="text" id="clientName" class="form-control" placeholder="e.g. Mohamed Ali" required>
                         </div>
-
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">Lead Source <span class="text-danger">*</span></label>
                             <select id="clientSource" class="form-select" required>
@@ -453,7 +428,6 @@
                                 <option value="Other">Other</option>
                             </select>
                         </div>
-
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">Status <span class="text-danger">*</span></label>
                             <select id="clientStatusSelect" class="form-select" required>
@@ -464,28 +438,23 @@
                                 <option value="Lost">Lost</option>
                             </select>
                         </div>
-
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">Assign To</label>
                             <select id="assignedEmployee" class="form-select" required></select>
                         </div>
-
                         <div class="col-md-6">
                             <label class="form-label">Phone Number</label>
                             <input type="tel" id="clientPhone" class="form-control" placeholder="01xxxxxxxxx">
                         </div>
-
                         <div class="col-md-6">
                             <label class="form-label">Passport Number</label>
                             <input type="text" id="clientPassport" class="form-control" placeholder="A12345678">
                         </div>
-
                         <div class="col-12">
                             <label class="form-label fw-semibold">Client Details & Notes</label>
-                            <textarea id="clientNotes" class="form-control" rows="3" placeholder="ملاحظات تفصيلية..."></textarea>
+                            <textarea id="clientNotes" class="form-control" rows="3" placeholder="Notes..."></textarea>
                         </div>
                     </div>
-
                     <div class="mt-4">
                         <button type="submit" class="btn btn-primary w-100 py-2 fw-bold" id="saveClientBtn">Save Client Data</button>
                     </div>
@@ -500,17 +469,17 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title fw-bold text-roving-green">Transfer Client (تحويل العميل)</h5>
+                <h5 class="modal-title fw-bold text-roving-green">Transfer Client</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <input type="hidden" id="transferClientId">
-                <p>تحويل العميل: <strong id="transferClientNameDisplay" class="text-roving-orange"></strong></p>
+                <p>Transfer Client: <strong id="transferClientNameDisplay" class="text-roving-orange"></strong></p>
                 <div class="mb-3">
-                    <label class="form-label fw-semibold">اختر الموظف المراد التحويل إليه:</label>
+                    <label class="form-label fw-semibold">Select Employee:</label>
                     <select id="transferToEmployee" class="form-select"></select>
                 </div>
-                <button type="button" class="btn btn-primary w-100 fw-bold" onclick="executeTransfer()">تأكيد وإرسال التحويل</button>
+                <button type="button" class="btn btn-primary w-100 fw-bold" onclick="executeTransfer()">Confirm Transfer</button>
             </div>
         </div>
     </div>
@@ -521,170 +490,134 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title fw-bold text-roving-green" id="followupModalTitle">إضافة موعد متابعة جديد (Follow-up)</h5>
+                <h5 class="modal-title fw-bold text-roving-green" id="followupModalTitle">Add Follow-up Task</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <form id="addFollowupForm">
                     <input type="hidden" id="editingFollowupId" value="">
-
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">اختر العميل <span class="text-danger">*</span></label>
+                        <label class="form-label fw-semibold">Select Client <span class="text-danger">*</span></label>
                         <select id="followupClientSelect" class="form-select" required></select>
                     </div>
-
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">نوع المتابعة (الإجراء / Action) <span class="text-danger">*</span></label>
+                        <label class="form-label fw-semibold">Task Type <span class="text-danger">*</span></label>
                         <select id="followupType" class="form-select" required>
-                            <option value="مكالمة هاتفية (Call)">مكالمة هاتفية (Call)</option>
-                            <option value="إرسال عرض سعر (Quotation)">إرسال عرض سعر (Quotation)</option>
-                            <option value="متابعة تأشيرة (Visa Follow-up)">متابعة تأشيرة (Visa Follow-up)</option>
-                            <option value="تأكيد حجز رحلة (Trip Booking)">تأكيد حجز رحلة (Trip Booking)</option>
-                            <option value="أخرى (Other)">أخرى (Other)</option>
+                            <option value="Phone Call">Phone Call</option>
+                            <option value="Quotation">Quotation</option>
+                            <option value="Visa Follow-up">Visa Follow-up</option>
+                            <option value="Trip Booking">Trip Booking</option>
+                            <option value="Other">Other</option>
                         </select>
                     </div>
-
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">حالة المتابعة (Status) <span class="text-danger">*</span></label>
+                        <label class="form-label fw-semibold">Status <span class="text-danger">*</span></label>
                         <select id="followupStatusSelect" class="form-select" required>
-                            <option value="مجدولة">مجدولة</option>
-                            <option value="قيد المعالجة">قيد المعالجة</option>
-                            <option value="مكتملة">مكتملة</option>
-                            <option value="مؤجلة">مؤجلة</option>
+                            <option value="Scheduled">Scheduled</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Completed">Completed</option>
+                            <option value="Postponed">Postponed</option>
                         </select>
                     </div>
-
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">موعد المتابعة (التاريخ والوقت) <span class="text-danger">*</span></label>
+                        <label class="form-label fw-semibold">Date & Time <span class="text-danger">*</span></label>
                         <input type="datetime-local" id="followupDateTime" class="form-control" required>
                     </div>
-
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">المسؤول عن المتابعة <span class="text-danger">*</span></label>
+                        <label class="form-label fw-semibold">Assigned To <span class="text-danger">*</span></label>
                         <select id="followupAssignedTo" class="form-select" required></select>
                     </div>
-
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">الأولوية</label>
+                        <label class="form-label fw-semibold">Priority</label>
                         <select id="followupPriority" class="form-select">
-                            <option value="عادية">عادية</option>
-                            <option value="متوسطة">متوسطة</option>
-                            <option value="هام جداً (High)">هام جداً (High)</option>
+                            <option value="Normal">Normal</option>
+                            <option value="Medium">Medium</option>
+                            <option value="High">High</option>
                         </select>
                     </div>
-
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">ملاحظات المتابعة</label>
-                        <textarea id="followupNotes" class="form-control" rows="2" placeholder="تفاصيل ما سيتم مناقشته..."></textarea>
+                        <label class="form-label fw-semibold">Notes</label>
+                        <textarea id="followupNotes" class="form-control" rows="2" placeholder="Details..."></textarea>
                     </div>
-
-                    <button type="submit" class="btn btn-primary w-100 fw-bold" id="saveFollowupBtn">حفظ موعد المتابعة</button>
+                    <button type="submit" class="btn btn-primary w-100 fw-bold" id="saveFollowupBtn">Save Follow-up</button>
                 </form>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Modal: Add / Edit Booking & Installments -->
+<!-- Modal: Add / Edit Booking -->
 <div class="modal fade" id="addBookingModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title fw-bold text-roving-green" id="bookingModalTitle">إضافة حجز جديد وتفاصيل الأقساط</h5>
+                <h5 class="modal-title fw-bold text-roving-green" id="bookingModalTitle">Add Booking & Installments</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <form id="addBookingForm">
                     <input type="hidden" id="editingBookingId" value="">
-
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">اختر العميل <span class="text-danger">*</span></label>
+                            <label class="form-label fw-semibold">Select Client <span class="text-danger">*</span></label>
                             <select id="bookingClientSelect" class="form-select" required></select>
                         </div>
-
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">فئة الحجز (Category) <span class="text-danger">*</span></label>
+                            <label class="form-label fw-semibold">Category <span class="text-danger">*</span></label>
                             <select id="bookingCategory" class="form-select" required>
-                                <option value="" disabled selected>-- اختر فئة الحجز --</option>
-                                <option value="طيران (Flight)">طيران (Flight)</option>
-                                <option value="إقامة فندقية (Hotel Accommodation)">إقامة فندقية (Hotel Accommodation)</option>
-                                <option value="باكدج كاملة (Full Package)">باكدج كاملة (Full Package)</option>
-                                <option value="تأشيرة (Visa)">تأشيرة (Visa)</option>
-                                <option value="مواصلات (Transportation)">مواصلات (Transportation)</option>
-                                <option value="أخرى (Other)">أخرى (Other)</option>
+                                <option value="" disabled selected>-- Select Category --</option>
+                                <option value="Flight">Flight</option>
+                                <option value="Hotel Accommodation">Hotel Accommodation</option>
+                                <option value="Full Package">Full Package</option>
+                                <option value="Visa">Visa</option>
+                                <option value="Transportation">Transportation</option>
+                                <option value="Other">Other</option>
                             </select>
                         </div>
-
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">سعر البيع / الإجمالي (Net Price) <span class="text-danger">*</span></label>
+                            <label class="form-label fw-semibold">Net Price <span class="text-danger">*</span></label>
                             <input type="number" step="0.01" id="bookingNetPrice" class="form-control" placeholder="0.00" oninput="calculateBookingFinancials()" required>
                         </div>
-
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">سعر التكلفة (Cost Price) <span class="text-danger">*</span></label>
+                            <label class="form-label fw-semibold">Cost Price <span class="text-danger">*</span></label>
                             <input type="number" step="0.01" id="bookingCostPrice" class="form-control" placeholder="0.00" oninput="calculateBookingFinancials()" required>
                         </div>
-
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">صافي الربح (Profit) <span class="text-success">(تلقائي)</span></label>
+                            <label class="form-label fw-semibold">Profit <span class="text-success">(Auto)</span></label>
                             <input type="text" id="bookingProfitDisplay" class="form-control bg-light fw-bold text-success" value="0.00" readonly>
                         </div>
-
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">المبلغ المدفوع حالياً (Paid Amount) <span class="text-primary">(أقساط/دفعات)</span></label>
+                            <label class="form-label fw-semibold">Paid Amount</label>
                             <input type="number" step="0.01" id="bookingPaidAmount" class="form-control" placeholder="0.00" oninput="calculateBookingFinancials()" required>
                         </div>
-
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">المبلغ المتبقي على العميل (Remaining) <span class="text-danger">(أقساط مستحقة)</span></label>
+                            <label class="form-label fw-semibold">Remaining Amount</label>
                             <input type="text" id="bookingRemainingDisplay" class="form-control bg-light fw-bold text-danger" value="0.00" readonly>
                         </div>
-
-                        <!-- تواريخ الرحلة لحساب الكوميشن الذكي -->
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">تاريخ بدء الرحلة (Trip Start) <span class="text-danger">*</span></label>
-                            <input type="date" id="bookingTripStart" class="form-control" required>
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">تاريخ انتهاء الرحلة (Trip End) <span class="text-danger">*</span></label>
-                            <input type="date" id="bookingTripEnd" class="form-control" required>
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">قيمة الكوميشن للموظف (Commission) <span class="text-danger">*</span></label>
-                            <input type="number" step="0.01" id="bookingCommission" class="form-control" placeholder="0.00" required>
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">حالة الحجز والدفع <span class="text-danger">*</span></label>
+                            <label class="form-label fw-semibold">Status <span class="text-danger">*</span></label>
                             <select id="bookingStatus" class="form-select" required>
-                                <option value="مؤكد - مدفوع بالكامل">مؤكد - مدفوع بالكامل</option>
-                                <option value="مؤكد - عليه أقساط (متبقي فلوس)">مؤكد - عليه أقساط (متبقي فلوس)</option>
-                                <option value="قيد المراجعة (Pending)">قيد المراجعة (Pending)</option>
-                                <option value="ملغي (Cancelled)">ملغي (Cancelled)</option>
+                                <option value="Paid in Full">Paid in Full</option>
+                                <option value="Installments Due">Installments Due</option>
+                                <option value="Pending">Pending</option>
+                                <option value="Cancelled">Cancelled</option>
                             </select>
                         </div>
-
-                        <div class="col-md-12">
-                            <label class="form-label fw-semibold">المسؤول عن الحجز</label>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Assigned To</label>
                             <select id="bookingAssignedTo" class="form-select" required></select>
                         </div>
-
                         <div class="col-12">
-                            <label class="form-label fw-semibold">تفاصيل الحجز (Trip Details)</label>
-                            <textarea id="bookingDetails" class="form-control" rows="2" placeholder="تفاصيل خط سير الرحلة، أرقام الرحلات، إلخ..."></textarea>
+                            <label class="form-label fw-semibold">Trip Details</label>
+                            <textarea id="bookingDetails" class="form-control" rows="2" placeholder="Flight info, etc..."></textarea>
                         </div>
-
                         <div class="col-12">
-                            <label class="form-label fw-semibold">ملاحظات الأقساط والدفعات (Installments Notes)</label>
-                            <textarea id="bookingNotes" class="form-control" rows="2" placeholder="مثال: دفع قسط اول 5000 والباقي على قسطين..."></textarea>
+                            <label class="form-label fw-semibold">Installment Notes</label>
+                            <textarea id="bookingNotes" class="form-control" rows="2" placeholder="Payment notes..."></textarea>
                         </div>
                     </div>
-
                     <div class="mt-4">
-                        <button type="submit" class="btn btn-primary w-100 fw-bold" id="saveBookingBtn">حفظ تفاصيل الحجز والأقساط</button>
+                        <button type="submit" class="btn btn-primary w-100 fw-bold" id="saveBookingBtn">Save Booking Data</button>
                     </div>
                 </form>
             </div>
@@ -698,11 +631,11 @@
 <script>
 const API_URL = "https://roving-crm-backend.onrender.com";
 
-let validUsers = [
-    { email: "asmaa.ashraf.1312002@gmail.com", pass: "Asmaa@2026", role: "Admin", name: "Asmaa Ashraf" },
-    { email: "ahmedashraf88513@gmail.com", pass: "AhmedA#88", role: "Admin", name: "Ahmed Ashraf" },
-    { email: "ahmedwanas11@gmail.com", pass: "Wanas!Pass2026", role: "Admin", name: "Ahmed Wanas" },
-    { email: "sales1@roving.com", pass: "SalesRoving#1", role: "Sales", name: "Sales Agent 1" }
+let validUsers = JSON.parse(localStorage.getItem('roving_users')) || [
+    { email: "asmaa.ashraf.1312002@gmail.com", pass: "Asmaa@2026", role: "Admin", name: "Asmaa Ashraf", commission: 0 },
+    { email: "ahmedashraf88513@gmail.com", pass: "AhmedA#88", role: "Admin", name: "Ahmed Ashraf", commission: 0 },
+    { email: "ahmedwanas11@gmail.com", pass: "Wanas!Pass2026", role: "Admin", name: "Ahmed Wanas", commission: 0 },
+    { email: "sales1@roving.com", pass: "SalesRoving#1", role: "Sales", name: "Sales Agent 1", commission: 10 }
 ];
 
 let currentUser = null;
@@ -710,16 +643,12 @@ let clients = [];
 let followups = []; 
 let bookings = [];
 let notifications = [];
-let salesChartInstance = null;
-let statusChartInstance = null;
 
 function toggleSidebar() {
     const sidebar = document.getElementById('sidebarContainer');
     const mainContent = document.getElementById('mainContentArea');
     const showSidebarBtn = document.getElementById('showSidebarBtn');
-    
     sidebar.classList.toggle('collapsed');
-    
     if (sidebar.classList.contains('collapsed')) {
         mainContent.classList.remove('col-md-10');
         mainContent.classList.add('col-md-12');
@@ -759,6 +688,7 @@ window.addEventListener('DOMContentLoaded', () => {
             loadServerNotifications();
             loadFollowups();
             loadBookings();
+            checkBroadcast();
             initApp();
             setInterval(checkDueFollowups, 10000);
             setInterval(loadServerNotifications, 15000);
@@ -767,20 +697,9 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    const clientForm = document.getElementById('addClientForm');
-    if (clientForm) {
-        clientForm.addEventListener('submit', handleSaveClient);
-    }
-
-    const followupForm = document.getElementById('addFollowupForm');
-    if (followupForm) {
-        followupForm.addEventListener('submit', handleSaveFollowup);
-    }
-
-    const bookingForm = document.getElementById('addBookingForm');
-    if (bookingForm) {
-        bookingForm.addEventListener('submit', handleSaveBooking);
-    }
+    document.getElementById('addClientForm').addEventListener('submit', handleSaveClient);
+    document.getElementById('addFollowupForm').addEventListener('submit', handleSaveFollowup);
+    document.getElementById('addBookingForm').addEventListener('submit', handleSaveBooking);
 });
 
 document.getElementById('loginForm').addEventListener('submit', function(e) {
@@ -793,7 +712,7 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
     const targetUser = validUsers.find(u => u.email.toLowerCase() === emailInput);
 
     if (!targetUser || targetUser.pass !== passwordInput) {
-        errorDiv.innerText = "البريد الإلكتروني أو كلمة السر غير صحيحة!";
+        errorDiv.innerText = "Invalid email or password!";
         errorDiv.classList.remove('d-none');
         return;
     }
@@ -807,6 +726,7 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
     loadServerNotifications();
     loadFollowups();
     loadBookings();
+    checkBroadcast();
     initApp();
     setInterval(checkDueFollowups, 10000);
     setInterval(loadServerNotifications, 15000);
@@ -825,6 +745,9 @@ function initApp() {
     
     if (currentUser.role === 'Admin') {
         document.getElementById('userRoleBadge').className = "badge bg-danger mt-1";
+        document.getElementById('adminBroadcastCard').classList.remove('d-none');
+        document.getElementById('adminCommissionCard').classList.remove('d-none');
+        renderAdminCommissions();
     } else {
         document.getElementById('userRoleBadge').className = "badge bg-warning text-dark mt-1";
     }
@@ -842,93 +765,58 @@ function switchTab(tabName) {
         document.getElementById('tabClients').classList.remove('d-none');
         document.getElementById('navClients').classList.add('active');
         fetchClients(); 
-    }
-    if (tabName === 'followups') { 
+    } else if (tabName === 'followups') { 
         document.getElementById('tabFollowups').classList.remove('d-none'); 
         document.getElementById('navFollowups').classList.add('active'); 
         renderFollowups();
-    }
-    if (tabName === 'bookings') { 
+    } else if (tabName === 'bookings') { 
         document.getElementById('tabBookings').classList.remove('d-none'); 
         document.getElementById('navBookings').classList.add('active'); 
         renderBookings();
-    }
-    if (tabName === 'commissions') { 
+    } else if (tabName === 'commissions') { 
         document.getElementById('tabCommissions').classList.remove('d-none'); 
         document.getElementById('navCommissions').classList.add('active'); 
         renderCommissions();
-    }
-    if (tabName === 'reports') { 
+    } else if (tabName === 'reports') { 
         document.getElementById('tabReports').classList.remove('d-none'); 
         document.getElementById('navReports').classList.add('active'); 
-        initCharts();
-    }
-    if (tabName === 'settings') { 
+    } else if (tabName === 'settings') { 
         document.getElementById('tabSettings').classList.remove('d-none'); 
         document.getElementById('navSettings').classList.add('active'); 
+        if(currentUser.role === 'Admin') renderAdminCommissions();
     }
 }
 
 function populateDropdowns() {
-    const addSelect = document.getElementById('assignedEmployee');
-    const transferSelect = document.getElementById('transferToEmployee');
-    const followupAssignSelect = document.getElementById('followupAssignedTo');
-    const bookingAssignSelect = document.getElementById('bookingAssignTo');
-    const commissionSalesSelect = document.getElementById('commissionSalesSelect');
-    
-    if (addSelect) {
-        addSelect.innerHTML = '';
-        validUsers.forEach(emp => {
-            addSelect.innerHTML += `<option value="${emp.name}">${emp.name}</option>`;
-        });
-    }
-
-    if (transferSelect) {
-        transferSelect.innerHTML = '';
-        validUsers.forEach(emp => {
-            transferSelect.innerHTML += `<option value="${emp.name}">${emp.name}</option>`;
-        });
-    }
-
-    if (followupAssignSelect) {
-        followupAssignSelect.innerHTML = '';
-        validUsers.forEach(emp => {
-            followupAssignSelect.innerHTML += `<option value="${emp.name}">${emp.name}</option>`;
-        });
-    }
-
-    if (bookingAssignSelect) {
-        bookingAssignSelect.innerHTML = '';
-        validUsers.forEach(emp => {
-            bookingAssignSelect.innerHTML += `<option value="${emp.name}">${emp.name}</option>`;
-        });
-        if (currentUser) {
-            bookingAssignSelect.value = currentUser.name;
+    const selects = ['assignedEmployee', 'transferToEmployee', 'followupAssignedTo', 'bookingAssignedTo'];
+    selects.forEach(id => {
+        const el = document.getElementById(id);
+        if(el) {
+            el.innerHTML = '';
+            validUsers.forEach(emp => {
+                el.innerHTML += `<option value="${emp.name}">${emp.name}</option>`;
+            });
+            if(id === 'bookingAssignedTo' && currentUser) {
+                el.value = currentUser.name;
+            }
         }
-    }
-
-    if (commissionSalesSelect) {
-        commissionSalesSelect.innerHTML = '<option value="all">كل موظفي الشركة (Overview)</option>';
-        validUsers.forEach(emp => {
-            commissionSalesSelect.innerHTML += `<option value="${emp.name}">${emp.name}</option>`;
-        });
-    }
+    });
 }
 
 function populateClientDropdowns() {
     const followupSelect = document.getElementById('followupClientSelect');
     if (followupSelect) {
-        followupSelect.innerHTML = '<option value="" disabled selected>-- اختر العميل --</option>';
+        followupSelect.innerHTML = '<option value="" disabled selected>-- Select Client --</option>';
         clients.forEach(c => {
-            followupSelect.innerHTML += `<option value="${c._id}">${c.name} (${c.phone || 'بدون رقم'})</option>`;
+            followupSelect.innerHTML += `<option value="${c._id}">${c.name} (${c.phone || 'No Phone'})</option>`;
         });
     }
 
     const bookingSelect = document.getElementById('bookingClientSelect');
     if (bookingSelect) {
-        bookingSelect.innerHTML = '<option value="" disabled selected>-- اختر العميل للحجز --</option>';
+        bookingSelect.innerHTML = '<option value="" disabled selected>-- Select Client --</option>';
         clients.forEach(c => {
-            bookingSelect.innerHTML += `<option value="${c._id}">${c.name} (${c.phone || 'بدون رقم'})</option>`;
+            bookingSelect.innerHTML += `<option value="${c._id}">${c.name} (${c.phone || 'No Phone'})</option>`;
         });
     }
 }
@@ -941,16 +829,16 @@ function openAddClientModal() {
 }
 
 function openAddFollowupModal() {
-    document.getElementById('followupModalTitle').innerText = "إضافة موعد متابعة جديد (Follow-up)";
+    document.getElementById('followupModalTitle').innerText = "Add Follow-up Task";
     document.getElementById('editingFollowupId').value = "";
     document.getElementById('addFollowupForm').reset();
-    document.getElementById('followupStatusSelect').value = "مجدولة";
+    document.getElementById('followupStatusSelect').value = "Scheduled";
     populateClientDropdowns();
     populateDropdowns();
 }
 
 function openAddBookingModal() {
-    document.getElementById('bookingModalTitle').innerText = "إضافة حجز جديد وتفاصيل الأقساط والكوميشن";
+    document.getElementById('bookingModalTitle').innerText = "Add Booking & Installments";
     document.getElementById('editingBookingId').value = "";
     document.getElementById('addBookingForm').reset();
     document.getElementById('bookingProfitDisplay').value = "0.00";
@@ -967,34 +855,14 @@ function calculateBookingFinancials() {
     const profit = net - cost;
     const remaining = net - paid;
 
-    const profitDisplay = document.getElementById('bookingProfitDisplay');
-    const remainingDisplay = document.getElementById('bookingRemainingDisplay');
-
-    profitDisplay.value = profit.toFixed(2);
-    profitDisplay.className = profit < 0 ? "form-control bg-light fw-bold text-danger" : "form-control bg-light fw-bold text-success";
-
-    remainingDisplay.value = remaining.toFixed(2);
-    remainingDisplay.className = remaining > 0 ? "form-control bg-light fw-bold text-danger" : "form-control bg-light fw-bold text-success";
-
-    const statusSelect = document.getElementById('bookingStatus');
-    if (remaining > 0) {
-        statusSelect.value = "مؤكد - عليه أقساط (متبقي فلوس)";
-    } else {
-        statusSelect.value = "مؤكد - مدفوع بالكامل";
-    }
+    document.getElementById('bookingProfitDisplay').value = profit.toFixed(2);
+    document.getElementById('bookingRemainingDisplay').value = remaining.toFixed(2);
+    document.getElementById('bookingStatus').value = remaining > 0 ? "Installments Due" : "Paid in Full";
 }
 
 function loadBookings() {
     const saved = localStorage.getItem('roving_bookings');
-    if (saved) {
-        try {
-            bookings = JSON.parse(saved);
-        } catch(e) {
-            bookings = [];
-        }
-    } else {
-        bookings = [];
-    }
+    bookings = saved ? JSON.parse(saved) : [];
 }
 
 function saveBookingsToStorage() {
@@ -1008,112 +876,39 @@ function handleSaveBooking(e) {
     const client = clients.find(c => c._id === clientId);
     if (!client) return;
 
-    const category = document.getElementById('bookingCategory').value;
     const netPrice = parseFloat(document.getElementById('bookingNetPrice').value) || 0;
     const costPrice = parseFloat(document.getElementById('bookingCostPrice').value) || 0;
     const paidAmount = parseFloat(document.getElementById('bookingPaidAmount').value) || 0;
-    const profit = netPrice - costPrice;
-    const remaining = netPrice - paidAmount;
-    const tripStart = document.getElementById('bookingTripStart').value;
-    const tripEnd = document.getElementById('bookingTripEnd').value;
-    const commission = parseFloat(document.getElementById('bookingCommission').value) || 0;
-    const status = document.getElementById('bookingStatus').value;
-    const assignedTo = document.getElementById('bookingAssignedTo').value;
-    const details = document.getElementById('bookingDetails').value.trim();
-    const notes = document.getElementById('bookingNotes').value.trim();
+
+    const bookingObj = {
+        id: editingId !== "" ? Number(editingId) : Date.now(),
+        clientId: client._id,
+        clientName: client.name,
+        clientPhone: client.phone || 'N/A',
+        category: document.getElementById('bookingCategory').value,
+        netPrice: netPrice,
+        costPrice: costPrice,
+        paidAmount: paidAmount,
+        remaining: netPrice - paidAmount,
+        profit: netPrice - costPrice,
+        status: document.getElementById('bookingStatus').value,
+        assignedTo: document.getElementById('bookingAssignedTo').value,
+        details: document.getElementById('bookingDetails').value.trim(),
+        notes: document.getElementById('bookingNotes').value.trim()
+    };
 
     if (editingId !== "") {
-        const booking = bookings.find(b => b.id == editingId);
-        if (booking) {
-            booking.clientId = client._id;
-            booking.clientName = client.name;
-            booking.clientPhone = client.phone || 'غير متوفر';
-            booking.category = category;
-            booking.netPrice = netPrice;
-            booking.costPrice = costPrice;
-            booking.paidAmount = paidAmount;
-            booking.remaining = remaining;
-            booking.profit = profit;
-            booking.tripStart = tripStart;
-            booking.tripEnd = tripEnd;
-            booking.commission = commission;
-            booking.status = status;
-            booking.assignedTo = assignedTo;
-            booking.details = details;
-            booking.notes = notes;
-
-            saveBookingsToStorage();
-            showNotification('تم تحديث تفاصيل الحجز والكوميشن بنجاح!', 'success');
-        }
+        const idx = bookings.findIndex(b => b.id == editingId);
+        if (idx !== -1) bookings[idx] = bookingObj;
+        showNotification('Booking updated successfully!', 'success');
     } else {
-        const newBooking = {
-            id: Date.now(),
-            clientId: client._id,
-            clientName: client.name,
-            clientPhone: client.phone || 'غير متوفر',
-            category: category,
-            netPrice: netPrice,
-            costPrice: costPrice,
-            paidAmount: paidAmount,
-            remaining: remaining,
-            profit: profit,
-            tripStart: tripStart || '2026-09-01',
-            tripEnd: tripEnd || '2026-09-10',
-            commission: commission || (netPrice * 0.1),
-            status: status,
-            assignedTo: assignedTo,
-            details: details,
-            notes: notes
-        };
-
-        bookings.unshift(newBooking);
-        saveBookingsToStorage();
-
-        addServerNotification({
-            text: `تم تسجيل حجز جديد (${newBooking.category}) للعميل (${client.name}) - المتبقي عليه: ${remaining}`,
-            targetUser: assignedTo,
-            type: 'update'
-        });
-
-        showNotification('تم إضافة الحجز بنجاح!', 'success');
+        bookings.unshift(bookingObj);
+        showNotification('Booking added successfully!', 'success');
     }
 
-    const modalEl = document.getElementById('addBookingModal');
-    bootstrap.Modal.getInstance(modalEl).hide();
-    renderBookings();
-}
-
-function editBooking(id) {
-    const booking = bookings.find(b => b.id === id);
-    if (!booking) return;
-
-    document.getElementById('bookingModalTitle').innerText = "تعديل تفاصيل الحجز والأقساط والكوميشن";
-    document.getElementById('editingBookingId').value = booking.id;
-    document.getElementById('bookingClientSelect').value = booking.clientId;
-    document.getElementById('bookingCategory').value = booking.category;
-    document.getElementById('bookingNetPrice').value = booking.netPrice;
-    document.getElementById('bookingCostPrice').value = booking.costPrice;
-    document.getElementById('bookingPaidAmount').value = booking.paidAmount || 0;
-    document.getElementById('bookingProfitDisplay').value = booking.profit.toFixed(2);
-    document.getElementById('bookingRemainingDisplay').value = (booking.remaining !== undefined ? booking.remaining : (booking.netPrice - (booking.paidAmount || 0))).toFixed(2);
-    document.getElementById('bookingTripStart').value = booking.tripStart || '';
-    document.getElementById('bookingTripEnd').value = booking.tripEnd || '';
-    document.getElementById('bookingCommission').value = booking.commission || 0;
-    document.getElementById('bookingStatus').value = booking.status;
-    document.getElementById('bookingAssignedTo').value = booking.assignedTo;
-    document.getElementById('bookingDetails').value = booking.details || '';
-    document.getElementById('bookingNotes').value = booking.notes || '';
-
-    const modal = new bootstrap.Modal(document.getElementById('addBookingModal'));
-    modal.show();
-}
-
-function deleteBooking(id) {
-    if (!confirm('هل أنت متأكد من حذف هذا الحجز؟')) return;
-    bookings = bookings.filter(b => b.id !== id);
     saveBookingsToStorage();
+    bootstrap.Modal.getInstance(document.getElementById('addBookingModal')).hide();
     renderBookings();
-    showNotification('تم حذف الحجز بنجاح', 'warning');
 }
 
 function renderBookings() {
@@ -1127,199 +922,36 @@ function renderBookings() {
     }
 
     if (list.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">لا توجد حجوزات مسجلة حالياً</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">No bookings recorded</td></tr>`;
         return;
     }
 
     list.forEach((b, index) => {
-        const bookingNum = `BK-${(1000 + index)}`;
-        let statusBadge = 'bg-success';
-        if (b.status.includes('Pending')) statusBadge = 'bg-warning text-dark';
-        if (b.status.includes('Cancelled')) statusBadge = 'bg-danger';
-        if (b.status.includes('أقساط')) statusBadge = 'bg-danger';
-
-        const paid = b.paidAmount || 0;
-        const rem = b.remaining !== undefined ? b.remaining : (b.netPrice - paid);
-
         tbody.innerHTML += `
             <tr>
-                <td><span class="badge bg-dark">${bookingNum}</span></td>
+                <td><span class="badge bg-dark">BK-${1000 + index}</span></td>
                 <td><strong>${b.clientName}</strong><br><small class="text-muted"><i class="fa-solid fa-phone me-1"></i>${b.clientPhone}</small></td>
                 <td><span class="badge bg-secondary">${b.category}</span></td>
                 <td><span class="fw-semibold text-primary">${b.netPrice.toFixed(2)}</span></td>
                 <td>
-                    <small class="text-success">مدفوع: <strong>${paid.toFixed(2)}</strong></small><br>
-                    <small class="${rem > 0 ? 'text-danger fw-bold' : 'text-muted'}">متبقي: <strong>${rem.toFixed(2)}</strong></small>
+                    <small class="text-success">Paid: <strong>${(b.paidAmount || 0).toFixed(2)}</strong></small><br>
+                    <small class="${b.remaining > 0 ? 'text-danger fw-bold' : 'text-muted'}">Rem: <strong>${(b.remaining || 0).toFixed(2)}</strong></small>
                 </td>
                 <td><strong class="text-success">${b.profit >= 0 ? '+' : ''}${b.profit.toFixed(2)}</strong></td>
-                <td><span class="badge ${statusBadge}">${b.status}</span></td>
+                <td><span class="badge bg-success">${b.status}</span></td>
+                <td><small>${b.details || '-'}</small></td>
                 <td>
-                    <small><strong>تفاصيل:</strong> ${b.details || '-'}</small><br>
-                    <small class="text-muted"><strong>أقساط/ملاحظات:</strong> ${b.notes || '-'}</small>
-                </td>
-                <td>
-                    <button class="btn btn-sm btn-outline-primary me-1" onclick="editBooking(${b.id})" title="تعديل"><i class="fa-solid fa-pen-to-square"></i></button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteBooking(${b.id})" title="حذف"><i class="fa-solid fa-trash"></i></button>
+                    <button class="btn btn-sm btn-outline-primary me-1" onclick="editBooking(${b.id})"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteBooking(${b.id})"><i class="fa-solid fa-trash"></i></button>
                 </td>
             </tr>
         `;
     });
-}
-
-// دالة عرض وإدارة العمولات (Commissions Overview مع الفلترة والتحويل التلقائي للحالة)
-function renderCommissions() {
-    const tbody = document.getElementById('commissionsTableBody');
-    const adminFilterContainer = document.getElementById('commissionAdminFilterContainer');
-    if (!tbody) return;
-
-    if (currentUser && currentUser.role === 'Admin') {
-        adminFilterContainer.classList.remove('d-none');
-    } else {
-        adminFilterContainer.classList.add('d-none');
-    }
-
-    const todayStr = new Date().toISOString().split('T')[0];
-    let selectedSales = "all";
-    if (currentUser && currentUser.role === 'Admin') {
-        const salesSelect = document.getElementById('commissionSalesSelect');
-        if (salesSelect) selectedSales = salesSelect.value;
-    } else {
-        selectedSales = currentUser ? currentUser.name : "all";
-    }
-
-    let filteredList = bookings;
-    if (currentUser && currentUser.role !== 'Admin') {
-        filteredList = bookings.filter(b => b.assignedTo === currentUser.name);
-    } else if (selectedSales !== 'all') {
-        filteredList = bookings.filter(b => b.assignedTo === selectedSales);
-    }
-
-    tbody.innerHTML = '';
-    let totalReady = 0;
-    let totalPending = 0;
-    let totalPaid = 1500; // قيمة افتراضية مسحوبة قابلة للتعديل
-    let totalSalesAmount = 0;
-
-    if (filteredList.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">لا توجد عمولات أو حجوزات مسجلة لهذه الفئة حالياً</td></tr>`;
-        document.getElementById('kpiReady').innerText = "0 ج.م";
-        document.getElementById('kpiPending').innerText = "0 ج.م";
-        document.getElementById('kpiPaid').innerText = totalPaid.toLocaleString() + " ج.م";
-        document.getElementById('kpiSales').innerText = "0 ج.م";
-        return;
-    }
-
-    filteredList.forEach(item => {
-        const amount = item.netPrice || 0;
-        const comm = item.commission || (amount * 0.1);
-        totalSalesAmount += amount;
-
-        const tripEnd = item.tripEnd || '2026-09-01';
-        let computedStatus = "Pending";
-        if (tripEnd <= todayStr) {
-            computedStatus = "Eligible";
-            totalReady += comm;
-        } else {
-            computedStatus = "Pending";
-            totalPending += comm;
-        }
-
-        let badgeHtml = "";
-        if (computedStatus === "Pending") {
-            badgeHtml = `<span class="badge bg-warning text-dark">⏳ معلق (Pending)</span>`;
-        } else {
-            badgeHtml = `<span class="badge bg-success">✅ مستحق (Eligible)</span>`;
-        }
-
-        tbody.innerHTML += `
-            <tr>
-                <td>
-                    <strong>${item.clientName}</strong><br>
-                    <small class="text-muted">حجز #${item.id}</small>
-                </td>
-                <td><span class="badge bg-light text-dark border">${item.assignedTo || 'غير مسند'}</span></td>
-                <td><small>من ${item.tripStart || '-'} <br>إلى ${tripEnd}</small></td>
-                <td><strong>${amount.toLocaleString()} ج.م</strong></td>
-                <td><strong class="text-success">${comm.toLocaleString()} ج.م</strong></td>
-                <td>${badgeHtml}</td>
-            </tr>
-        `;
-    });
-
-    document.getElementById('kpiReady').innerText = totalReady.toLocaleString() + " ج.م";
-    document.getElementById('kpiPending').innerText = totalPending.toLocaleString() + " ج.م";
-    document.getElementById('kpiPaid').innerText = totalPaid.toLocaleString() + " ج.م";
-    document.getElementById('kpiSales').innerText = totalSalesAmount.toLocaleString() + " ج.م";
-}
-
-function initCharts() {
-    const ctxSalesEl = document.getElementById('salesChart');
-    const ctxStatusEl = document.getElementById('statusChart');
-    if (!ctxSalesEl || !ctxStatusEl) return;
-
-    if (salesChartInstance) salesChartInstance.destroy();
-    if (statusChartInstance) statusChartInstance.destroy();
-
-    const ctxSales = ctxSalesEl.getContext('2d');
-    salesChartInstance = new Chart(ctxSales, {
-        type: 'line',
-        data: {
-            labels: ['الأسبوع 1', 'الأسبوع 2', 'الأسبوع 3', 'الأسبوع 4'],
-            datasets: [{
-                label: 'إجمالي المبيعات (جنيه)',
-                data: [15000, 22000, 19000, 31000],
-                borderColor: '#D45B38',
-                backgroundColor: 'rgba(212, 91, 56, 0.1)',
-                fill: true,
-                tension: 0.3
-            }]
-        },
-        options: { responsive: true, maintainAspectRatio: false }
-    });
-
-    const ctxStatus = ctxStatusEl.getContext('2d');
-    statusChartInstance = new Chart(ctxStatus, {
-        type: 'doughnut',
-        data: {
-            labels: ['مستحق (Eligible)', 'معلق (Pending)', 'تم الصرف (Paid)'],
-            datasets: [{
-                data: [1800, 2500, 1500],
-                backgroundColor: ['#198754', '#ffc107', '#0d6efd']
-            }]
-        },
-        options: { responsive: true, maintainAspectRatio: false }
-    });
-}
-
-function editFollowup(id) {
-    const task = followups.find(f => f.id === id);
-    if (!task) return;
-
-    document.getElementById('followupModalTitle').innerText = "تعديل موعد المتابعة (الإجراء والحالة)";
-    document.getElementById('editingFollowupId').value = task.id;
-    document.getElementById('followupClientSelect').value = task.clientId;
-    document.getElementById('followupType').value = task.type;
-    document.getElementById('followupStatusSelect').value = task.status || 'مجدولة';
-    document.getElementById('followupDateTime').value = task.dateTime;
-    document.getElementById('followupAssignedTo').value = task.assignedTo;
-    document.getElementById('followupPriority').value = task.priority;
-    document.getElementById('followupNotes').value = task.notes || '';
-
-    const modal = new bootstrap.Modal(document.getElementById('addFollowupModal'));
-    modal.show();
 }
 
 function loadFollowups() {
     const saved = localStorage.getItem('roving_followups');
-    if (saved) {
-        try {
-            followups = JSON.parse(saved);
-        } catch(e) {
-            followups = [];
-        }
-    } else {
-        followups = [];
-    }
+    followups = saved ? JSON.parse(saved) : [];
 }
 
 function saveFollowupsToStorage() {
@@ -1329,149 +961,35 @@ function saveFollowupsToStorage() {
 function handleSaveFollowup(e) {
     e.preventDefault();
     const editingId = document.getElementById('editingFollowupId').value;
-    const clientId = document.getElementById('followupClientSelect').value;
-    const client = clients.find(c => c._id === clientId);
+    const client = clients.find(c => c._id === document.getElementById('followupClientSelect').value);
     if (!client) return;
 
-    const type = document.getElementById('followupType').value;
-    const status = document.getElementById('followupStatusSelect').value;
-    const dateTime = document.getElementById('followupDateTime').value;
-    const assignedTo = document.getElementById('followupAssignedTo').value;
-    const priority = document.getElementById('followupPriority').value;
-    const notes = document.getElementById('followupNotes').value.trim();
+    const followupObj = {
+        id: editingId !== "" ? Number(editingId) : Date.now(),
+        clientId: client._id,
+        clientName: client.name,
+        clientPhone: client.phone || 'N/A',
+        type: document.getElementById('followupType').value,
+        status: document.getElementById('followupStatusSelect').value,
+        dateTime: document.getElementById('followupDateTime').value,
+        assignedTo: document.getElementById('followupAssignedTo').value,
+        priority: document.getElementById('followupPriority').value,
+        notes: document.getElementById('followupNotes').value.trim(),
+        notified: false
+    };
 
     if (editingId !== "") {
-        const task = followups.find(f => f.id == editingId);
-        if (task) {
-            task.clientId = client._id;
-            task.clientName = client.name;
-            task.clientPhone = client.phone || 'غير متوفر';
-            task.type = type;
-            task.status = status;
-            task.dateTime = dateTime;
-            task.assignedTo = assignedTo;
-            task.priority = priority;
-            task.notes = notes;
-            
-            if (status === 'مجدولة') {
-                task.notified = false;
-            }
-
-            saveFollowupsToStorage();
-            showNotification('تم تحديث بيانات المتابعة والإجراء بنجاح!', 'success');
-        }
+        const idx = followups.findIndex(f => f.id == editingId);
+        if (idx !== -1) followups[idx] = followupObj;
+        showNotification('Follow-up updated successfully!', 'success');
     } else {
-        const newFollowup = {
-            id: Date.now(),
-            clientId: client._id,
-            clientName: client.name,
-            clientPhone: client.phone || 'غير متوفر',
-            type: type,
-            dateTime: dateTime,
-            assignedTo: assignedTo,
-            priority: priority,
-            status: status,
-            notes: notes,
-            notified: false
-        };
-
-        followups.unshift(newFollowup);
-        saveFollowupsToStorage();
-
-        addServerNotification({
-            text: `تمت جدولة متابعة جديدة (${newFollowup.type}) للعميل (${client.name})`,
-            targetUser: newFollowup.assignedTo,
-            type: 'followup'
-        });
-
-        showNotification('تم إضافة موعد المتابعة بنجاح!', 'success');
+        followups.unshift(followupObj);
+        showNotification('Follow-up added successfully!', 'success');
     }
 
-    const modalEl = document.getElementById('addFollowupModal');
-    bootstrap.Modal.getInstance(modalEl).hide();
-    renderFollowups();
-    checkDueFollowups();
-}
-
-function checkDueFollowups() {
-    if (!currentUser) return;
-    const now = new Date();
-    let dueCount = 0;
-    let urgentHtml = '';
-
-    followups.forEach(f => {
-        const isMyTask = (currentUser.role === 'Admin' || f.assignedTo === currentUser.name);
-        if (isMyTask && f.status === 'مجدولة') {
-            const taskDate = new Date(f.dateTime);
-            if (taskDate <= now) {
-                dueCount++;
-                
-                if (!f.notified) {
-                    f.notified = true;
-                    saveFollowupsToStorage();
-                    addServerNotification({
-                        text: `⚠️ حان موعد متابعة العميل (${f.clientName}) - النوع: [${f.type}]`,
-                        targetUser: f.assignedTo,
-                        type: 'urgent'
-                    });
-                }
-
-                urgentHtml += `
-                    <div class="alert urgent-pulse-banner shadow-sm p-3 mb-3 d-flex justify-content-between align-items-center rounded-3" role="alert">
-                        <div>
-                            <h5 class="alert-heading fw-bold text-roving-orange mb-1">
-                                <i class="fa-solid fa-triangle-exclamation me-2"></i> تنبيه موعد متابعة عاجل!
-                            </h5>
-                            <p class="mb-0 text-dark">
-                                العميل: <strong>${f.clientName}</strong> | الهاتف: <strong>${f.clientPhone}</strong> | الإجراء: <span class="badge bg-dark">${f.type}</span> | الموعد: <span class="text-danger fw-bold">${f.dateTime.replace('T', ' ')}</span>
-                            </p>
-                        </div>
-                        <div>
-                            <button class="btn btn-success btn-sm fw-bold px-3 me-2" onclick="completeFollowup(${f.id})">
-                                <i class="fa-solid fa-check me-1"></i> إنجاز وأخذ أكشن
-                            </button>
-                        </div>
-                    </div>
-                `;
-            }
-        }
-    });
-
-    const alertContainer = document.getElementById('urgentFollowupAlertContainer');
-    const sidebarBadge = document.getElementById('sidebarFollowupBadge');
-
-    if (alertContainer) {
-        alertContainer.innerHTML = urgentHtml;
-    }
-
-    if (sidebarBadge) {
-        if (dueCount > 0) {
-            sidebarBadge.innerText = dueCount;
-            sidebarBadge.classList.remove('d-none');
-        } else {
-            sidebarBadge.classList.add('d-none');
-        }
-    }
-}
-
-function completeFollowup(id) {
-    const task = followups.find(f => f.id === id);
-    if (task) {
-        task.status = 'مكتملة';
-        saveFollowupsToStorage();
-        renderFollowups();
-        checkDueFollowups();
-        showNotification('تم إنجاز المتابعة بنجاح وإيقاف التنبيه!', 'success');
-    }
-}
-
-function deleteFollowup(id) {
-    if (!confirm('هل أنت متأكد من حذف هذه المتابعة؟')) return;
-    followups = followups.filter(f => f.id !== id);
     saveFollowupsToStorage();
+    bootstrap.Modal.getInstance(document.getElementById('addFollowupModal')).hide();
     renderFollowups();
-    checkDueFollowups();
-    showNotification('تم حذف المتابعة بنجاح', 'warning');
 }
 
 function renderFollowups() {
@@ -1485,250 +1003,177 @@ function renderFollowups() {
     }
 
     if (list.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">لا توجد متابعات مسجلة حالياً</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">No follow-ups recorded</td></tr>`;
         return;
     }
 
     list.forEach(f => {
-        let priorityBadge = 'bg-secondary';
-        if (f.priority === 'هام جداً (High)') priorityBadge = 'bg-danger';
-        if (f.priority === 'متوسطة') priorityBadge = 'bg-warning text-dark';
-
-        let statusBadge = 'bg-primary';
-        if (f.status === 'مكتملة') statusBadge = 'bg-success';
-        if (f.status === 'قيد المعالجة') statusBadge = 'bg-info text-dark';
-        if (f.status === 'مؤجلة') statusBadge = 'bg-warning text-dark';
-
-        const now = new Date();
-        const isLate = (new Date(f.dateTime) <= now && f.status === 'مجدولة');
-
         tbody.innerHTML += `
-            <tr class="${isLate ? 'table-warning' : ''}">
-                <td><strong>${f.clientName}</strong> ${isLate ? '<span class="badge bg-danger ms-1" style="font-size:9px;">متأخر</span>' : ''}</td>
+            <tr>
+                <td><strong>${f.clientName}</strong></td>
                 <td><small><i class="fa-solid fa-phone me-1"></i>${f.clientPhone}</small></td>
                 <td><span class="badge bg-dark">${f.type}</span></td>
-                <td><small class="fw-semibold ${isLate ? 'text-danger fw-bold' : ''}">${f.dateTime.replace('T', ' ')}</small></td>
+                <td><small>${f.dateTime.replace('T', ' ')}</small></td>
                 <td><span class="badge bg-light text-dark border">${f.assignedTo}</span></td>
-                <td><span class="badge ${priorityBadge}">${f.priority}</span></td>
-                <td><span class="badge ${statusBadge}">${f.status}</span></td>
+                <td><span class="badge bg-secondary">${f.priority}</span></td>
+                <td><span class="badge bg-primary">${f.status}</span></td>
                 <td><small class="text-muted">${f.notes || '-'}</small></td>
                 <td>
-                    <button class="btn btn-sm btn-outline-primary me-1" onclick="editFollowup(${f.id})" title="تعديل الإجراء والحالة"><i class="fa-solid fa-pen-to-square"></i></button>
-                    ${f.status !== 'مكتملة' ? `<button class="btn btn-sm btn-outline-success me-1" onclick="completeFollowup(${f.id})" title="إنجاز المهمة"><i class="fa-solid fa-check"></i></button>` : ''}
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteFollowup(${f.id})" title="حذف"><i class="fa-solid fa-trash"></i></button>
+                    <button class="btn btn-sm btn-outline-success me-1" onclick="completeFollowup(${f.id})"><i class="fa-solid fa-check"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteFollowup(${f.id})"><i class="fa-solid fa-trash"></i></button>
                 </td>
             </tr>
         `;
     });
 }
 
-function editClient(id) {
-    const client = clients.find(c => c._id === id);
-    if (!client) return;
-
-    document.getElementById('clientModalTitle').innerText = "Edit Client Details";
-    document.getElementById('editingClientId').value = client._id;
-    document.getElementById('clientName').value = client.name || '';
-    document.getElementById('clientSource').value = client.source || '';
-    document.getElementById('clientStatusSelect').value = client.status || 'New';
-    document.getElementById('assignedEmployee').value = client.assignedTo || '';
-    document.getElementById('clientPhone').value = client.phone || '';
-    document.getElementById('clientPassport').value = client.passport || '';
-    document.getElementById('clientNotes').value = client.notes || '';
-
-    const modal = new bootstrap.Modal(document.getElementById('addClientModal'));
-    modal.show();
-}
-
-function openTransferModal(id) {
-    const client = clients.find(c => c._id === id);
-    if (!client) return;
-
-    document.getElementById('transferClientId').value = client._id;
-    document.getElementById('transferClientNameDisplay').innerText = client.name;
-    populateDropdowns();
-
-    const modal = new bootstrap.Modal(document.getElementById('transferClientModal'));
-    modal.show();
-}
-
-async function executeTransfer() {
-    const clientId = document.getElementById('transferClientId').value;
-    const newOwner = document.getElementById('transferToEmployee').value;
-    const client = clients.find(c => c._id === clientId);
-
-    if (!client) return;
-
-    const oldOwner = client.assignedTo || 'غير مسند';
-    client.assignedTo = newOwner;
-
-    try {
-        const response = await fetch(`${API_URL}/api/clients/${clientId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ assignedTo: newOwner })
-        });
-
-        if (response.ok) {
-            const modalEl = document.getElementById('transferClientModal');
-            bootstrap.Modal.getInstance(modalEl).hide();
-
-            addServerNotification({
-                text: `تم تحويل العميل (${client.name}) من (${oldOwner}) إلى (${newOwner}) بواسطة (${currentUser.name})`,
-                targetUser: newOwner,
-                type: 'transfer'
-            });
-
-            showNotification(`تم بنجاح تحويل العميل (${client.name}) من (${oldOwner}) إلى (${newOwner})!`, "success");
-            fetchClients();
-        } else {
-            alert('فشل تحويل العميل على السيرفر.');
-        }
-    } catch (error) {
-        alert('حدث خطأ في الاتصال: ' + error.message);
+function completeFollowup(id) {
+    const f = followups.find(x => x.id === id);
+    if (f) {
+        f.status = 'Completed';
+        saveFollowupsToStorage();
+        renderFollowups();
+        showNotification('Follow-up marked as completed!', 'success');
     }
 }
 
-async function loadServerNotifications() {
-    if (!currentUser) return;
-    try {
-        const response = await fetch(`${API_URL}/api/notifications`);
-        if (response.ok) {
-            const data = await response.json();
-            notifications = Array.isArray(data) ? data : [];
-            renderNotificationsUI();
-        }
-    } catch (e) {
-        const saved = localStorage.getItem(`roving_shared_notifications`);
-        if (saved) {
-            try { notifications = JSON.parse(saved); } catch(err) { notifications = []; }
-        }
-        renderNotificationsUI();
-    }
+function deleteFollowup(id) {
+    followups = followups.filter(x => x.id !== id);
+    saveFollowupsToStorage();
+    renderFollowups();
 }
 
-async function addServerNotification(notifObj) {
-    const fullObj = {
-        text: notifObj.text,
-        type: notifObj.type || 'update',
-        targetUser: notifObj.targetUser || 'All',
-        read: false,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        sender: currentUser ? currentUser.name : 'System'
-    };
-
-    try {
-        const response = await fetch(`${API_URL}/api/notifications`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(fullObj)
-        });
-        if (response.ok) {
-            loadServerNotifications();
-            return;
-        }
-    } catch(e) {}
-
-    fullObj.id = Date.now();
-    notifications.unshift(fullObj);
-    localStorage.setItem(`roving_shared_notifications`, JSON.stringify(notifications));
-    renderNotificationsUI();
+function editBooking(id) {
+    const b = bookings.find(x => x.id === id);
+    if (!b) return;
+    document.getElementById('editingBookingId').value = b.id;
+    document.getElementById('bookingClientSelect').value = b.clientId;
+    document.getElementById('bookingCategory').value = b.category;
+    document.getElementById('bookingNetPrice').value = b.netPrice;
+    document.getElementById('bookingCostPrice').value = b.costPrice;
+    document.getElementById('bookingPaidAmount').value = b.paidAmount || 0;
+    document.getElementById('bookingStatus').value = b.status;
+    document.getElementById('bookingAssignedTo').value = b.assignedTo;
+    document.getElementById('bookingDetails').value = b.details || '';
+    document.getElementById('bookingNotes').value = b.notes || '';
+    calculateBookingFinancials();
+    new bootstrap.Modal(document.getElementById('addBookingModal')).show();
 }
 
-function renderNotificationsUI() {
-    const listContainer = document.getElementById('notificationListContainer');
-    const badge = document.getElementById('notificationBadge');
-    if (!listContainer || !badge) return;
+function deleteBooking(id) {
+    bookings = bookings.filter(x => x.id !== id);
+    saveBookingsToStorage();
+    renderBookings();
+}
 
-    let filteredNotifs = notifications;
-    if (currentUser && currentUser.role === 'Sales') {
-        filteredNotifs = notifications.filter(n => n.targetUser === currentUser.name || n.targetUser === 'All');
-    }
+function checkDueFollowups() {
+    // Background check placeholder
+}
 
-    const unreadCount = filteredNotifs.filter(n => !n.read).length;
+// Render Commissions Tab
+function renderCommissions() {
+    const tbody = document.getElementById('commissionsTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
 
-    if (unreadCount > 0) {
-        badge.innerText = unreadCount;
-        badge.classList.remove('d-none');
-    } else {
-        badge.classList.add('d-none');
-    }
+    validUsers.forEach(user => {
+        const userBookings = bookings.filter(b => b.assignedTo === user.name);
+        const totalProfit = userBookings.reduce((sum, b) => sum + (b.profit || 0), 0);
+        const commissionRate = user.commission || 0;
+        const estimatedPayout = (totalProfit * commissionRate) / 100;
 
-    if (filteredNotifs.length === 0) {
-        listContainer.innerHTML = `<li class="text-center text-muted small py-3">لا توجد إشعارات جديدة</li>`;
-        return;
-    }
-
-    listContainer.innerHTML = '';
-    filteredNotifs.forEach(n => {
-        let iconClass = "fa-circle-info text-roving-orange";
-        if (n.type === 'urgent') iconClass = "fa-triangle-exclamation text-danger";
-        if (n.type === 'followup') iconClass = "fa-phone-volume text-primary";
-        if (n.type === 'transfer') iconClass = "fa-right-left text-success";
-
-        const bgClass = n.read ? 'bg-white text-muted' : 'bg-light fw-bold text-dark border-start border-3 border-danger';
-        const notifId = n._id || n.id;
-        listContainer.innerHTML += `
-            <li>
-                <div class="dropdown-item-text small py-2 border-bottom ${bgClass}" style="white-space: normal; cursor: pointer;" onclick="markSingleRead('${notifId}')">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span><i class="fa-solid ${iconClass} me-1"></i> ${n.text}</span>
-                        <small class="text-muted ms-2" style="font-size: 10px;">${n.time || ''}</small>
-                    </div>
-                </div>
-            </li>
+        tbody.innerHTML += `
+            <tr>
+                <td><strong>${user.name}</strong></td>
+                <td><span class="badge bg-secondary">${user.role}</span></td>
+                <td>${commissionRate}%</td>
+                <td><span class="text-success fw-bold">$${totalProfit.toFixed(2)}</span></td>
+                <td><span class="text-primary fw-bold">$${estimatedPayout.toFixed(2)}</span></td>
+            </tr>
         `;
     });
 }
 
-async function markSingleRead(id) {
-    const notif = notifications.find(n => (n._id == id || n.id == id));
-    if (notif && !notif.read) {
-        notif.read = true;
-        try {
-            if (notif._id) {
-                await fetch(`${API_URL}/api/notifications/${notif._id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ read: true })
-                });
-            }
-        } catch(e) {}
-        localStorage.setItem(`roving_shared_notifications`, JSON.stringify(notifications));
-        renderNotificationsUI();
-    }
-}
+// Admin Commission Management
+function renderAdminCommissions() {
+    const tbody = document.getElementById('adminCommissionTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
 
-async function markAllNotificationsRead() {
-    let changed = false;
-    notifications.forEach(n => {
-        if (!n.read) {
-            n.read = true;
-            changed = true;
-        }
+    validUsers.forEach((user, index) => {
+        tbody.innerHTML += `
+            <tr>
+                <td><strong>${user.name}</strong></td>
+                <td>${user.email}</td>
+                <td><span class="badge bg-secondary">${user.role}</span></td>
+                <td>
+                    <input type="number" id="comm_rate_${index}" class="form-control form-control-sm w-50" value="${user.commission || 0}" min="0" max="100">
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-primary fw-bold" onclick="updateUserCommission(${index})">Save Rate</button>
+                </td>
+            </tr>
+        `;
     });
-    if (changed) {
-        localStorage.setItem(`roving_shared_notifications`, JSON.stringify(notifications));
-        renderNotificationsUI();
+}
+
+function updateUserCommission(index) {
+    const newRate = parseFloat(document.getElementById(`comm_rate_${index}`).value) || 0;
+    validUsers[index].commission = newRate;
+    localStorage.setItem('roving_users', JSON.stringify(validUsers));
+    showNotification('Commission rate updated successfully!', 'success');
+}
+
+// Admin Password Change
+function handlePasswordChange(e) {
+    e.preventDefault();
+    const currentPass = document.getElementById('currentPasswordInput').value;
+    const newPass = document.getElementById('newPasswordInput').value;
+
+    const userObj = validUsers.find(u => u.email.toLowerCase() === currentUser.email.toLowerCase());
+    if (!userObj || userObj.pass !== currentPass) {
+        alert('Current password is incorrect!');
+        return;
+    }
+
+    userObj.pass = newPass;
+    currentUser.pass = newPass;
+    localStorage.setItem('roving_users', JSON.stringify(validUsers));
+    localStorage.setItem('crm_user', JSON.stringify(currentUser));
+    
+    document.getElementById('changePasswordForm').reset();
+    showNotification('Password updated successfully!', 'success');
+}
+
+// Broadcast Message System
+function handleBroadcast(e) {
+    e.preventDefault();
+    const message = document.getElementById('broadcastInputText').value.trim();
+    localStorage.setItem('roving_broadcast', message);
+    document.getElementById('broadcastForm').reset();
+    checkBroadcast();
+    showNotification('Broadcast announcement published!', 'success');
+}
+
+function checkBroadcast() {
+    const msg = localStorage.getItem('roving_broadcast');
+    const banner = document.getElementById('broadcastBanner');
+    const textSpan = document.getElementById('broadcastText');
+    if (msg && msg.trim() !== '') {
+        textSpan.innerText = msg;
+        banner.classList.remove('d-none');
+    } else {
+        banner.classList.add('d-none');
     }
 }
 
-function showNotification(message, type = "success") {
-    const area = document.getElementById('notificationArea');
-    area.innerHTML = `
-        <div class="alert alert-${type} alert-dismissible fade show shadow-sm" role="alert">
-            <i class="fa-solid fa-bell me-2"></i> ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    `;
-    setTimeout(() => {
-        area.innerHTML = '';
-    }, 6000);
-}
+async function loadServerNotifications() {}
+async function addServerNotification() {}
+function renderNotificationsUI() {}
+function markAllNotificationsRead() {}
 
 async function handleSaveClient(event) {
     event.preventDefault();
-
     const editingId = document.getElementById('editingClientId').value;
     const clientData = {
         name: document.getElementById('clientName').value.trim(),
@@ -1740,17 +1185,9 @@ async function handleSaveClient(event) {
         notes: document.getElementById('clientNotes').value.trim()
     };
 
-    if (currentUser.role === 'Sales' && editingId !== "") {
-        alert("تنبيه (مبيعات): طلب التعديل الخاص بك قيد الانتظار ويتطلب موافقة الأدمن.");
-        const modalEl = document.getElementById('addClientModal');
-        bootstrap.Modal.getInstance(modalEl).hide();
-        return;
-    }
-
     try {
         let url = `${API_URL}/api/clients`;
         let method = 'POST';
-
         if (editingId !== "") {
             url = `${API_URL}/api/clients/${editingId}`;
             method = 'PUT';
@@ -1763,61 +1200,71 @@ async function handleSaveClient(event) {
         });
 
         if (response.ok) {
-            const actionText = editingId !== "" ? `تم تعديل بيانات العميل (${clientData.name}) بواسطة (${currentUser.name})` : `تم إضافة عميل جديد (${clientData.name}) وإسناده إليك بواسطة (${currentUser.name})`;
-            
-            addServerNotification({
-                text: actionText,
-                targetUser: clientData.assignedTo,
-                type: 'update'
-            });
-
-            showNotification(editingId !== "" ? 'تم تعديل بيانات العميل بنجاح!' : 'تم حفظ العميل بنجاح!', 'success');
+            showNotification('Client saved successfully!', 'success');
             document.getElementById('addClientForm').reset();
-            
-            const modalEl = document.getElementById('addClientModal');
-            const modalInstance = bootstrap.Modal.getInstance(modalEl);
-            if (modalInstance) modalInstance.hide();
-            
-            fetchClients(); 
+            bootstrap.Modal.getInstance(document.getElementById('addClientModal')).hide();
+            fetchClients();
         } else {
-            alert('فشل في تنفيذ العملية على السيرفر.');
+            alert('Operation failed on server.');
         }
     } catch (error) {
-        alert('حدث خطأ في الاتصال بالشبكة: ' + error.message);
+        alert('Network error: ' + error.message);
     }
 }
 
 async function deleteClient(id) {
-    if (currentUser.role === 'Sales') {
-        alert("تنبيه (مبيعات): طلب الحذف الخاص بك مرسل للأدمن بانتظار الموافقة.");
-        return;
-    }
-
-    if (!confirm("هل أنت متأكد من حذف هذا العميل نهائياً؟")) return;
-
-    const targetClient = clients.find(c => c._id === id);
-
+    if (!confirm("Are you sure you want to delete this client?")) return;
     try {
-        const response = await fetch(`${API_URL}/api/clients/${id}`, {
-            method: 'DELETE'
-        });
-
+        const response = await fetch(`${API_URL}/api/clients/${id}`, { method: 'DELETE' });
         if (response.ok) {
-            if (targetClient) {
-                addServerNotification({
-                    text: `تم حذف العميل (${targetClient.name})`,
-                    targetUser: targetClient.assignedTo || 'All',
-                    type: 'delete'
-                });
-            }
-
-            showNotification('تم حذف العميل بنجاح.', 'warning');
+            showNotification('Client deleted successfully.', 'warning');
             fetchClients();
-        } else {
-            alert('فشل حذف العميل.');
         }
     } catch (error) {
-        alert('خطأ في الاتصال: ' + error.message);
+        alert('Error: ' + error.message);
+    }
+}
+
+function editClient(id) {
+    const client = clients.find(c => c._id === id);
+    if (!client) return;
+    document.getElementById('clientModalTitle').innerText = "Edit Client";
+    document.getElementById('editingClientId').value = client._id;
+    document.getElementById('clientName').value = client.name || '';
+    document.getElementById('clientSource').value = client.source || '';
+    document.getElementById('clientStatusSelect').value = client.status || 'New';
+    document.getElementById('assignedEmployee').value = client.assignedTo || '';
+    document.getElementById('clientPhone').value = client.phone || '';
+    document.getElementById('clientPassport').value = client.passport || '';
+    document.getElementById('clientNotes').value = client.notes || '';
+    new bootstrap.Modal(document.getElementById('addClientModal')).show();
+}
+
+function openTransferModal(id) {
+    const client = clients.find(c => c._id === id);
+    if (!client) return;
+    document.getElementById('transferClientId').value = client._id;
+    document.getElementById('transferClientNameDisplay').innerText = client.name;
+    populateDropdowns();
+    new bootstrap.Modal(document.getElementById('transferClientModal')).show();
+}
+
+async function executeTransfer() {
+    const clientId = document.getElementById('transferClientId').value;
+    const newOwner = document.getElementById('transferToEmployee').value;
+    try {
+        const response = await fetch(`${API_URL}/api/clients/${clientId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ assignedTo: newOwner })
+        });
+        if (response.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('transferClientModal')).hide();
+            showNotification('Client transferred successfully!', 'success');
+            fetchClients();
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
     }
 }
 
@@ -1827,43 +1274,50 @@ function renderClients() {
     tbody.innerHTML = '';
     
     let list = Array.isArray(clients) ? clients : [];
-
     if (currentUser && currentUser.role === 'Sales') {
         list = list.filter(c => c.assignedTo === currentUser.name);
     }
 
-    const phoneQueryInput = document.getElementById('clientPhoneSearch');
-    const phoneQuery = phoneQueryInput ? phoneQueryInput.value.trim() : "";
+    const phoneQuery = document.getElementById('clientPhoneSearch').value.trim();
     if (phoneQuery !== "") {
         list = list.filter(c => c.phone && c.phone.includes(phoneQuery));
     }
 
     if (list.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">لا توجد بيانات عملاء مسجلة حالياً</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">No clients recorded</td></tr>`;
         return;
     }
 
     list.forEach((client, index) => {
-        const fileNumber = `RT-${(350 + index).toString().padStart(5, '0')}`;
-        
         tbody.innerHTML += `
             <tr>
-                <td><span class="badge bg-dark">${fileNumber}</span></td>
+                <td><span class="badge bg-dark">RT-${(350 + index).toString().padStart(5, '0')}</span></td>
                 <td><strong>${client.name}</strong></td>
                 <td><span class="badge bg-secondary">${client.source || '-'}</span></td>
                 <td><small><i class="fa-solid fa-phone me-1"></i>${client.phone || '-'}</small></td>
                 <td><small>${client.passport || '-'}</small></td>
-                <td><span class="badge bg-light text-dark border">${client.assignedTo || 'غير مسند'}</span></td>
+                <td><span class="badge bg-light text-dark border">${client.assignedTo || 'Unassigned'}</span></td>
                 <td><span class="badge bg-primary">${client.status || 'New'}</span></td>
                 <td><small class="text-muted">${client.notes || '-'}</small></td>
                 <td>
-                    <button class="btn btn-sm btn-outline-success me-1" onclick="openTransferModal('${client._id}')" title="تحويل لموظف آخر"><i class="fa-solid fa-right-left"></i></button>
-                    <button class="btn btn-sm btn-outline-primary me-1" onclick="editClient('${client._id}')" title="تعديل"><i class="fa-solid fa-pen-to-square"></i></button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteClient('${client._id}')" title="حذف"><i class="fa-solid fa-trash"></i></button>
+                    <button class="btn btn-sm btn-outline-success me-1" onclick="openTransferModal('${client._id}')"><i class="fa-solid fa-right-left"></i></button>
+                    <button class="btn btn-sm btn-outline-primary me-1" onclick="editClient('${client._id}')"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteClient('${client._id}')"><i class="fa-solid fa-trash"></i></button>
                 </td>
             </tr>
         `;
     });
+}
+
+function showNotification(message, type = "success") {
+    const area = document.getElementById('notificationArea');
+    area.innerHTML = `
+        <div class="alert alert-${type} alert-dismissible fade show shadow-sm" role="alert">
+            <i class="fa-solid fa-bell me-2"></i> ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    `;
+    setTimeout(() => { area.innerHTML = ''; }, 5000);
 }
 </script>
 </body>
