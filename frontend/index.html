@@ -467,7 +467,6 @@ function openAddClientModal() {
     populateDropdowns(); 
 }
 
-// دالة الحفظ المحدثة مع التنبيهات الفورية لفحص سبب أي مشكلة محتملة
 async function handleAddClient(event) {
     event.preventDefault();
     alert("تم الضغط على زر حفظ العميل بنجاح!");
@@ -519,7 +518,8 @@ function renderClients() {
         list = list.filter(c => c.assignedTo === currentUser.name);
     }
 
-    const phoneQuery = document.getElementById('clientPhoneSearch') ? document.getElementById('clientPhoneSearch'].value.trim() : "";
+    const phoneQueryInput = document.getElementById('clientPhoneSearch');
+    const phoneQuery = phoneQueryInput ? phoneQueryInput.value.trim() : "";
     if (phoneQuery !== "") {
         list = list.filter(c => c.phone && c.phone.includes(phoneQuery));
     }
