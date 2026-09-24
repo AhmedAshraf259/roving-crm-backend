@@ -47,7 +47,27 @@ app.post('/api/clients', async (req, res) => {
   }
 });
 
-// تشغيل السيرفر (تم تعريفه مرة واحدة فقط هنا لتجنب أي أخطاء)
+// تعديل بيانات عميل
+app.put('/api/clients/:id', async (req, res) => {
+  try {
+    const updatedClient = await Client.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    res.json(updatedClient);
+  } catch (err) {
+    res.status(400).json({ error: 'خطأ في التعديل', details: err.message });
+  }
+});
+
+// حذف عميل
+app.delete('/api/clients/:id', async (req, res) => {
+  try {
+    await Client.findByIdAndDelete(req.params.id);
+    res.json({ message: 'تم الحذف بنجاح' });
+  } catch (err) {
+    res.status(500).json({ error: 'خطأ في الحذف' });
+  }
+});
+
+// تشغيل السيرفر
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log(`السيرفر يعمل على المنفذ ${PORT}`);
