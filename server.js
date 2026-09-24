@@ -47,13 +47,8 @@ app.post('/api/clients', async (req, res) => {
   }
 });
 
-// تشغيل السيرفر
+// تشغيل السيرفر (تم تعريفه مرة واحدة فقط هنا لتجنب أي أخطاء)
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log(`السيرفر يعمل على المنفذ ${PORT}`);
-});
-// تشغيل السيرفر على المنفذ المتاح أو المنفذ الافتراضي لـ Render
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
 });
