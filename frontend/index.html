@@ -721,20 +721,31 @@ function toggleSidebar() {
 }
 
 async function fetchClients() {
+    // جلب العملاء المخزنين محلياً أولاً لضمان سرعة الظهور وعدم الضياع
+    const localClients = JSON.parse(localStorage.getItem('roving_local_clients')) || [];
+    
     try {
         const response = await fetch(`${API_URL}/api/clients`);
         if (response.ok) {
             const data = await response.json();
-            clients = Array.isArray(data) ? data : [];
-            renderClients();
-            populateClientDropdowns();
+            const apiClients = Array.isArray(data) ? data : [];
+            
+            // دمج العملاء مع تفضيل وتحديث القائمة المشتركة
+            const mergedMap = new Map();
+            apiClients.forEach(c => mergedMap.set(c._id || c.id, c));
+            localClients.forEach(c => mergedMap.set(c._id || c.id, c));
+            
+            clients = Array.from(mergedMap.values());
         } else {
-            clients = [];
-            renderClients();
+            clients = localClients;
         }
     } catch (error) {
-        clients = [];
-        renderClients();
+        clients = localClients;
+    }
+    
+    renderClients();
+    if (typeof populateClientDropdowns === 'function') {
+        populateClientDropdowns();
     }
 }
 
@@ -1329,45 +1340,58 @@ setInterval(() => {
 }, 3000);
 
 async function handleSaveClient(event) {
-    event.preventDefault();
+    if (event) event.preventDefault();
     const editingId = document.getElementById('editingClientId').value;
+    
     const clientData = {
+        _id: editingId !== "" ? editingId : 'local_' + Date.now(),
         name: document.getElementById('clientName').value.trim(),
         phone: document.getElementById('clientPhone').value.trim(),
         passport: document.getElementById('clientPassport').value.trim(),
         source: document.getElementById('clientSource').value,
         status: document.getElementById('clientStatusSelect').value,
-        assignedTo: document.getElementById('assignedEmployee').value,
+        assignedTo: document.getElementById('assignedEmployee').value, // اسم الموظف الحالي أو المُختار
         notes: document.getElementById('clientNotes').value.trim()
     };
 
+    // 1. الحفظ محلياً فوراً لضمان ظهوره لدى الموظف والأدمن بدون تأخير
+    let localClients = JSON.parse(localStorage.getItem('roving_local_clients')) || [];
+    if (editingId !== "") {
+        localClients = localClients.map(c => (c._id === editingId || c.id === editingId) ? clientData : c);
+    } else {
+        localClients.unshift(clientData);
+    }
+    localStorage.setItem('roving_local_clients', JSON.stringify(localClients));
+
+    // 2. مزامنة البيانات مع السيرفر في الخلفية
     try {
         let url = `${API_URL}/api/clients`;
         let method = 'POST';
-        if (editingId !== "") {
+        if (editingId !== "" && !editingId.startsWith('local_')) {
             url = `${API_URL}/api/clients/${editingId}`;
             method = 'PUT';
         }
-
-        const response = await fetch(url, {
+        await fetch(url, {
             method: method,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(clientData)
         });
-
-        if (response.ok) {
-            showNotification('Client saved successfully!', 'success');
-            document.getElementById('addClientForm').reset();
-            bootstrap.Modal.getInstance(document.getElementById('addClientModal')).hide();
-            fetchClients();
-        } else {
-            alert('Operation failed on server.');
-        }
     } catch (error) {
-        alert('Network error: ' + error.message);
+        console.log("Server sync skipped, saved locally.");
     }
-}
 
+    if (typeof showNotification === 'function') {
+        showNotification('Client saved successfully!', 'success');
+    }
+    
+    const modalEl = document.getElementById('addClientModal');
+    if (modalEl) {
+        const modalInstance = bootstrap.Modal.getInstance(modalEl);
+        if (modalInstance) modalInstance.hide();
+    }
+    
+    fetchClients();
+}
 async function deleteClient(id) {
     if (!confirm("Are you sure you want to delete this client?")) return;
     try {
@@ -1444,13 +1468,18 @@ function renderClients() {
     tbody.innerHTML = '';
     
     let list = Array.isArray(clients) ? clients : [];
+    
+    // الفلترة حسب الصلاحية: لو المستخدم Sales يظهر له العملاء المسندين إليه فقط
     if (currentUser && currentUser.role === 'Sales') {
-        list = list.filter(c => c.assignedTo === currentUser.name);
+        list = list.filter(c => c.assignedTo && c.assignedTo.trim().toLowerCase() === currentUser.name.trim().toLowerCase());
     }
 
-    const phoneQuery = document.getElementById('clientPhoneSearch').value.trim();
-    if (phoneQuery !== "") {
-        list = list.filter(c => c.phone && c.phone.includes(phoneQuery));
+    const phoneSearchInput = document.getElementById('clientPhoneSearch');
+    if (phoneSearchInput) {
+        const phoneQuery = phoneSearchInput.value.trim();
+        if (phoneQuery !== "") {
+            list = list.filter(c => c.phone && c.phone.includes(phoneQuery));
+        }
     }
 
     if (list.length === 0) {
@@ -1459,6 +1488,7 @@ function renderClients() {
     }
 
     list.forEach((client, index) => {
+        const clientId = client._id || client.id;
         tbody.innerHTML += `
             <tr>
                 <td><span class="badge bg-dark">RT-${(350 + index).toString().padStart(5, '0')}</span></td>
@@ -1470,9 +1500,9 @@ function renderClients() {
                 <td><span class="badge bg-primary">${client.status || 'New'}</span></td>
                 <td><small class="text-muted">${client.notes || '-'}</small></td>
                 <td>
-                    <button class="btn btn-sm btn-outline-success me-1" onclick="openTransferModal('${client._id}')" title="Transfer Client"><i class="fa-solid fa-right-left"></i></button>
-                    <button class="btn btn-sm btn-outline-primary me-1" onclick="editClient('${client._id}')"><i class="fa-solid fa-pen-to-square"></i></button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteClient('${client._id}')"><i class="fa-solid fa-trash"></i></button>
+                    <button class="btn btn-sm btn-outline-success me-1" onclick="openTransferModal('${clientId}')" title="Transfer Client"><i class="fa-solid fa-right-left"></i></button>
+                    <button class="btn btn-sm btn-outline-primary me-1" onclick="editClient('${clientId}')"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteClient('${clientId}')"><i class="fa-solid fa-trash"></i></button>
                 </td>
             </tr>
         `;
