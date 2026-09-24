@@ -1343,18 +1343,53 @@ async function handleSaveClient(event) {
     if (event) event.preventDefault();
     const editingId = document.getElementById('editingClientId').value;
     
+    const nameInput = document.getElementById('clientName').value.trim();
+    const phoneInput = document.getElementById('clientPhone').value.trim();
+
+    // التحقق من عدم التكرار (فقط في حالة إضافة عميل جديد أو تغيير بيانات عميل حالي)
+    let allClients = Array.isArray(clients) ? [...clients] : [];
+    const localClientsCheck = JSON.parse(localStorage.getItem('roving_local_clients')) || [];
+    
+    // دمج القائمتين للتحقق الشامل
+    const combinedMap = new Map();
+    allClients.forEach(c => combinedMap.set(c._id || c.id, c));
+    localClientsCheck.forEach(c => combinedMap.set(c._id || c.id, c));
+    const uniqueClientsList = Array.from(combinedMap.values());
+
+    const isDuplicate = uniqueClientsList.some(c => {
+        const cId = c._id || c.id;
+        // استثناء العميل الحالي عند التعديل
+        if (editingId !== "" && (cId === editingId)) {
+            return false;
+        }
+        
+        const matchName = c.name && c.name.trim().toLowerCase() === nameInput.toLowerCase();
+        const matchPhone = c.phone && c.phone.trim() === phoneInput;
+        
+        return matchName || matchPhone;
+    });
+
+    if (isDuplicate) {
+        if (typeof showNotification === 'function') {
+            showNotification('عذراً، هذا العميل مسجل مسبقاً بنفس الاسم أو رقم الهاتف!', 'danger');
+        } else {
+            alert('عذراً، هذا العميل مسجل مسبقاً بنفس الاسم أو رقم الهاتف!');
+        }
+        return; // إيقاف عملية الحفظ
+    }
+
     const clientData = {
         _id: editingId !== "" ? editingId : 'local_' + Date.now(),
-        name: document.getElementById('clientName').value.trim(),
-        phone: document.getElementById('clientPhone').value.trim(),
+        name: nameInput,
+        phone: phoneInput,
         passport: document.getElementById('clientPassport').value.trim(),
         source: document.getElementById('clientSource').value,
         status: document.getElementById('clientStatusSelect').value,
-        assignedTo: document.getElementById('assignedEmployee').value, // اسم الموظف الحالي أو المُختار
+        assignedTo: document.getElementById('assignedEmployee').value,
         notes: document.getElementById('clientNotes').value.trim()
     };
 
-    // 1. الحفظ محلياً فوراً لضمان ظهوره لدى الموظف والأدمن بدون تأخير
+    // 1. الحفظ محلياً فوراً
     let localClients = JSON.parse(localStorage.getItem('roving_local_clients')) || [];
     if (editingId !== "") {
         localClients = localClients.map(c => (c._id === editingId || c.id === editingId) ? clientData : c);
