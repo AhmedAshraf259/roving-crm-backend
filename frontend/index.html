@@ -98,6 +98,1025 @@
             box-shadow: 0 10px 30px rgba(194, 120, 53, 0.15); 
             background: #ffffff;
         }
+
+        .notification-dropdown {
+            width: 350px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+
+<!-- 1. LOGIN SECTION -->
+<div id="loginSection" class="container">
+    <div class="card login-card p-4">
+        <div class="text-center mb-4">
+            <div class="d-flex justify-content-center align-items-center mb-2">
+                <h3 class="fw-bold text-roving-orange m-0">Roving Travel</h3>
+            </div>
+            <p class="text-muted">System Login</p>
+        </div>
+        <form id="loginForm">
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Email Address</label>
+                <input type="email" id="loginEmail" class="form-control" placeholder="name@roving.com" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Password</label>
+                <input type="password" id="loginPassword" class="form-control" placeholder="••••••••" required>
+            </div>
+            <div id="loginError" class="alert alert-danger py-2 d-none" role="alert"></div>
+            <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">Sign In</button>
+        </form>
+    </div>
+</div>
+
+<!-- 2. MAIN APPLICATION DASHBOARD -->
+<div id="appSection" class="container-fluid d-none">
+    <div class="row">
+        <!-- Sidebar Navigation -->
+        <div class="col-md-2 sidebar p-3" id="sidebarContainer">
+            <div class="d-flex justify-content-between align-items-center my-2">
+                <div class="d-flex align-items-center">
+                    <h4 class="text-roving-orange fw-bold m-0" style="font-size: 1rem;">Roving CRM</h4>
+                </div>
+                <button class="btn btn-sm btn-outline-light" onclick="toggleSidebar()" title="إخفاء القائمة">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+            </div>
+            <hr class="border-secondary my-2">
+            
+            <div class="mb-3 text-center bg-dark p-2 rounded bg-opacity-25">
+                <small class="text-light opacity-75 d-block">Current User:</small>
+                <strong id="userDisplayName" class="text-truncate d-block small text-white">...</strong>
+                <div><span id="userRoleBadge" class="badge mt-1"></span></div>
+            </div>
+
+            <!-- Navigation Links -->
+            <nav class="mt-3">
+                <a href="#" id="navClients" class="active" onclick="switchTab('clients')"><i class="fa-solid fa-users me-2"></i> Clients</a>
+                <a href="#" id="navFollowups" onclick="switchTab('followups')"><i class="fa-solid fa-phone-volume me-2"></i> Follow-ups</a>
+                <a href="#" id="navBookings" onclick="switchTab('bookings')"><i class="fa-solid fa-receipt me-2"></i> Bookings</a>
+                <a href="#" id="navCommissions" onclick="switchTab('commissions')"><i class="fa-solid fa-hand-holding-dollar me-2"></i> Commissions</a>
+                <a href="#" id="navReports" onclick="switchTab('reports')"><i class="fa-solid fa-chart-line me-2"></i> Reports</a>
+                <a href="#" id="navSettings" onclick="switchTab('settings')"><i class="fa-solid fa-gear me-2"></i> Settings</a>
+                <a href="#" class="text-danger mt-4" onclick="handleLogout()"><i class="fa-solid fa-right-from-bracket me-2"></i> Logout</a>
+            </nav>
+        </div>
+
+        <!-- Main Dashboard View -->
+        <div class="col-md-10 p-4" id="mainContentArea">
+            <!-- Top Bar with Notifications Bell -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <button class="btn btn-outline-dark d-none fw-bold shadow-sm" id="showSidebarBtn" onclick="toggleSidebar()">
+                    <i class="fa-solid fa-bars me-2 text-roving-orange"></i> إظهار القائمة الجانبية
+                </button>
+                <div></div>
+                
+                <!-- زر الجرس والإشعارات -->
+                <div class="dropdown">
+                    <button class="btn btn-light position-relative border shadow-sm px-3 py-2 rounded-pill" type="button" id="notificationDropdownBtn" data-bs-toggle="dropdown" aria-expanded="false" onclick="markAllNotificationsRead()">
+                        <i class="fa-solid fa-bell text-roving-orange fa-lg"></i>
+                        <span id="notificationBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">
+                            0
+                        </span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end notification-dropdown p-2 shadow" aria-labelledby="notificationDropdownBtn">
+                        <li><h6 class="dropdown-header fw-bold text-roving-green">الإشعارات والتحديثات</h6></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <div id="notificationListContainer">
+                            <li class="text-center text-muted small py-3">لا توجد إشعارات جديدة</li>
+                        </div>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Toast Alert Area -->
+            <div id="notificationArea"></div>
+
+            <!-- Tab 1: Clients -->
+            <div id="tabClients" class="tab-content-item">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2 class="fw-bold text-roving-green">Client Directory</h2>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addClientModal" onclick="openAddClientModal()"><i class="fa-solid fa-plus me-1"></i> Add Client</button>
+                </div>
+                
+                <div class="card card-custom p-3 mb-3 bg-light">
+                    <div class="row align-items-center">
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold mb-1"><i class="fa-solid fa-magnifying-glass me-1 text-roving-orange"></i> بحث برقم الهاتف</label>
+                            <input type="text" id="clientPhoneSearch" class="form-control" placeholder="اكتب رقم الهاتف للبحث..." oninput="renderClients()">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card card-custom p-3">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>File #</th>
+                                    <th>Name *</th>
+                                    <th>Source *</th>
+                                    <th>Contact Info</th>
+                                    <th>Passport Info</th>
+                                    <th>Assigned To</th>
+                                    <th>Status *</th>
+                                    <th>Notes</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="clientsTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 2: Follow-ups & Tasks Schedule -->
+            <div id="tabFollowups" class="tab-content-item d-none">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2 class="fw-bold text-roving-green">Follow-ups & Tasks Schedule</h2>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addFollowupModal" onclick="openAddFollowupModal()">
+                        <i class="fa-solid fa-plus me-1"></i> Add Follow-up Task
+                    </button>
+                </div>
+
+                <div class="card card-custom p-3">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Client Name</th>
+                                    <th>Phone</th>
+                                    <th>Task Type</th>
+                                    <th>Scheduled Date & Time</th>
+                                    <th>Assigned To</th>
+                                    <th>Priority</th>
+                                    <th>Status</th>
+                                    <th>Notes</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="followupsTableBody">
+                                <tr><td colspan="9" class="text-center text-muted py-4">لا توجد متابعات مسجلة حالياً</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Other Tabs -->
+            <div id="tabBookings" class="tab-content-item d-none"><h2 class="fw-bold text-roving-green">Confirmed Trips & Bookings</h2></div>
+            <div id="tabCommissions" class="tab-content-item d-none"><h2 class="fw-bold text-roving-green">Commissions Overview</h2></div>
+            <div id="tabReports" class="tab-content-item d-none"><h2 class="fw-bold text-roving-green">Reports & Analytics</h2></div>
+            <div id="tabSettings" class="tab-content-item d-none"><h2 class="fw-bold text-roving-green">Settings</h2></div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Add / Edit Client -->
+<div class="modal fade" id="addClientModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold text-roving-green" id="clientModalTitle">Add New Client</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addClientForm">
+                    <input type="hidden" id="editingClientId" value="">
+                    
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Client Name <span class="text-danger">*</span></label>
+                            <input type="text" id="clientName" class="form-control" placeholder="e.g. Mohamed Ali" required>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Lead Source <span class="text-danger">*</span></label>
+                            <select id="clientSource" class="form-select" required>
+                                <option value="" disabled selected>-- Select Source --</option>
+                                <option value="Facebook">Facebook</option>
+                                <option value="Instagram">Instagram</option>
+                                <option value="WhatsApp">WhatsApp</option>
+                                <option value="Recommendation">Recommendation</option>
+                                <option value="Website">Website</option>
+                                <option value="Direct Call">Direct Call</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Status <span class="text-danger">*</span></label>
+                            <select id="clientStatusSelect" class="form-select" required>
+                                <option value="New">New</option>
+                                <option value="Contacted">Contacted</option>
+                                <option value="Interested">Interested</option>
+                                <option value="Closed/Won">Closed/Won</option>
+                                <option value="Lost">Lost</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Assign To</label>
+                            <select id="assignedEmployee" class="form-select" required></select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Phone Number</label>
+                            <input type="tel" id="clientPhone" class="form-control" placeholder="01xxxxxxxxx">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Passport Number</label>
+                            <input type="text" id="clientPassport" class="form-control" placeholder="A12345678">
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Client Details & Notes</label>
+                            <textarea id="clientNotes" class="form-control" rows="3" placeholder="ملاحظات تفصيلية..."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-primary w-100 py-2 fw-bold" id="saveClientBtn">Save Client Data</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Transfer Client -->
+<div class="modal fade" id="transferClientModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold text-roving-green">Transfer Client (تحويل العميل)</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="transferClientId">
+                <p>تحويل العميل: <strong id="transferClientNameDisplay" class="text-roving-orange"></strong></p>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">اختر الموظف المراد التحويل إليه:</label>
+                    <select id="transferToEmployee" class="form-select"></select>
+                </div>
+                <button type="button" class="btn btn-primary w-100 fw-bold" onclick="executeTransfer()">تأكيد وإرسال التحويل</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Add Follow-up Task -->
+<div class="modal fade" id="addFollowupModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold text-roving-green">إضافة موعد متابعة جديد (Follow-up)</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addFollowupForm">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">اختر العميل <span class="text-danger">*</span></label>
+                        <select id="followupClientSelect" class="form-select" required></select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">نوع المتابعة <span class="text-danger">*</span></label>
+                        <select id="followupType" class="form-select" required>
+                            <option value="مكالمة هاتفية (Call)">مكالمة هاتفية (Call)</option>
+                            <option value="إرسال عرض سعر (Quotation)">إرسال عرض سعر (Quotation)</option>
+                            <option value="متابعة تأشيرة (Visa Follow-up)">متابعة تأشيرة (Visa Follow-up)</option>
+                            <option value="تأكيد حجز رحلة (Trip Booking)">تأكيد حجز رحلة (Trip Booking)</option>
+                            <option value="أخرى (Other)">أخرى (Other)</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">موعد المتابعة (التاريخ والوقت) <span class="text-danger">*</span></label>
+                        <input type="datetime-local" id="followupDateTime" class="form-control" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">المسؤول عن المتابعة <span class="text-danger">*</span></label>
+                        <select id="followupAssignedTo" class="form-select" required></select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">الأولوية</label>
+                        <select id="followupPriority" class="form-select">
+                            <option value="عادية">عادية</option>
+                            <option value="متوسطة">متوسطة</option>
+                            <option value="هام جداً (High)">هام جداً (High)</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">ملاحظات المتابعة</label>
+                        <textarea id="followupNotes" class="form-control" rows="2" placeholder="تفاصيل ما سيتم مناقشته..."></textarea>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100 fw-bold">حفظ موعد المتابعة</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bootstrap 5 JS Bundle -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+const API_URL = "https://roving-crm-backend.onrender.com";
+
+let validUsers = [
+    { email: "asmaa.ashraf.1312002@gmail.com", pass: "Asmaa@2026", role: "Admin", name: "Asmaa Ashraf" },
+    { email: "ahmedashraf88513@gmail.com", pass: "AhmedA#88", role: "Admin", name: "Ahmed Ashraf" },
+    { email: "ahmedwanas11@gmail.com", pass: "Wanas!Pass2026", role: "Admin", name: "Ahmed Wanas" },
+    { email: "sales1@roving.com", pass: "SalesRoving#1", role: "Sales", name: "Sales Agent 1" }
+];
+
+let currentUser = null;
+let clients = []; 
+let followups = []; // مصفوفة المتابعات
+let notifications = [];
+
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebarContainer');
+    const mainContent = document.getElementById('mainContentArea');
+    const showSidebarBtn = document.getElementById('showSidebarBtn');
+    
+    sidebar.classList.toggle('collapsed');
+    
+    if (sidebar.classList.contains('collapsed')) {
+        mainContent.classList.remove('col-md-10');
+        mainContent.classList.add('col-md-12');
+        if (showSidebarBtn) showSidebarBtn.classList.remove('d-none');
+    } else {
+        mainContent.classList.remove('col-md-12');
+        mainContent.classList.add('col-md-10');
+        if (showSidebarBtn) showSidebarBtn.classList.add('d-none');
+    }
+}
+
+async function fetchClients() {
+    try {
+        const response = await fetch(`${API_URL}/api/clients`);
+        if (response.ok) {
+            const data = await response.json();
+            clients = Array.isArray(data) ? data : [];
+            renderClients();
+            populateClientDropdownForFollowup();
+        } else {
+            clients = [];
+            renderClients();
+        }
+    } catch (error) {
+        clients = [];
+        renderClients();
+    }
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+    const savedUser = localStorage.getItem('crm_user');
+    if (savedUser) {
+        try {
+            currentUser = JSON.parse(savedUser);
+            document.getElementById('loginSection').classList.add('d-none');
+            document.getElementById('appSection').classList.remove('d-none');
+            loadUserNotifications();
+            loadFollowups();
+            initApp();
+        } catch (e) {
+            localStorage.removeItem('crm_user');
+        }
+    }
+
+    const clientForm = document.getElementById('addClientForm');
+    if (clientForm) {
+        clientForm.addEventListener('submit', handleSaveClient);
+    }
+
+    const followupForm = document.getElementById('addFollowupForm');
+    if (followupForm) {
+        followupForm.addEventListener('submit', handleSaveFollowup);
+    }
+});
+
+document.getElementById('loginForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const emailInput = document.getElementById('loginEmail').value.trim().toLowerCase();
+    const passwordInput = document.getElementById('loginPassword').value.trim();
+    const errorDiv = document.getElementById('loginError');
+
+    errorDiv.classList.add('d-none');
+    const targetUser = validUsers.find(u => u.email.toLowerCase() === emailInput);
+
+    if (!targetUser || targetUser.pass !== passwordInput) {
+        errorDiv.innerText = "البريد الإلكتروني أو كلمة السر غير صحيحة!";
+        errorDiv.classList.remove('d-none');
+        return;
+    }
+
+    currentUser = { email: targetUser.email, role: targetUser.role, name: targetUser.name, pass: targetUser.pass };
+    localStorage.setItem('crm_user', JSON.stringify(currentUser));
+
+    document.getElementById('loginSection').classList.add('d-none');
+    document.getElementById('appSection').classList.remove('d-none');
+    
+    loadUserNotifications();
+    loadFollowups();
+    initApp();
+});
+
+function handleLogout() {
+    currentUser = null;
+    localStorage.removeItem('crm_user');
+    document.getElementById('loginSection').classList.remove('d-none');
+    document.getElementById('appSection').classList.add('d-none');
+}
+
+function initApp() {
+    document.getElementById('userDisplayName').innerText = currentUser.name || currentUser.email;
+    document.getElementById('userRoleBadge').innerText = currentUser.role;
+    
+    if (currentUser.role === 'Admin') {
+        document.getElementById('userRoleBadge').className = "badge bg-danger mt-1";
+    } else {
+        document.getElementById('userRoleBadge').className = "badge bg-warning text-dark mt-1";
+    }
+
+    fetchClients(); 
+    populateDropdowns();  
+}
+
+function switchTab(tabName) {
+    document.querySelectorAll('.tab-content-item').forEach(el => el.classList.add('d-none'));
+    document.querySelectorAll('.sidebar nav a').forEach(el => el.classList.remove('active'));
+
+    if (tabName === 'clients') {
+        document.getElementById('tabClients').classList.remove('d-none');
+        document.getElementById('navClients').classList.add('active');
+        fetchClients(); 
+    }
+    if (tabName === 'followups') { 
+        document.getElementById('tabFollowups').classList.remove('d-none'); 
+        document.getElementById('navFollowups').classList.add('active'); 
+        renderFollowups();
+    }
+    if (tabName === 'bookings') { document.getElementById('tabBookings').classList.remove('d-none'); document.getElementById('navBookings').classList.add('active'); }
+    if (tabName === 'commissions') { document.getElementById('tabCommissions').classList.remove('d-none'); document.getElementById('navCommissions').classList.add('active'); }
+    if (tabName === 'reports') { document.getElementById('tabReports').classList.remove('d-none'); document.getElementById('navReports').classList.add('active'); }
+    if (tabName === 'settings') { document.getElementById('tabSettings').classList.remove('d-none'); document.getElementById('navSettings').classList.add('active'); }
+}
+
+function populateDropdowns() {
+    const addSelect = document.getElementById('assignedEmployee');
+    const transferSelect = document.getElementById('transferToEmployee');
+    const followupAssignSelect = document.getElementById('followupAssignedTo');
+    
+    if (addSelect) {
+        addSelect.innerHTML = '';
+        validUsers.forEach(emp => {
+            addSelect.innerHTML += `<option value="${emp.name}">${emp.name}</option>`;
+        });
+    }
+
+    if (transferSelect) {
+        transferSelect.innerHTML = '';
+        validUsers.forEach(emp => {
+            transferSelect.innerHTML += `<option value="${emp.name}">${emp.name}</option>`;
+        });
+    }
+
+    if (followupAssignSelect) {
+        followupAssignSelect.innerHTML = '';
+        validUsers.forEach(emp => {
+            followupAssignSelect.innerHTML += `<option value="${emp.name}">${emp.name}</option>`;
+        });
+    }
+}
+
+function populateClientDropdownForFollowup() {
+    const select = document.getElementById('followupClientSelect');
+    if (!select) return;
+    select.innerHTML = '<option value="" disabled selected>-- اختر العميل --</option>';
+    clients.forEach(c => {
+        select.innerHTML += `<option value="${c._id}">${c.name} (${c.phone || 'بدون رقم'})</option>`;
+    });
+}
+
+function openAddClientModal() {
+    document.getElementById('clientModalTitle').innerText = "Add New Client";
+    document.getElementById('editingClientId').value = "";
+    document.getElementById('addClientForm').reset();
+    populateDropdowns(); 
+}
+
+function openAddFollowupModal() {
+    document.getElementById('addFollowupForm').reset();
+    populateClientDropdownForFollowup();
+    populateDropdowns();
+}
+
+// تخزين وجلب المتابعات عبر LocalStorage
+function loadFollowups() {
+    const saved = localStorage.getItem('roving_followups');
+    if (saved) {
+        try {
+            followups = JSON.parse(saved);
+        } catch(e) {
+            followups = [];
+        }
+    } else {
+        followups = [];
+    }
+}
+
+function saveFollowupsToStorage() {
+    localStorage.setItem('roving_followups', JSON.stringify(followups));
+}
+
+function handleSaveFollowup(e) {
+    e.preventDefault();
+    const clientId = document.getElementById('followupClientSelect').value;
+    const client = clients.find(c => c._id === clientId);
+    if (!client) return;
+
+    const newFollowup = {
+        id: Date.now(),
+        clientId: client._id,
+        clientName: client.name,
+        clientPhone: client.phone || 'غير متوفر',
+        type: document.getElementById('followupType').value,
+        dateTime: document.getElementById('followupDateTime').value,
+        assignedTo: document.getElementById('followupAssignedTo').value,
+        priority: document.getElementById('followupPriority').value,
+        status: 'مجدولة',
+        notes: document.getElementById('followupNotes').value.trim()
+    };
+
+    followups.unshift(newFollowup);
+    saveFollowupsToStorage();
+
+    addNotification({
+        text: `تم جدولة متابعة جديدة للعميل (${client.name})`,
+        targetUser: newFollowup.assignedTo,
+        type: 'followup'
+    });
+
+    showNotification('تم إضافة موعد المتابعة بنجاح!', 'success');
+
+    const modalEl = document.getElementById('addFollowupModal');
+    bootstrap.Modal.getInstance(modalEl).hide();
+    renderFollowups();
+}
+
+function completeFollowup(id) {
+    const task = followups.find(f => f.id === id);
+    if (task) {
+        task.status = 'مكتملة';
+        saveFollowupsToStorage();
+        renderFollowups();
+        showNotification('تم تحديث حالة المتابعة إلى مكتملة', 'success');
+    }
+}
+
+function deleteFollowup(id) {
+    if (!confirm('هل أنت متأكد من حذف هذه المتابعة؟')) return;
+    followups = followups.filter(f => f.id !== id);
+    saveFollowupsToStorage();
+    renderFollowups();
+    showNotification('تم حذف المتابعة بنجاح', 'warning');
+}
+
+function renderFollowups() {
+    const tbody = document.getElementById('followupsTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    let list = followups;
+    if (currentUser && currentUser.role === 'Sales') {
+        list = list.filter(f => f.assignedTo === currentUser.name);
+    }
+
+    if (list.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">لا توجد متابعات مسجلة حالياً</td></tr>`;
+        return;
+    }
+
+    list.forEach(f => {
+        let priorityBadge = 'bg-secondary';
+        if (f.priority === 'هام جداً (High)') priorityBadge = 'bg-danger';
+        if (f.priority === 'متوسطة') priorityBadge = 'bg-warning text-dark';
+
+        let statusBadge = f.status === 'مكتملة' ? 'bg-success' : 'bg-primary';
+
+        tbody.innerHTML += `
+            <tr>
+                <td><strong>${f.clientName}</strong></td>
+                <td><small><i class="fa-solid fa-phone me-1"></i>${f.clientPhone}</small></td>
+                <td><span class="badge bg-dark">${f.type}</span></td>
+                <td><small class="fw-semibold">${f.dateTime.replace('T', ' ')}</small></td>
+                <td><span class="badge bg-light text-dark border">${f.assignedTo}</span></td>
+                <td><span class="badge ${priorityBadge}">${f.priority}</span></td>
+                <td><span class="badge ${statusBadge}">${f.status}</span></td>
+                <td><small class="text-muted">${f.notes || '-'}</small></td>
+                <td>
+                    ${f.status !== 'مكتملة' ? `<button class="btn btn-sm btn-outline-success me-1" onclick="completeFollowup(${f.id})" title="إنجاز المهمة"><i class="fa-solid fa-check"></i></button>` : ''}
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteFollowup(${f.id})" title="حذف"><i class="fa-solid fa-trash"></i></button>
+                </td>
+            </tr>
+        `;
+    });
+}
+
+function editClient(id) {
+    const client = clients.find(c => c._id === id);
+    if (!client) return;
+
+    document.getElementById('clientModalTitle').innerText = "Edit Client Details";
+    document.getElementById('editingClientId').value = client._id;
+    document.getElementById('clientName').value = client.name || '';
+    document.getElementById('clientSource').value = client.source || '';
+    document.getElementById('clientStatusSelect').value = client.status || 'New';
+    document.getElementById('assignedEmployee').value = client.assignedTo || '';
+    document.getElementById('clientPhone').value = client.phone || '';
+    document.getElementById('clientPassport').value = client.passport || '';
+    document.getElementById('clientNotes').value = client.notes || '';
+
+    const modal = new bootstrap.Modal(document.getElementById('addClientModal'));
+    modal.show();
+}
+
+function openTransferModal(id) {
+    const client = clients.find(c => c._id === id);
+    if (!client) return;
+
+    document.getElementById('transferClientId').value = client._id;
+    document.getElementById('transferClientNameDisplay').innerText = client.name;
+    populateDropdowns();
+
+    const modal = new bootstrap.Modal(document.getElementById('transferClientModal'));
+    modal.show();
+}
+
+async function executeTransfer() {
+    const clientId = document.getElementById('transferClientId').value;
+    const newOwner = document.getElementById('transferToEmployee').value;
+    const client = clients.find(c => c._id === clientId);
+
+    if (!client) return;
+
+    const oldOwner = client.assignedTo || 'غير مسند';
+    client.assignedTo = newOwner;
+
+    try {
+        const response = await fetch(`${API_URL}/api/clients/${clientId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ assignedTo: newOwner })
+        });
+
+        if (response.ok) {
+            const modalEl = document.getElementById('transferClientModal');
+            bootstrap.Modal.getInstance(modalEl).hide();
+
+            addNotification({
+                text: `تم تحويل العميل (${client.name}) من (${oldOwner}) إلى (${newOwner})`,
+                targetUser: newOwner,
+                type: 'transfer'
+            });
+
+            showNotification(`تم بنجاح تحويل العميل (${client.name}) من (${oldOwner}) إلى (${newOwner})!`, "success");
+            fetchClients();
+        } else {
+            alert('فشل تحويل العميل على السيرفر.');
+        }
+    } catch (error) {
+        alert('حدث خطأ في الاتصال: ' + error.message);
+    }
+}
+
+function loadUserNotifications() {
+    if (!currentUser) return;
+    const saved = localStorage.getItem(`notifications_${currentUser.email}`);
+    if (saved) {
+        try {
+            notifications = JSON.parse(saved);
+        } catch(e) {
+            notifications = [];
+        }
+    } else {
+        notifications = [];
+    }
+    renderNotificationsUI();
+}
+
+function saveUserNotifications() {
+    if (!currentUser) return;
+    localStorage.setItem(`notifications_${currentUser.email}`, JSON.stringify(notifications));
+}
+
+function addNotification(notifObj) {
+    const fullObj = {
+        id: Date.now(),
+        text: notifObj.text,
+        type: notifObj.type || 'update',
+        targetUser: notifObj.targetUser || 'All',
+        read: false,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+
+    notifications.unshift(fullObj);
+    saveUserNotifications();
+    renderNotificationsUI();
+}
+
+function renderNotificationsUI() {
+    const listContainer = document.getElementById('notificationListContainer');
+    const badge = document.getElementById('notificationBadge');
+    if (!listContainer || !badge) return;
+
+    let filteredNotifs = notifications;
+    if (currentUser && currentUser.role === 'Sales') {
+        filteredNotifs = notifications.filter(n => n.targetUser === currentUser.name || n.targetUser === 'All');
+    }
+
+    const unreadCount = filteredNotifs.filter(n => !n.read).length;
+
+    if (unreadCount > 0) {
+        badge.innerText = unreadCount;
+        badge.classList.remove('d-none');
+    } else {
+        badge.classList.add('d-none');
+    }
+
+    if (filteredNotifs.length === 0) {
+        listContainer.innerHTML = `<li class="text-center text-muted small py-3">لا توجد إشعارات جديدة</li>`;
+        return;
+    }
+
+    listContainer.innerHTML = '';
+    filteredNotifs.forEach(n => {
+        const bgClass = n.read ? 'bg-white text-muted' : 'bg-light fw-bold text-dark border-start border-3 border-danger';
+        listContainer.innerHTML += `
+            <li>
+                <div class="dropdown-item-text small py-2 border-bottom ${bgClass}" style="white-space: normal; cursor: pointer;" onclick="markSingleRead(${n.id})">
+                    <div class="d-flex justify-content-between">
+                        <span><i class="fa-solid fa-circle-info text-roving-orange me-1"></i> ${n.text}</span>
+                        <small class="text-muted ms-2" style="font-size: 10px;">${n.time}</small>
+                    </div>
+                </div>
+            </li>
+        `;
+    });
+}
+
+function markSingleRead(id) {
+    const notif = notifications.find(n => n.id === id);
+    if (notif && !notif.read) {
+        notif.read = true;
+        saveUserNotifications();
+        renderNotificationsUI();
+    }
+}
+
+function markAllNotificationsRead() {
+    let changed = false;
+    notifications.forEach(n => {
+        if (!n.read) {
+            n.read = true;
+            changed = true;
+        }
+    });
+    if (changed) {
+        saveUserNotifications();
+        renderNotificationsUI();
+    }
+}
+
+function showNotification(message, type = "success") {
+    const area = document.getElementById('notificationArea');
+    area.innerHTML = `
+        <div class="alert alert-${type} alert-dismissible fade show shadow-sm" role="alert">
+            <i class="fa-solid fa-bell me-2"></i> ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    `;
+    setTimeout(() => {
+        area.innerHTML = '';
+    }, 6000);
+}
+
+async function handleSaveClient(event) {
+    event.preventDefault();
+
+    const editingId = document.getElementById('editingClientId').value;
+    const clientData = {
+        name: document.getElementById('clientName').value.trim(),
+        phone: document.getElementById('clientPhone').value.trim(),
+        passport: document.getElementById('clientPassport').value.trim(),
+        source: document.getElementById('clientSource').value,
+        status: document.getElementById('clientStatusSelect').value,
+        assignedTo: document.getElementById('assignedEmployee').value,
+        notes: document.getElementById('clientNotes').value.trim()
+    };
+
+    if (currentUser.role === 'Sales' && editingId !== "") {
+        alert("تنبيه (مبيعات): طلب التعديل الخاص بك قيد الانتظار ويتطلب موافقة الأدمن.");
+        const modalEl = document.getElementById('addClientModal');
+        bootstrap.Modal.getInstance(modalEl).hide();
+        return;
+    }
+
+    try {
+        let url = `${API_URL}/api/clients`;
+        let method = 'POST';
+
+        if (editingId !== "") {
+            url = `${API_URL}/api/clients/${editingId}`;
+            method = 'PUT';
+        }
+
+        const response = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(clientData)
+        });
+
+        if (response.ok) {
+            const actionText = editingId !== "" ? `تم تعديل بيانات العميل (${clientData.name})` : `تم إضافة عميل جديد (${clientData.name})`;
+            
+            addNotification({
+                text: actionText,
+                targetUser: clientData.assignedTo,
+                type: 'update'
+            });
+
+            showNotification(editingId !== "" ? 'تم تعديل بيانات العميل بنجاح!' : 'تم حفظ العميل بنجاح!', 'success');
+            document.getElementById('addClientForm').reset();
+            
+            const modalEl = document.getElementById('addClientModal');
+            const modalInstance = bootstrap.Modal.getInstance(modalEl);
+            if (modalInstance) modalInstance.hide();
+            
+            fetchClients(); 
+        } else {
+            alert('فشل في تنفيذ العملية على السيرفر.');
+        }
+    } catch (error) {
+        alert('حدث خطأ في الاتصال بالشبكة: ' + error.message);
+    }
+}
+
+async function deleteClient(id) {
+    if (currentUser.role === 'Sales') {
+        alert("تنبيه (مبيعات): طلب الحذف الخاص بك مرسل للأدمن بانتظار الموافقة.");
+        return;
+    }
+
+    if (!confirm("هل أنت متأكد من حذف هذا العميل نهائياً؟")) return;
+
+    const targetClient = clients.find(c => c._id === id);
+
+    try {
+        const response = await fetch(`${API_URL}/api/clients/${id}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            if (targetClient) {
+                addNotification({
+                    text: `تم حذف العميل (${targetClient.name})`,
+                    targetUser: targetClient.assignedTo || 'All',
+                    type: 'delete'
+                });
+            }
+
+            showNotification('تم حذف العميل بنجاح.', 'warning');
+            fetchClients();
+        } else {
+            alert('فشل حذف العميل.');
+        }
+    } catch (error) {
+        alert('خطأ في الاتصال: ' + error.message);
+    }
+}
+
+function renderClients() {
+    const tbody = document.getElementById('clientsTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    
+    let list = Array.isArray(clients) ? clients : [];
+
+    if (currentUser && currentUser.role === 'Sales') {
+        list = list.filter(c => c.assignedTo === currentUser.name);
+    }
+
+    const phoneQueryInput = document.getElementById('clientPhoneSearch');
+    const phoneQuery = phoneQueryInput ? phoneQueryInput.value.trim() : "";
+    if (phoneQuery !== "") {
+        list = list.filter(c => c.phone && c.phone.includes(phoneQuery));
+    }
+
+    if (list.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">لا توجد بيانات عملاء مسجلة حالياً</td></tr>`;
+        return;
+    }
+
+    list.forEach((client, index) => {
+        const fileNumber = `RT-${(350 + index).toString().padStart(5, '0')}`;
+        
+        tbody.innerHTML += `
+            <tr>
+                <td><span class="badge bg-dark">${fileNumber}</span></td>
+                <td><strong>${client.name}</strong></td>
+                <td><span class="badge bg-secondary">${client.source || '-'}</span></td>
+                <td><small><i class="fa-solid fa-phone me-1"></i>${client.phone || '-'}</small></td>
+                <td><small>${client.passport || '-'}</small></td>
+                <td><span class="badge bg-light text-dark border">${client.assignedTo || 'غير مسند'}</span></td>
+                <td><span class="badge bg-primary">${client.status || 'New'}</span></td>
+                <td><small class="text-muted">${client.notes || '-'}</small></td>
+                <td>
+                    <button class="btn btn-sm btn-outline-success me-1" onclick="openTransferModal('${client._id}')" title="تحويل لموظف آخر"><i class="fa-solid fa-right-left"></i></button>
+                    <button class="btn btn-sm btn-outline-primary me-1" onclick="editClient('${client._id}')" title="تعديل"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteClient('${client._id}')" title="حذف"><i class="fa-solid fa-trash"></i></button>
+                </td>
+            </tr>
+        `;
+    });
+}
+</script>
+</body>
+</html>            background: var(--roving-green); 
+            color: #ffffff; 
+            transition: all 0.3s ease-in-out;
+            position: relative;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
+        .sidebar.collapsed {
+            margin-left: -16.666667%; 
+            opacity: 0;
+            padding: 0 !important;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar.collapsed {
+                margin-left: -100%;
+            }
+        }
+
+        .sidebar a { 
+            color: #E2E8F0; 
+            text-decoration: none; 
+            padding: 12px 18px; 
+            display: block; 
+            border-radius: 8px; 
+            margin-bottom: 6px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar a:hover, .sidebar a.active { 
+            background: var(--roving-orange); 
+            color: #ffffff; 
+        }
+
+        .card-custom { 
+            border: none; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05); 
+            background: #ffffff;
+        }
+
+        .btn-primary, .bg-primary-custom {
+            background-color: var(--roving-orange) !important;
+            border-color: var(--roving-orange) !important;
+        }
+
+        .btn-primary:hover {
+            background-color: #B83A1B !important;
+            border-color: #B83A1B !important;
+        }
+
+        .text-roving-green { color: var(--roving-green) !important; }
+        .text-roving-orange { color: var(--roving-orange) !important; }
+
+        .login-card { 
+            max-width: 420px; 
+            margin: 80px auto; 
+            border-radius: 16px; 
+            border: none; 
+            box-shadow: 0 10px 30px rgba(194, 120, 53, 0.15); 
+            background: #ffffff;
+        }
     </style>
 </head>
 <body>
