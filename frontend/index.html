@@ -105,7 +105,6 @@
             overflow-y: auto;
         }
 
-        /* تأثير التنبيه النابض المتحرك للمواعيد العاجلة */
         @keyframes pulseAlert {
             0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(212, 91, 56, 0.4); }
             70% { transform: scale(1.01); box-shadow: 0 0 0 10px rgba(212, 91, 56, 0); }
@@ -208,7 +207,7 @@
                 </div>
             </div>
 
-            <!-- منطقة التنبيهات العاجلة (النافذة المتحركة لمواعيد الفولو أب التي حان وقتها) -->
+            <!-- منطقة التنبيهات العاجلة -->
             <div id="urgentFollowupAlertContainer"></div>
 
             <!-- Toast Alert Area -->
@@ -268,7 +267,7 @@
                                 <tr>
                                     <th>Client Name</th>
                                     <th>Phone</th>
-                                    <th>Task Type</th>
+                                    <th>Task Type (Action)</th>
                                     <th>Scheduled Date & Time</th>
                                     <th>Assigned To</th>
                                     <th>Priority</th>
@@ -285,8 +284,40 @@
                 </div>
             </div>
 
+            <!-- Tab 3: Confirmed Trips & Bookings -->
+            <div id="tabBookings" class="tab-content-item d-none">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2 class="fw-bold text-roving-green">Confirmed Trips & Bookings</h2>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addBookingModal" onclick="openAddBookingModal()">
+                        <i class="fa-solid fa-plus me-1"></i> Add New Booking
+                    </button>
+                </div>
+
+                <div class="card card-custom p-3">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Booking #</th>
+                                    <th>Client Name</th>
+                                    <th>Category</th>
+                                    <th>Net Price</th>
+                                    <th>Cost Price</th>
+                                    <th>Profit</th>
+                                    <th>Status</th>
+                                    <th>Details & Notes</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bookingsTableBody">
+                                <tr><td colspan="9" class="text-center text-muted py-4">لا توجد حجوزات مسجلة حالياً</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             <!-- Other Tabs -->
-            <div id="tabBookings" class="tab-content-item d-none"><h2 class="fw-bold text-roving-green">Confirmed Trips & Bookings</h2></div>
             <div id="tabCommissions" class="tab-content-item d-none"><h2 class="fw-bold text-roving-green">Commissions Overview</h2></div>
             <div id="tabReports" class="tab-content-item d-none"><h2 class="fw-bold text-roving-green">Reports & Analytics</h2></div>
             <div id="tabSettings" class="tab-content-item d-none"><h2 class="fw-bold text-roving-green">Settings</h2></div>
@@ -388,29 +419,41 @@
     </div>
 </div>
 
-<!-- Modal: Add Follow-up Task -->
+<!-- Modal: Add / Edit Follow-up Task -->
 <div class="modal fade" id="addFollowupModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title fw-bold text-roving-green">إضافة موعد متابعة جديد (Follow-up)</h5>
+                <h5 class="modal-title fw-bold text-roving-green" id="followupModalTitle">إضافة موعد متابعة جديد (Follow-up)</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <form id="addFollowupForm">
+                    <input type="hidden" id="editingFollowupId" value="">
+
                     <div class="mb-3">
                         <label class="form-label fw-semibold">اختر العميل <span class="text-danger">*</span></label>
                         <select id="followupClientSelect" class="form-select" required></select>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">نوع المتابعة <span class="text-danger">*</span></label>
+                        <label class="form-label fw-semibold">نوع المتابعة (الإجراء / Action) <span class="text-danger">*</span></label>
                         <select id="followupType" class="form-select" required>
                             <option value="مكالمة هاتفية (Call)">مكالمة هاتفية (Call)</option>
                             <option value="إرسال عرض سعر (Quotation)">إرسال عرض سعر (Quotation)</option>
                             <option value="متابعة تأشيرة (Visa Follow-up)">متابعة تأشيرة (Visa Follow-up)</option>
                             <option value="تأكيد حجز رحلة (Trip Booking)">تأكيد حجز رحلة (Trip Booking)</option>
                             <option value="أخرى (Other)">أخرى (Other)</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">حالة المتابعة (Status) <span class="text-danger">*</span></label>
+                        <select id="followupStatusSelect" class="form-select" required>
+                            <option value="مجدولة">مجدولة</option>
+                            <option value="قيد المعالجة">قيد المعالجة</option>
+                            <option value="مكتملة">مكتملة</option>
+                            <option value="مؤجلة">مؤجلة</option>
                         </select>
                     </div>
 
@@ -438,7 +481,87 @@
                         <textarea id="followupNotes" class="form-control" rows="2" placeholder="تفاصيل ما سيتم مناقشته..."></textarea>
                     </div>
 
-                    <button type="submit" class="btn btn-primary w-100 fw-bold">حفظ موعد المتابعة</button>
+                    <button type="submit" class="btn btn-primary w-100 fw-bold" id="saveFollowupBtn">حفظ موعد المتابعة</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Add / Edit Booking -->
+<div class="modal fade" id="addBookingModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold text-roving-green" id="bookingModalTitle">إضافة حجز جديد (New Booking)</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addBookingForm">
+                    <input type="hidden" id="editingBookingId" value="">
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">اختر العميل <span class="text-danger">*</span></label>
+                            <select id="bookingClientSelect" class="form-select" required></select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">فئة الحجز (Category) <span class="text-danger">*</span></label>
+                            <select id="bookingCategory" class="form-select" required>
+                                <option value="" disabled selected>-- اختر فئة الحجز --</option>
+                                <option value="طيران (Flight)">طيران (Flight)</option>
+                                <option value="إقامة فندقية (Hotel Accommodation)">إقامة فندقية (Hotel Accommodation)</option>
+                                <option value="باكدج كاملة (Full Package)">باكدج كاملة (Full Package)</option>
+                                <option value="تأشيرة (Visa)">تأشيرة (Visa)</option>
+                                <option value="مواصلات (Transportation)">مواصلات (Transportation)</option>
+                                <option value="أخرى (Other)">أخرى (Other)</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">سعر البيع / صافي العميل (Net Price) <span class="text-danger">*</span></label>
+                            <input type="number" step="0.01" id="bookingNetPrice" class="form-control" placeholder="0.00" oninput="calculateBookingProfit()" required>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">سعر التكلفة (Cost Price) <span class="text-danger">*</span></label>
+                            <input type="number" step="0.01" id="bookingCostPrice" class="form-control" placeholder="0.00" oninput="calculateBookingProfit()" required>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">صافي الربح (Profit) <span class="text-success">(محسوب تلقائياً)</span></label>
+                            <input type="text" id="bookingProfitDisplay" class="form-control bg-light fw-bold text-success" value="0.00" readonly>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">حالة الحجز (Status) <span class="text-danger">*</span></label>
+                            <select id="bookingStatus" class="form-select" required>
+                                <option value="مؤكد (Confirmed)">مؤكد (Confirmed)</option>
+                                <option value="قيد المراجعة (Pending)">قيد المراجعة (Pending)</option>
+                                <option value="ملغي (Cancelled)">ملغي (Cancelled)</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">المسؤول عن الحجز</label>
+                            <select id="bookingAssignedTo" class="form-select" required></select>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">تفاصيل الحجز (Trip Details)</label>
+                            <textarea id="bookingDetails" class="form-control" rows="2" placeholder="تفاصيل خط سير الرحلة، أرقام الرحلات، الفندق، إلخ..."></textarea>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">ملاحظات إضافية (Notes)</label>
+                            <textarea id="bookingNotes" class="form-control" rows="2" placeholder="ملاحظات أخرى..."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-primary w-100 fw-bold" id="saveBookingBtn">حفظ تفاصيل الحجز</button>
+                    </div>
                 </form>
             </div>
         </div>
@@ -461,6 +584,7 @@ let validUsers = [
 let currentUser = null;
 let clients = []; 
 let followups = []; 
+let bookings = [];
 let notifications = [];
 
 function toggleSidebar() {
@@ -488,7 +612,7 @@ async function fetchClients() {
             const data = await response.json();
             clients = Array.isArray(data) ? data : [];
             renderClients();
-            populateClientDropdownForFollowup();
+            populateClientDropdowns();
         } else {
             clients = [];
             renderClients();
@@ -508,8 +632,8 @@ window.addEventListener('DOMContentLoaded', () => {
             document.getElementById('appSection').classList.remove('d-none');
             loadUserNotifications();
             loadFollowups();
+            loadBookings();
             initApp();
-            // فحص دوري للمواعيد كل 10 ثوانٍ
             setInterval(checkDueFollowups, 10000);
         } catch (e) {
             localStorage.removeItem('crm_user');
@@ -524,6 +648,11 @@ window.addEventListener('DOMContentLoaded', () => {
     const followupForm = document.getElementById('addFollowupForm');
     if (followupForm) {
         followupForm.addEventListener('submit', handleSaveFollowup);
+    }
+
+    const bookingForm = document.getElementById('addBookingForm');
+    if (bookingForm) {
+        bookingForm.addEventListener('submit', handleSaveBooking);
     }
 });
 
@@ -550,6 +679,7 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
     
     loadUserNotifications();
     loadFollowups();
+    loadBookings();
     initApp();
     setInterval(checkDueFollowups, 10000);
 });
@@ -590,7 +720,11 @@ function switchTab(tabName) {
         document.getElementById('navFollowups').classList.add('active'); 
         renderFollowups();
     }
-    if (tabName === 'bookings') { document.getElementById('tabBookings').classList.remove('d-none'); document.getElementById('navBookings').classList.add('active'); }
+    if (tabName === 'bookings') { 
+        document.getElementById('tabBookings').classList.remove('d-none'); 
+        document.getElementById('navBookings').classList.add('active'); 
+        renderBookings();
+    }
     if (tabName === 'commissions') { document.getElementById('tabCommissions').classList.remove('d-none'); document.getElementById('navCommissions').classList.add('active'); }
     if (tabName === 'reports') { document.getElementById('tabReports').classList.remove('d-none'); document.getElementById('navReports').classList.add('active'); }
     if (tabName === 'settings') { document.getElementById('tabSettings').classList.remove('d-none'); document.getElementById('navSettings').classList.add('active'); }
@@ -600,6 +734,7 @@ function populateDropdowns() {
     const addSelect = document.getElementById('assignedEmployee');
     const transferSelect = document.getElementById('transferToEmployee');
     const followupAssignSelect = document.getElementById('followupAssignedTo');
+    const bookingAssignSelect = document.getElementById('bookingAssignedTo');
     
     if (addSelect) {
         addSelect.innerHTML = '';
@@ -621,15 +756,34 @@ function populateDropdowns() {
             followupAssignSelect.innerHTML += `<option value="${emp.name}">${emp.name}</option>`;
         });
     }
+
+    if (bookingAssignSelect) {
+        bookingAssignSelect.innerHTML = '';
+        validUsers.forEach(emp => {
+            bookingAssignSelect.innerHTML += `<option value="${emp.name}">${emp.name}</option>`;
+        });
+        if (currentUser) {
+            bookingAssignSelect.value = currentUser.name;
+        }
+    }
 }
 
-function populateClientDropdownForFollowup() {
-    const select = document.getElementById('followupClientSelect');
-    if (!select) return;
-    select.innerHTML = '<option value="" disabled selected>-- اختر العميل --</option>';
-    clients.forEach(c => {
-        select.innerHTML += `<option value="${c._id}">${c.name} (${c.phone || 'بدون رقم'})</option>`;
-    });
+function populateClientDropdowns() {
+    const followupSelect = document.getElementById('followupClientSelect');
+    if (followupSelect) {
+        followupSelect.innerHTML = '<option value="" disabled selected>-- اختر العميل --</option>';
+        clients.forEach(c => {
+            followupSelect.innerHTML += `<option value="${c._id}">${c.name} (${c.phone || 'بدون رقم'})</option>`;
+        });
+    }
+
+    const bookingSelect = document.getElementById('bookingClientSelect');
+    if (bookingSelect) {
+        bookingSelect.innerHTML = '<option value="" disabled selected>-- اختر العميل الحجز --</option>';
+        clients.forEach(c => {
+            bookingSelect.innerHTML += `<option value="${c._id}">${c.name} (${c.phone || 'بدون رقم'})</option>`;
+        });
+    }
 }
 
 function openAddClientModal() {
@@ -640,9 +794,207 @@ function openAddClientModal() {
 }
 
 function openAddFollowupModal() {
+    document.getElementById('followupModalTitle').innerText = "إضافة موعد متابعة جديد (Follow-up)";
+    document.getElementById('editingFollowupId').value = "";
     document.getElementById('addFollowupForm').reset();
-    populateClientDropdownForFollowup();
+    document.getElementById('followupStatusSelect').value = "مجدولة";
+    populateClientDropdowns();
     populateDropdowns();
+}
+
+function openAddBookingModal() {
+    document.getElementById('bookingModalTitle').innerText = "إضافة حجز جديد (New Booking)";
+    document.getElementById('editingBookingId').value = "";
+    document.getElementById('addBookingForm').reset();
+    document.getElementById('bookingProfitDisplay').value = "0.00";
+    populateClientDropdowns();
+    populateDropdowns();
+}
+
+function calculateBookingProfit() {
+    const net = parseFloat(document.getElementById('bookingNetPrice').value) || 0;
+    const cost = parseFloat(document.getElementById('bookingCostPrice').value) || 0;
+    const profit = net - cost;
+    const profitDisplay = document.getElementById('bookingProfitDisplay');
+    profitDisplay.value = profit.toFixed(2);
+    if (profit < 0) {
+        profitDisplay.className = "form-control bg-light fw-bold text-danger";
+    } else {
+        profitDisplay.className = "form-control bg-light fw-bold text-success";
+    }
+}
+
+function loadBookings() {
+    const saved = localStorage.getItem('roving_bookings');
+    if (saved) {
+        try {
+            bookings = JSON.parse(saved);
+        } catch(e) {
+            bookings = [];
+        }
+    } else {
+        bookings = [];
+    }
+}
+
+function saveBookingsToStorage() {
+    localStorage.setItem('roving_bookings', JSON.stringify(bookings));
+}
+
+function handleSaveBooking(e) {
+    e.preventDefault();
+    const editingId = document.getElementById('editingBookingId').value;
+    const clientId = document.getElementById('bookingClientSelect').value;
+    const client = clients.find(c => c._id === clientId);
+    if (!client) return;
+
+    const category = document.getElementById('bookingCategory').value;
+    const netPrice = parseFloat(document.getElementById('bookingNetPrice').value) || 0;
+    const costPrice = parseFloat(document.getElementById('bookingCostPrice').value) || 0;
+    const profit = netPrice - costPrice;
+    const status = document.getElementById('bookingStatus').value;
+    const assignedTo = document.getElementById('bookingAssignedTo').value;
+    const details = document.getElementById('bookingDetails').value.trim();
+    const notes = document.getElementById('bookingNotes').value.trim();
+
+    if (editingId !== "") {
+        const booking = bookings.find(b => b.id == editingId);
+        if (booking) {
+            booking.clientId = client._id;
+            booking.clientName = client.name;
+            booking.clientPhone = client.phone || 'غير متوفر';
+            booking.category = category;
+            booking.netPrice = netPrice;
+            booking.costPrice = costPrice;
+            booking.profit = profit;
+            booking.status = status;
+            booking.assignedTo = assignedTo;
+            booking.details = details;
+            booking.notes = notes;
+
+            saveBookingsToStorage();
+            showNotification('تم تحديث تفاصيل الحجز بنجاح!', 'success');
+        }
+    } else {
+        const newBooking = {
+            id: Date.now(),
+            clientId: client._id,
+            clientName: client.name,
+            clientPhone: client.phone || 'غير متوفر',
+            category: category,
+            netPrice: netPrice,
+            costPrice: costPrice,
+            profit: profit,
+            status: status,
+            assignedTo: assignedTo,
+            details: details,
+            notes: notes
+        };
+
+        bookings.unshift(newBooking);
+        saveBookingsToStorage();
+
+        addNotification({
+            text: `تم تسجيل حجز جديد (${newBooking.category}) للعميل (${client.name}) بقيمة ربح ${profit}`,
+            targetUser: assignedTo,
+            type: 'update'
+        });
+
+        showNotification('تم إضافة الحجز بنجاح!', 'success');
+    }
+
+    const modalEl = document.getElementById('addBookingModal');
+    bootstrap.Modal.getInstance(modalEl).hide();
+    renderBookings();
+}
+
+function editBooking(id) {
+    const booking = bookings.find(b => b.id === id);
+    if (!booking) return;
+
+    document.getElementById('bookingModalTitle').innerText = "تعديل تفاصيل الحجز";
+    document.getElementById('editingBookingId').value = booking.id;
+    document.getElementById('bookingClientSelect').value = booking.clientId;
+    document.getElementById('bookingCategory').value = booking.category;
+    document.getElementById('bookingNetPrice').value = booking.netPrice;
+    document.getElementById('bookingCostPrice').value = booking.costPrice;
+    document.getElementById('bookingProfitDisplay').value = booking.profit.toFixed(2);
+    document.getElementById('bookingStatus').value = booking.status;
+    document.getElementById('bookingAssignedTo').value = booking.assignedTo;
+    document.getElementById('bookingDetails').value = booking.details || '';
+    document.getElementById('bookingNotes').value = booking.notes || '';
+
+    const modal = new bootstrap.Modal(document.getElementById('addBookingModal'));
+    modal.show();
+}
+
+function deleteBooking(id) {
+    if (!confirm('هل أنت متأكد من حذف هذا الحجز؟')) return;
+    bookings = bookings.filter(b => b.id !== id);
+    saveBookingsToStorage();
+    renderBookings();
+    showNotification('تم حذف الحجز بنجاح', 'warning');
+}
+
+function renderBookings() {
+    const tbody = document.getElementById('bookingsTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    let list = bookings;
+    if (currentUser && currentUser.role === 'Sales') {
+        list = list.filter(b => b.assignedTo === currentUser.name);
+    }
+
+    if (list.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">لا توجد حجوزات مسجلة حالياً</td></tr>`;
+        return;
+    }
+
+    list.forEach((b, index) => {
+        const bookingNum = `BK-${(1000 + index)}`;
+        let statusBadge = 'bg-success';
+        if (b.status.includes('Pending')) statusBadge = 'bg-warning text-dark';
+        if (b.status.includes('Cancelled')) statusBadge = 'bg-danger';
+
+        tbody.innerHTML += `
+            <tr>
+                <td><span class="badge bg-dark">${bookingNum}</span></td>
+                <td><strong>${b.clientName}</strong><br><small class="text-muted"><i class="fa-solid fa-phone me-1"></i>${b.clientPhone}</small></td>
+                <td><span class="badge bg-secondary">${b.category}</span></td>
+                <td><span class="fw-semibold text-primary">${b.netPrice.toFixed(2)}</span></td>
+                <td><span class="text-muted">${b.costPrice.toFixed(2)}</span></td>
+                <td><strong class="text-success">${b.profit >= 0 ? '+' : ''}${b.profit.toFixed(2)}</strong></td>
+                <td><span class="badge ${statusBadge}">${b.status}</span></td>
+                <td>
+                    <small><strong>تفاصيل:</strong> ${b.details || '-'}</small><br>
+                    <small class="text-muted"><strong>ملاحظات:</strong> ${b.notes || '-'}</small>
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary me-1" onclick="editBooking(${b.id})" title="تعديل"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteBooking(${b.id})" title="حذف"><i class="fa-solid fa-trash"></i></button>
+                </td>
+            </tr>
+        `;
+    });
+}
+
+function editFollowup(id) {
+    const task = followups.find(f => f.id === id);
+    if (!task) return;
+
+    document.getElementById('followupModalTitle').innerText = "تعديل موعد المتابعة (الإجراء والحالة)";
+    document.getElementById('editingFollowupId').value = task.id;
+    document.getElementById('followupClientSelect').value = task.clientId;
+    document.getElementById('followupType').value = task.type;
+    document.getElementById('followupStatusSelect').value = task.status || 'مجدولة';
+    document.getElementById('followupDateTime').value = task.dateTime;
+    document.getElementById('followupAssignedTo').value = task.assignedTo;
+    document.getElementById('followupPriority').value = task.priority;
+    document.getElementById('followupNotes').value = task.notes || '';
+
+    const modal = new bootstrap.Modal(document.getElementById('addFollowupModal'));
+    modal.show();
 }
 
 function loadFollowups() {
@@ -664,34 +1016,64 @@ function saveFollowupsToStorage() {
 
 function handleSaveFollowup(e) {
     e.preventDefault();
+    const editingId = document.getElementById('editingFollowupId').value;
     const clientId = document.getElementById('followupClientSelect').value;
     const client = clients.find(c => c._id === clientId);
     if (!client) return;
 
-    const newFollowup = {
-        id: Date.now(),
-        clientId: client._id,
-        clientName: client.name,
-        clientPhone: client.phone || 'غير متوفر',
-        type: document.getElementById('followupType').value,
-        dateTime: document.getElementById('followupDateTime').value,
-        assignedTo: document.getElementById('followupAssignedTo').value,
-        priority: document.getElementById('followupPriority').value,
-        status: 'مجدولة',
-        notes: document.getElementById('followupNotes').value.trim(),
-        notified: false
-    };
+    const type = document.getElementById('followupType').value;
+    const status = document.getElementById('followupStatusSelect').value;
+    const dateTime = document.getElementById('followupDateTime').value;
+    const assignedTo = document.getElementById('followupAssignedTo').value;
+    const priority = document.getElementById('followupPriority').value;
+    const notes = document.getElementById('followupNotes').value.trim();
 
-    followups.unshift(newFollowup);
-    saveFollowupsToStorage();
+    if (editingId !== "") {
+        const task = followups.find(f => f.id == editingId);
+        if (task) {
+            task.clientId = client._id;
+            task.clientName = client.name;
+            task.clientPhone = client.phone || 'غير متوفر';
+            task.type = type;
+            task.status = status;
+            task.dateTime = dateTime;
+            task.assignedTo = assignedTo;
+            task.priority = priority;
+            task.notes = notes;
+            
+            if (status === 'مجدولة') {
+                task.notified = false;
+            }
 
-    addNotification({
-        text: `تمت جدولة متابعة جديدة (${newFollowup.type}) للعميل (${client.name})`,
-        targetUser: newFollowup.assignedTo,
-        type: 'followup'
-    });
+            saveFollowupsToStorage();
+            showNotification('تم تحديث بيانات المتابعة والإجراء بنجاح!', 'success');
+        }
+    } else {
+        const newFollowup = {
+            id: Date.now(),
+            clientId: client._id,
+            clientName: client.name,
+            clientPhone: client.phone || 'غير متوفر',
+            type: type,
+            dateTime: dateTime,
+            assignedTo: assignedTo,
+            priority: priority,
+            status: status,
+            notes: notes,
+            notified: false
+        };
 
-    showNotification('تم إضافة موعد المتابعة بنجاح!', 'success');
+        followups.unshift(newFollowup);
+        saveFollowupsToStorage();
+
+        addNotification({
+            text: `تمت جدولة متابعة جديدة (${newFollowup.type}) للعميل (${client.name})`,
+            targetUser: newFollowup.assignedTo,
+            type: 'followup'
+        });
+
+        showNotification('تم إضافة موعد المتابعة بنجاح!', 'success');
+    }
 
     const modalEl = document.getElementById('addFollowupModal');
     bootstrap.Modal.getInstance(modalEl).hide();
@@ -699,7 +1081,6 @@ function handleSaveFollowup(e) {
     checkDueFollowups();
 }
 
-// دالة فحص المواعيد وحان وقتها لعرض التنبيه النابض والشريط العائم
 function checkDueFollowups() {
     if (!currentUser) return;
     const now = new Date();
@@ -707,14 +1088,12 @@ function checkDueFollowups() {
     let urgentHtml = '';
 
     followups.forEach(f => {
-        // فحص إذا كانت المهمة تخص الموظف الحالي (أو الأدمن يرى الكل) وأن حالتها مجدولة
         const isMyTask = (currentUser.role === 'Admin' || f.assignedTo === currentUser.name);
         if (isMyTask && f.status === 'مجدولة') {
             const taskDate = new Date(f.dateTime);
             if (taskDate <= now) {
                 dueCount++;
                 
-                // إضافة إشعار تلقائي جرس إذا لم يتم إضافته مسبقاً لهذه المهمة
                 if (!f.notified) {
                     f.notified = true;
                     saveFollowupsToStorage();
@@ -725,7 +1104,6 @@ function checkDueFollowups() {
                     });
                 }
 
-                // بناء واجهة تنبيه نابضة تظهر وتختفي لحين أخذ إكشن
                 urgentHtml += `
                     <div class="alert urgent-pulse-banner shadow-sm p-3 mb-3 d-flex justify-content-between align-items-center rounded-3" role="alert">
                         <div>
@@ -733,7 +1111,7 @@ function checkDueFollowups() {
                                 <i class="fa-solid fa-triangle-exclamation me-2"></i> تنبيه موعد متابعة عاجل!
                             </h5>
                             <p class="mb-0 text-dark">
-                                العميل: <strong>${f.clientName}</strong> | الهاتف: <strong>${f.clientPhone}</strong> | نوع المتابعة: <span class="badge bg-dark">${f.type}</span> | الموعد المحدد: <span class="text-danger fw-bold">${f.dateTime.replace('T', ' ')}</span>
+                                العميل: <strong>${f.clientName}</strong> | الهاتف: <strong>${f.clientPhone}</strong> | الإجراء: <span class="badge bg-dark">${f.type}</span> | الموعد: <span class="text-danger fw-bold">${f.dateTime.replace('T', ' ')}</span>
                             </p>
                         </div>
                         <div>
@@ -804,7 +1182,11 @@ function renderFollowups() {
         if (f.priority === 'هام جداً (High)') priorityBadge = 'bg-danger';
         if (f.priority === 'متوسطة') priorityBadge = 'bg-warning text-dark';
 
-        let statusBadge = f.status === 'مكتملة' ? 'bg-success' : 'bg-primary';
+        let statusBadge = 'bg-primary';
+        if (f.status === 'مكتملة') statusBadge = 'bg-success';
+        if (f.status === 'قيد المعالجة') statusBadge = 'bg-info text-dark';
+        if (f.status === 'مؤجلة') statusBadge = 'bg-warning text-dark';
+
         const now = new Date();
         const isLate = (new Date(f.dateTime) <= now && f.status === 'مجدولة');
 
@@ -819,6 +1201,7 @@ function renderFollowups() {
                 <td><span class="badge ${statusBadge}">${f.status}</span></td>
                 <td><small class="text-muted">${f.notes || '-'}</small></td>
                 <td>
+                    <button class="btn btn-sm btn-outline-primary me-1" onclick="editFollowup(${f.id})" title="تعديل الإجراء والحالة"><i class="fa-solid fa-pen-to-square"></i></button>
                     ${f.status !== 'مكتملة' ? `<button class="btn btn-sm btn-outline-success me-1" onclick="completeFollowup(${f.id})" title="إنجاز المهمة"><i class="fa-solid fa-check"></i></button>` : ''}
                     <button class="btn btn-sm btn-outline-danger" onclick="deleteFollowup(${f.id})" title="حذف"><i class="fa-solid fa-trash"></i></button>
                 </td>
