@@ -343,7 +343,7 @@
             <div id="tabSettings" class="tab-content-item d-none">
                 <h2 class="fw-bold text-roving-green mb-4">System Settings</h2>
                 
-                <!-- Password Change Section -->
+                <!-- Password Change Section (Available for All) -->
                 <div class="card card-custom p-4 mb-4">
                     <h4 class="text-roving-green fw-bold mb-3">Change Password</h4>
                     <form id="changePasswordForm" onsubmit="handlePasswordChange(event)">
@@ -1145,6 +1145,7 @@ function deleteBooking(id) {
     renderBookings();
 }
 
+// Render Commissions Tab (Hidden Assigned Commission Rate column)
 function renderCommissions() {
     const tbody = document.getElementById('commissionsTableBody');
     if (!tbody) return;
@@ -1172,6 +1173,7 @@ function renderCommissions() {
     });
 }
 
+// Admin Users & Commissions Management
 function renderAdminUsers() {
     const tbody = document.getElementById('adminUsersTableBody');
     if (!tbody) return;
@@ -1233,6 +1235,7 @@ function handleAddNewUser(e) {
     populateDropdowns();
 }
 
+// Admin Password Change
 function handlePasswordChange(e) {
     e.preventDefault();
     const currentPass = document.getElementById('currentPasswordInput').value;
@@ -1253,6 +1256,7 @@ function handlePasswordChange(e) {
     showNotification('Password updated successfully!', 'success');
 }
 
+// Broadcast Message System
 function handleBroadcast(e) {
     e.preventDefault();
     const message = document.getElementById('broadcastInputText').value.trim();
@@ -1274,6 +1278,7 @@ function checkBroadcast() {
     }
 }
 
+// Approval and Notification System for Sales Actions & Clients
 function addApprovalRequest(req) {
     req.id = Date.now();
     pendingApprovals.push(req);
@@ -1287,11 +1292,14 @@ function renderNotificationsUI() {
     if (!listContainer) return;
 
     pendingApprovals = JSON.parse(localStorage.getItem('roving_pending_approvals')) || [];
+
     let displayItems = [];
 
     if (currentUser.role === 'Admin') {
+        // الأدمن يرى طلبات الموافقة الواردة من السيلز
         displayItems = pendingApprovals;
     } else {
+        // السيلز يرى إشعاراته الخاصة أو العلاء الموجهين له
         displayItems = pendingApprovals.filter(req => req.targetUser === currentUser.name || req.user === currentUser.name);
     }
 
@@ -1328,6 +1336,7 @@ function renderNotificationsUI() {
     });
 }
 
+// فحص دوري للإشعارات (Polling) كل 3 ثوانٍ
 setInterval(() => {
     if (currentUser) {
         const storedApprovals = JSON.parse(localStorage.getItem('roving_pending_approvals')) || [];
