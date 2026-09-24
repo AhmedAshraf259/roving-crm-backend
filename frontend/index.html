@@ -165,6 +165,9 @@
                 <i class="fa-solid fa-bars me-2 text-roving-orange"></i> إظهار القائمة الجانبية
             </button>
 
+            <!-- Notifications Area -->
+            <div id="notificationArea"></div>
+
             <!-- Tab 1: Clients -->
             <div id="tabClients" class="tab-content-item">
                 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -281,6 +284,27 @@
                         <button type="submit" class="btn btn-primary w-100 py-2 fw-bold" id="saveClientBtn">Save Client Data</button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Transfer Client -->
+<div class="modal fade" id="transferClientModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold text-roving-green">Transfer Client (تحويل العميل)</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="transferClientId">
+                <p>تحويل العميل: <strong id="transferClientNameDisplay" class="text-roving-orange"></strong></p>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">اختر الموظف المراد التحويل إليه:</label>
+                    <select id="transferToEmployee" class="form-select"></select>
+                </div>
+                <button type="button" class="btn btn-primary w-100 fw-bold" onclick="executeTransfer()">تأكيد وإرسال التحويل</button>
             </div>
         </div>
     </div>
@@ -419,10 +443,19 @@ function switchTab(tabName) {
 
 function populateDropdowns() {
     const addSelect = document.getElementById('assignedEmployee');
+    const transferSelect = document.getElementById('transferToEmployee');
+    
     if (addSelect) {
         addSelect.innerHTML = '';
         validUsers.forEach(emp => {
             addSelect.innerHTML += `<option value="${emp.name}">${emp.name}</option>`;
+        });
+    }
+
+    if (transferSelect) {
+        transferSelect.innerHTML = '';
+        validUsers.forEach(emp => {
+            transferSelect.innerHTML += `<option value="${emp.name}">${emp.name}</option>`;
         });
     }
 }
@@ -452,6 +485,65 @@ function editClient(id) {
     modal.show();
 }
 
+// فتح نافذة التحويل
+function openTransferModal(id) {
+    const client = clients.find(c => c._id === id);
+    if (!client) return;
+
+    document.getElementById('transferClientId').value = client._id;
+    document.getElementById('transferClientNameDisplay').innerText = client.name;
+    populateDropdowns();
+
+    const modal = new bootstrap.Modal(document.getElementById('transferClientModal'));
+    modal.show();
+}
+
+// تنفيذ عملية التحويل مع إشعار فوري
+async function executeTransfer() {
+    const clientId = document.getElementById('transferClientId').value;
+    const newOwner = document.getElementById('transferToEmployee').value;
+    const client = clients.find(c => c._id === clientId);
+
+    if (!client) return;
+
+    const oldOwner = client.assignedTo || 'غير مسند';
+    client.assignedTo = newOwner;
+
+    try {
+        const response = await fetch(`${API_URL}/api/clients/${clientId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ assignedTo: newOwner })
+        });
+
+        if (response.ok) {
+            const modalEl = document.getElementById('transferClientModal');
+            bootstrap.Modal.getInstance(modalEl).hide();
+
+            // عرض إشعار النجاح والتنبيه
+            showNotification(`تم بنجاح تحويل العميل (${client.name}) من (${oldOwner}) إلى (${newOwner})!`, "success");
+            fetchClients();
+        } else {
+            alert('فشل تحويل العميل على السيرفر.');
+        }
+    } catch (error) {
+        alert('حدث خطأ في الاتصال: ' + error.message);
+    }
+}
+
+function showNotification(message, type = "success") {
+    const area = document.getElementById('notificationArea');
+    area.innerHTML = `
+        <div class="alert alert-${type} alert-dismissible fade show shadow-sm" role="alert">
+            <i class="fa-solid fa-bell me-2"></i> ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    `;
+    setTimeout(() => {
+        area.innerHTML = '';
+    }, 6000);
+}
+
 async function handleSaveClient(event) {
     event.preventDefault();
 
@@ -466,9 +558,8 @@ async function handleSaveClient(event) {
         notes: document.getElementById('clientNotes').value.trim()
     };
 
-    // التحقق من الصلاحيات: لو السيلز بيعدل، يحتاج موافقة
     if (currentUser.role === 'Sales' && editingId !== "") {
-        alert("تنبيه (مبيعات): طلب التعديل الخاص بك قيد الانتظار ويتطلب موافقة الأدمن (Admin Approval).");
+        alert("تنبيه (مبيعات): طلب التعديل الخاص بك قيد الانتظار ويتطلب موافقة الأدمن.");
         const modalEl = document.getElementById('addClientModal');
         bootstrap.Modal.getInstance(modalEl).hide();
         return;
@@ -490,7 +581,7 @@ async function handleSaveClient(event) {
         });
 
         if (response.ok) {
-            alert(editingId !== "" ? 'تم تعديل بيانات العميل بنجاح!' : 'تم حفظ العميل بنجاح!');
+            showNotification(editingId !== "" ? 'تم تعديل بيانات العميل بنجاح!' : 'تم حفظ العميل بنجاح!', 'success');
             document.getElementById('addClientForm').reset();
             
             const modalEl = document.getElementById('addClientModal');
@@ -520,7 +611,7 @@ async function deleteClient(id) {
         });
 
         if (response.ok) {
-            alert('تم حذف العميل بنجاح.');
+            showNotification('تم حذف العميل بنجاح.', 'warning');
             fetchClients();
         } else {
             alert('فشل حذف العميل.');
@@ -553,7 +644,6 @@ function renderClients() {
     }
 
     list.forEach((client, index) => {
-        // حساب رقم الملف ليبدأ من RT-00350 تصاعدياً
         const fileNumber = `RT-${(350 + index).toString().padStart(5, '0')}`;
         
         tbody.innerHTML += `
@@ -567,6 +657,7 @@ function renderClients() {
                 <td><span class="badge bg-primary">${client.status || 'New'}</span></td>
                 <td><small class="text-muted">${client.notes || '-'}</small></td>
                 <td>
+                    <button class="btn btn-sm btn-outline-success me-1" onclick="openTransferModal('${client._id}')" title="تحويل لموظف آخر"><i class="fa-solid fa-right-left"></i></button>
                     <button class="btn btn-sm btn-outline-primary me-1" onclick="editClient('${client._id}')" title="تعديل"><i class="fa-solid fa-pen-to-square"></i></button>
                     <button class="btn btn-sm btn-outline-danger" onclick="deleteClient('${client._id}')" title="حذف"><i class="fa-solid fa-trash"></i></button>
                 </td>
