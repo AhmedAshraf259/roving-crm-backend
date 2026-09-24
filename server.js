@@ -1,55 +1,59 @@
-require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 
 const app = express();
+
+// إعدادات Middleware الأساسية
 app.use(express.json());
 app.use(cors());
 
-// الاتصال بقاعدة البيانات السحابية الخاصة بك
-const MONGO_URI = "mongodb://ahmedashraf88513_db_user:68mcJLbyolkGSsAh@cluster0-shard-00-00.ht4llir.mongodb.net:27017,cluster0-shard-00-01.ht4llir.mongodb.net:27017,cluster0-shard-00-02.ht4llir.mongodb.net:27017/?ssl=true&replicaSet=atlas-12345-shard-0&authSource=admin&retryWrites=true&w=majority";
+// الاتصال بقاعدة بيانات MongoDB باستخدام متغير البيئة MONGO_URL
+const MONGO_URL = process.env.MONGO_URL;
 
-mongoose.connect(MONGO_URI)
-  .then(() => console.log('تم الاتصال بقاعدة بيانات MongoDB Atlas بنجاح'))
-  .catch(err => console.error('خطأ في الاتصال بقاعدة البيانات:', err));
+mongoose.connect(MONGO_URL, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+})
+.then(() => console.log("Connected to MongoDB successfully!"))
+.catch(err => console.error("MongoDB connection error:", err));
 
-// تصميم هيكل بيانات العميل (Schema)
+// تعريف نموذج (Schema) للعملاء
 const clientSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  phone: { type: String, required: true },
-  passport: String,
-  source: String,
-  assignedTo: String, 
-  status: { type: String, default: 'جديد' },
-  notes: String,
-  createdAt: { type: Date, default: Date.now }
-});
+    name: { type: String, required: true },
+    phone: String,
+    passport: String,
+    source: { type: String, required: true },
+    status: { type: String, required: true },
+    assignedTo: String,
+    notes: String
+}, { timestamps: true });
 
 const Client = mongoose.model('Client', clientSchema);
 
-// --- API Endpoints ---
+// مسار لجلب جميع العملاء
 app.get('/api/clients', async (req, res) => {
-  try {
-    const clients = await Client.find().sort({ createdAt: -1 });
-    res.json(clients);
-  } catch (err) {
-    res.status(500).json({ error: 'خطأ في جلب البيانات' });
-  }
+    try {
+        const clients = await Client.find().sort({ createdAt: -1 });
+        res.json(clients);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch clients' });
+    }
 });
 
+// مسار لإضافة عميل جديد
 app.post('/api/clients', async (req, res) => {
-  try {
-    const newClient = new Client(req.body);
-    const savedClient = await newClient.save();
-    res.status(201).json(savedClient);
-  } catch (err) {
-    res.status(400).json({ error: 'خطأ في حفظ العميل' });
-  }
+    try {
+        const newClient = new Client(req.body);
+        const savedClient = await newClient.save();
+        res.status(201).json(savedClient);
+    } catch (error) {
+        res.status(400).json({ error: 'Failed to save client' });
+    }
 });
 
-// تشغيل السيرفر
-const PORT = process.env.PORT || 5000;
+// تشغيل السيرفر على المنفذ المتاح أو المنفذ الافتراضي لـ Render
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`السيرفر يعمل على المنفذ ${PORT}`);
+    console.log(`Server is running on port ${PORT}`);
 });
