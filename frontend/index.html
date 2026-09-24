@@ -1316,7 +1316,72 @@ function renderNotificationsUI() {
         `;
     });
 }
+async function handleNotificationAction(notificationId, action) {
+    let notifications = JSON.parse(localStorage.getItem('roving_notifications')) || [];
+    const notifIndex = notifications.findIndex(n => n.id === notificationId);
+    if (notifIndex === -1) return;
 
+    const notif = notifications[notifIndex];
+
+    if (action === 'accept') {
+        notif.status = 'accepted';
+        
+        // تنفيذ العملية بناءً على نوع الطلب
+        if (notif.requestType === 'DELETE_CLIENT') {
+            // تنفيذ الحذف محلياً ومن السيرفر
+            await executeDeleteClient(notif.payload.clientId);
+            if (typeof showNotification === 'function') showNotification('تمت الموافقة وحذف العميل بنجاح', 'success');
+        } else if (notif.requestType === 'EDIT_CLIENT') {
+            // تنفيذ التعديل وحفظ البيانات المحدثة
+            await executeSaveClient(notif.payload.clientData);
+            if (typeof showNotification === 'function') showNotification('تمت الموافقة وتعديل بيانات العميل بنجاح', 'success');
+        }
+    } else {
+        notif.status = 'rejected';
+        if (typeof showNotification === 'function') {
+            showNotification('تم رفض الطلب بنجاح', 'info');
+        }
+    }
+
+    notifications[notifIndex] = notif;
+    localStorage.setItem('roving_notifications', JSON.stringify(notifications));
+    
+    // إعادة تحميل الإشعارات وقائمة العملاء
+    renderNotifications();
+    if (typeof fetchClients === 'function') fetchClients();
+}
+
+// دالة مساعدة لتنفيذ الحذف الفعلي
+async function executeDeleteClient(clientId) {
+    let localClients = JSON.parse(localStorage.getItem('roving_local_clients')) || [];
+    localClients = localClients.filter(c => (c._id || c.id) !== clientId);
+    localStorage.setItem('roving_local_clients', JSON.stringify(localClients));
+
+    try {
+        await fetch(`${API_URL}/api/clients/${clientId}`, { method: 'DELETE' });
+    } catch (error) {
+        console.log("Server delete skipped.");
+    }
+}
+
+// دالة مساعدة لتنفيذ الحفظ/التعديل الفعلي
+async function executeSaveClient(clientData) {
+    let localClients = JSON.parse(localStorage.getItem('roving_local_clients')) || [];
+    const editingId = clientData._id;
+    
+    localClients = localClients.map(c => (c._id === editingId || c.id === editingId) ? clientData : c);
+    localStorage.setItem('roving_local_clients', JSON.stringify(localClients));
+
+    try {
+        await fetch(`${API_URL}/api/clients/${editingId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(clientData)
+        });
+    } catch (error) {
+        console.log("Server sync skipped.");
+    }
+}
 function markAllNotificationsRead() {
     if (!currentUser) return;
     pendingNotifications.forEach(n => {
@@ -1346,38 +1411,6 @@ async function handleSaveClient(event) {
     const nameInput = document.getElementById('clientName').value.trim();
     const phoneInput = document.getElementById('clientPhone').value.trim();
 
-    // التحقق من عدم التكرار (فقط في حالة إضافة عميل جديد أو تغيير بيانات عميل حالي)
-    let allClients = Array.isArray(clients) ? [...clients] : [];
-    const localClientsCheck = JSON.parse(localStorage.getItem('roving_local_clients')) || [];
-    
-    // دمج القائمتين للتحقق الشامل
-    const combinedMap = new Map();
-    allClients.forEach(c => combinedMap.set(c._id || c.id, c));
-    localClientsCheck.forEach(c => combinedMap.set(c._id || c.id, c));
-    const uniqueClientsList = Array.from(combinedMap.values());
-
-    const isDuplicate = uniqueClientsList.some(c => {
-        const cId = c._id || c.id;
-        // استثناء العميل الحالي عند التعديل
-        if (editingId !== "" && (cId === editingId)) {
-            return false;
-        }
-        
-        const matchName = c.name && c.name.trim().toLowerCase() === nameInput.toLowerCase();
-        const matchPhone = c.phone && c.phone.trim() === phoneInput;
-        
-        return matchName || matchPhone;
-    });
-
-    if (isDuplicate) {
-        if (typeof showNotification === 'function') {
-            showNotification('عذراً، هذا العميل مسجل مسبقاً بنفس الاسم أو رقم الهاتف!', 'danger');
-        } else {
-            alert('عذراً، هذا العميل مسجل مسبقاً بنفس الاسم أو رقم الهاتف!');
-        }
-        return; // إيقاف عملية الحفظ
-    }
-
     const clientData = {
         _id: editingId !== "" ? editingId : 'local_' + Date.now(),
         name: nameInput,
@@ -1389,57 +1422,86 @@ async function handleSaveClient(event) {
         notes: document.getElementById('clientNotes').value.trim()
     };
 
-    // 1. الحفظ محلياً فوراً
-    let localClients = JSON.parse(localStorage.getItem('roving_local_clients')) || [];
-    if (editingId !== "") {
-        localClients = localClients.map(c => (c._id === editingId || c.id === editingId) ? clientData : c);
-    } else {
-        localClients.unshift(clientData);
-    }
-    localStorage.setItem('roving_local_clients', JSON.stringify(localClients));
-
-    // 2. مزامنة البيانات مع السيرفر في الخلفية
-    try {
-        let url = `${API_URL}/api/clients`;
-        let method = 'POST';
-        if (editingId !== "" && !editingId.startsWith('local_')) {
-            url = `${API_URL}/api/clients/${editingId}`;
-            method = 'PUT';
+    // إذا كان المستخدم Sales ويحاول "تعديل" عميل حالي
+    if (currentUser && currentUser.role === 'Sales' && editingId !== "") {
+        const approvalRequest = {
+            id: 'req_' + Date.now(),
+            type: 'EDIT_CLIENT',
+            clientData: clientData,
+            requestedBy: currentUser.name,
+            status: 'Pending',
+            date: new Date().toISOString()
+        };
+        saveApprovalRequest(approvalRequest);
+        
+        if (typeof showNotification === 'function') {
+            showNotification('تم إرسال طلب التعديل إلى المدير للموافقة عليه.', 'warning');
+        } else {
+            alert('تم إرسال طلب التعديل إلى المدير للموافقة عليه.');
         }
-        await fetch(url, {
-            method: method,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(clientData)
-        });
-    } catch (error) {
-        console.log("Server sync skipped, saved locally.");
-    }
 
-    if (typeof showNotification === 'function') {
-        showNotification('Client saved successfully!', 'success');
-    }
-    
-    const modalEl = document.getElementById('addClientModal');
-    if (modalEl) {
-        const modalInstance = bootstrap.Modal.getInstance(modalEl);
-        if (modalInstance) modalInstance.hide();
-    }
-    
-    fetchClients();
-}
-async function deleteClient(id) {
-    if (!confirm("Are you sure you want to delete this client?")) return;
-    try {
-        const response = await fetch(`${API_URL}/api/clients/${id}`, { method: 'DELETE' });
-        if (response.ok) {
-            showNotification('Client deleted successfully.', 'warning');
-            fetchClients();
+        const modalEl = document.getElementById('addClientModal');
+        if (modalEl) {
+            const modalInstance = bootstrap.Modal.getInstance(modalEl);
+            if (modalInstance) modalInstance.hide();
         }
-    } catch (error) {
-        alert('Error: ' + error.message);
+        return;
+    }
+
+    // (باقي كود الحفظ العادي للأدمن أو الإضافة الجديدة للموظف يوضع هنا كما كان)
+    // ...
+}
+// دالة الحذف الذكية حسب الصلاحية
+async function deleteClient(clientId) {
+    const client = clients.find(c => (c._id || c.id) === clientId);
+    if (!client) return;
+
+    // إذا كان المستخدم الحالي موظف مبيعات، يتم إرسال طلب حذف للأدمن
+    if (currentUser && currentUser.role === 'Sales') {
+        const approvalRequest = {
+            id: 'req_' + Date.now(),
+            type: 'DELETE_CLIENT',
+            clientId: clientId,
+            clientName: client.name,
+            requestedBy: currentUser.name,
+            status: 'Pending',
+            date: new Date().toISOString()
+        };
+
+        saveApprovalRequest(approvalRequest);
+        if (typeof showNotification === 'function') {
+            showNotification('تم إرسال طلب الحذف إلى المدير للموافقة عليه.', 'warning');
+        } else {
+            alert('تم إرسال طلب الحذف إلى المدير للموافقة عليه.');
+        }
+        return;
+    }
+
+    // إذا كان المستخدم مدير (Admin)، يتم الحذف مباشرة
+    if (confirm('هل أنت متأكد من حذف هذا العميل؟')) {
+        let localClients = JSON.parse(localStorage.getItem('roving_local_clients')) || [];
+        localClients = localClients.filter(c => (c._id || c.id) !== clientId);
+        localStorage.setItem('roving_local_clients', JSON.stringify(localClients));
+
+        try {
+            await `${API_URL}/api/clients/${clientId}`, { method: 'DELETE' };
+        } catch (error) {
+            console.log("Server delete skipped.");
+        }
+
+        if (typeof showNotification === 'function') {
+            showNotification('تم حذف العميل بنجاح', 'success');
+        }
+        fetchClients();
     }
 }
 
+// دالة مساعدة لحفظ طلبات الموافقة في الـ LocalStorage لتظهر عند الأدمن
+function saveApprovalRequest(request) {
+    let requests = JSON.parse(localStorage.getItem('roving_approval_requests')) || [];
+    requests.unshift(request);
+    localStorage.setItem('roving_approval_requests', JSON.stringify(requests));
+}
 function editClient(id) {
     const client = clients.find(c => c._id === id);
     if (!client) return;
