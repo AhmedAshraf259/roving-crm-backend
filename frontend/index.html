@@ -1,60 +1,550 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CRM - تسجيل الدخول</title>
+    <title>Roving Travel - CRM & Management System</title>
+    <!-- Google Fonts: Inter for Professional Modern Look -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
     <style>
-        body { font-family: Tahoma, sans-serif; background-color: #f4f7f6; padding: 50px; text-align: center; }
-        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); display: inline-block; width: 300px; }
-        input { width: 90%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; }
-        button { background: #007BFF; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; width: 100%; }
-        button:hover { background: #0056b3; }
-        #result { margin-top: 15px; font-size: 14px; word-break: break-all; }
+        :root {
+            --roving-green: #293E35;      
+            --roving-dark-green: #1A2822; 
+            --roving-orange: #D45B38;    
+            --roving-light-orange: #E67E55; 
+            --roving-bg: #F4F1EA;        
+        }
+
+        body { 
+            background-color: var(--roving-bg); 
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            color: #2D3748;
+            letter-spacing: -0.01em;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        h1, h2, h3, h4, h5, h6, .fw-bold, .fw-semibold {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .sidebar { 
+            min-height: 100vh; 
+            background: var(--roving-green); 
+            color: #ffffff; 
+            transition: all 0.3s ease-in-out;
+            position: relative;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
+        .sidebar.collapsed {
+            margin-left: -16.666667%; 
+            opacity: 0;
+            padding: 0 !important;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar.collapsed {
+                margin-left: -100%;
+            }
+        }
+
+        .sidebar a { 
+            color: #E2E8F0; 
+            text-decoration: none; 
+            padding: 12px 18px; 
+            display: block; 
+            border-radius: 8px; 
+            margin-bottom: 6px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar a:hover, .sidebar a.active { 
+            background: var(--roving-orange); 
+            color: #ffffff; 
+        }
+
+        .card-custom { 
+            border: none; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05); 
+            background: #ffffff;
+        }
+
+        .btn-primary, .bg-primary-custom {
+            background-color: var(--roving-orange) !important;
+            border-color: var(--roving-orange) !important;
+        }
+
+        .btn-primary:hover {
+            background-color: #B83A1B !important;
+            border-color: #B83A1B !important;
+        }
+
+        .text-roving-green { color: var(--roving-green) !important; }
+        .text-roving-orange { color: var(--roving-orange) !important; }
+
+        .login-card { 
+            max-width: 420px; 
+            margin: 80px auto; 
+            border-radius: 16px; 
+            border: none; 
+            box-shadow: 0 10px 30px rgba(194, 120, 53, 0.15); 
+            background: #ffffff;
+        }
     </style>
 </head>
 <body>
 
-    <div class="card">
-        <h2>تسجيل الدخول</h2>
-        <input type="email" id="email" placeholder="البريد الإلكتروني">
-        <input type="password" id="password" placeholder="كلمة المرور">
-        <button onclick="login()">دخول</button>
-        <div id="result"></div>
+<!-- 1. LOGIN SECTION -->
+<div id="loginSection" class="container">
+    <div class="card login-card p-4">
+        <div class="text-center mb-4">
+            <div class="d-flex justify-content-center align-items-center mb-2">
+                <h3 class="fw-bold text-roving-orange m-0">Roving Travel</h3>
+            </div>
+            <p class="text-muted">System Login</p>
+        </div>
+        <form id="loginForm">
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Email Address</label>
+                <input type="email" id="loginEmail" class="form-control" placeholder="name@roving.com" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Password</label>
+                <input type="password" id="loginPassword" class="form-control" placeholder="••••••••" required>
+            </div>
+            <div id="loginError" class="alert alert-danger py-2 d-none" role="alert"></div>
+            <button type="submit" id="loginSubmitBtn" class="btn btn-primary w-100 py-2 fw-bold">Sign In</button>
+        </form>
     </div>
+</div>
 
-    <script>
-        // قائمة المستخدمين المصرح لهم بالدخول
-        const validUsers = [
-            { email: "asmaa.ashraf.1312002@gmail.com", password: "Asmaa@2026", name: "Asmaa Ashraf" },
-            { email: "ahmedashraf88513@gmail.com", password: "AhmedA#88", name: "Ahmed Ashraf" },
-            { email: "ahmedwanas11@gmail.com", password: "Wanas!Pass2026", name: "Ahmed Wanas" },
-            { email: "sales1@roving.com", password: "SalesRoving#1", name: "Sales Agent 1" }
-        ];
+<!-- 2. MAIN APPLICATION DASHBOARD -->
+<div id="appSection" class="container-fluid d-none">
+    <div class="row">
+        <!-- Sidebar Navigation -->
+        <div class="col-md-2 sidebar p-3" id="sidebarContainer">
+            <div class="d-flex justify-content-between align-items-center my-2">
+                <div class="d-flex align-items-center">
+                    <h4 class="text-roving-orange fw-bold m-0" style="font-size: 1rem;">Roving CRM</h4>
+                </div>
+                <button class="btn btn-sm btn-outline-light" onclick="toggleSidebar()" title="إخفاء القائمة">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+            </div>
+            <hr class="border-secondary my-2">
+            
+            <div class="mb-3 text-center bg-dark p-2 rounded bg-opacity-25">
+                <small class="text-light opacity-75 d-block">Current User:</small>
+                <strong id="userDisplayName" class="text-truncate d-block small text-white">...</strong>
+                <div><span id="userRoleBadge" class="badge mt-1"></span></div>
+            </div>
 
-        function login() {
-            const emailInput = document.getElementById('email').value.trim();
-            const passwordInput = document.getElementById('password').value.trim();
-            const resultDiv = document.getElementById('result');
+            <!-- Navigation Links -->
+            <nav class="mt-3">
+                <a href="#" id="navClients" class="active" onclick="switchTab('clients')"><i class="fa-solid fa-users me-2"></i> Clients</a>
+                <a href="#" id="navFollowups" onclick="switchTab('followups')"><i class="fa-solid fa-phone-volume me-2"></i> Follow-ups</a>
+                <a href="#" id="navBookings" onclick="switchTab('bookings')"><i class="fa-solid fa-receipt me-2"></i> Bookings</a>
+                <a href="#" id="navCommissions" onclick="switchTab('commissions')"><i class="fa-solid fa-hand-holding-dollar me-2"></i> Commissions</a>
+                <a href="#" id="navReports" onclick="switchTab('reports')"><i class="fa-solid fa-chart-line me-2"></i> Reports</a>
+                <a href="#" id="navSettings" onclick="switchTab('settings')"><i class="fa-solid fa-gear me-2"></i> Settings</a>
+                <a href="#" class="text-danger mt-4" onclick="handleLogout()"><i class="fa-solid fa-right-from-bracket me-2"></i> Logout</a>
+            </nav>
+        </div>
 
-            // البحث عن المستخدم في القائمة
-            const user = validUsers.find(u => u.email === emailInput && u.password === passwordInput);
+        <!-- Main Dashboard View -->
+        <div class="col-md-10 p-4" id="mainContentArea">
+            <button class="btn btn-outline-dark mb-3 d-none fw-bold shadow-sm" id="showSidebarBtn" onclick="toggleSidebar()">
+                <i class="fa-solid fa-bars me-2 text-roving-orange"></i> إظهار القائمة الجانبية
+            </button>
 
-            if (user) {
-                resultDiv.style.color = 'green';
-                resultDiv.innerText = 'تم تسجيل الدخول بنجاح! جاري التحويل...';
+            <!-- Tab 1: Clients -->
+            <div id="tabClients" class="tab-content-item">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2 class="fw-bold text-roving-green">Client Directory</h2>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addClientModal" onclick="openAddClientModal()"><i class="fa-solid fa-plus me-1"></i> Add Client</button>
+                </div>
                 
-                localStorage.setItem('user', JSON.stringify(user));
+                <div class="card card-custom p-3 mb-3 bg-light">
+                    <div class="row align-items-center">
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold mb-1"><i class="fa-solid fa-magnifying-glass me-1 text-roving-orange"></i> بحث برقم الهاتف</label>
+                            <input type="text" id="clientPhoneSearch" class="form-control" placeholder="اكتب رقم الهاتف للبحث..." oninput="renderClients()">
+                        </div>
+                    </div>
+                </div>
 
-                setTimeout(() => {
-                    window.location.href = 'dashboard.html';
-                }, 1000);
-            } else {
-                resultDiv.style.color = 'red';
-                resultDiv.innerText = 'خطأ: البريد الإلكتروني أو كلمة المرور غير صحيحة';
-            }
+                <div class="card card-custom p-3">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>File #</th>
+                                    <th>Name *</th>
+                                    <th>Source *</th>
+                                    <th>Contact Info</th>
+                                    <th>Passport Info</th>
+                                    <th>Assigned To</th>
+                                    <th>Status *</th>
+                                    <th>Notes</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="clientsTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 2: Follow-ups -->
+            <div id="tabFollowups" class="tab-content-item d-none">
+                <h2 class="fw-bold text-roving-green">Follow-ups & Tasks Schedule</h2>
+            </div>
+
+            <!-- Tab 3: Bookings -->
+            <div id="tabBookings" class="tab-content-item d-none">
+                <h2 class="fw-bold text-roving-green">Confirmed Trips & Bookings</h2>
+            </div>
+
+            <!-- Tab 4: Commissions -->
+            <div id="tabCommissions" class="tab-content-item d-none">
+                <h2 class="fw-bold text-roving-green">Commissions Overview</h2>
+            </div>
+
+            <!-- Tab 5: Reports -->
+            <div id="tabReports" class="tab-content-item d-none">
+                <h2 class="fw-bold text-roving-green">Reports & Analytics</h2>
+            </div>
+
+            <!-- Tab 6: Settings -->
+            <div id="tabSettings" class="tab-content-item d-none">
+                <h2 class="fw-bold text-roving-green">Settings</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Add Client -->
+<div class="modal fade" id="addClientModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold text-roving-green" id="clientModalTitle">Add New Client</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addClientForm">
+                    <input type="hidden" id="editingClientId" value="">
+                    
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Client Name <span class="text-danger">*</span></label>
+                            <input type="text" id="clientName" class="form-control" placeholder="e.g. Mohamed Ali" required>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Lead Source <span class="text-danger">*</span></label>
+                            <select id="clientSource" class="form-select" required>
+                                <option value="" disabled selected>-- Select Source --</option>
+                                <option value="Facebook">Facebook</option>
+                                <option value="Instagram">Instagram</option>
+                                <option value="WhatsApp">WhatsApp</option>
+                                <option value="Recommendation">Recommendation</option>
+                                <option value="Website">Website</option>
+                                <option value="Direct Call">Direct Call</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Status <span class="text-danger">*</span></label>
+                            <select id="clientStatusSelect" class="form-select" required>
+                                <option value="New">New</option>
+                                <option value="Contacted">Contacted</option>
+                                <option value="Interested">Interested</option>
+                                <option value="Closed/Won">Closed/Won</option>
+                                <option value="Lost">Lost</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Assign To</label>
+                            <select id="assignedEmployee" class="form-select" required></select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Phone Number</label>
+                            <input type="tel" id="clientPhone" class="form-control" placeholder="01xxxxxxxxx">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Passport Number</label>
+                            <input type="text" id="clientPassport" class="form-control" placeholder="A12345678">
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Client Details & Notes</label>
+                            <textarea id="clientNotes" class="form-control" rows="3" placeholder="ملاحظات تفصيلية..."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-primary w-100 py-2 fw-bold" id="saveClientBtn">Save Client Data</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bootstrap 5 JS Bundle -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+const API_URL = "https://roving-crm-backend.onrender.com";
+
+let validUsers = [
+    { email: "asmaa.ashraf.1312002@gmail.com", pass: "Asmaa@2026", role: "Admin", name: "Asmaa Ashraf", commissionRate: 10 },
+    { email: "ahmedashraf88513@gmail.com", pass: "AhmedA#88", role: "Admin", name: "Ahmed Ashraf", commissionRate: 10 },
+    { email: "ahmedwanas11@gmail.com", pass: "Wanas!Pass2026", role: "Admin", name: "Ahmed Wanas", commissionRate: 10 },
+    { email: "sales1@roving.com", pass: "SalesRoving#1", role: "Sales", name: "Sales Agent 1", commissionRate: 8 }
+];
+
+let currentUser = null;
+let clients = []; 
+
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebarContainer');
+    const mainContent = document.getElementById('mainContentArea');
+    const showSidebarBtn = document.getElementById('showSidebarBtn');
+    
+    sidebar.classList.toggle('collapsed');
+    
+    if (sidebar.classList.contains('collapsed')) {
+        mainContent.classList.remove('col-md-10');
+        mainContent.classList.add('col-md-12');
+        if (showSidebarBtn) showSidebarBtn.classList.remove('d-none');
+    } else {
+        mainContent.classList.remove('col-md-12');
+        mainContent.classList.add('col-md-10');
+        if (showSidebarBtn) showSidebarBtn.classList.add('d-none');
+    }
+}
+
+async function fetchClients() {
+    try {
+        const response = await fetch(`${API_URL}/api/clients`);
+        if (response.ok) {
+            const data = await response.json();
+            clients = Array.isArray(data) ? data : [];
+            renderClients();
+        } else {
+            clients = [];
+            renderClients();
         }
-    </script>
+    } catch (error) {
+        clients = [];
+        renderClients();
+    }
+}
 
+window.addEventListener('DOMContentLoaded', () => {
+    const savedUser = localStorage.getItem('crm_user');
+    if (savedUser) {
+        try {
+            currentUser = JSON.parse(savedUser);
+            document.getElementById('loginSection').classList.add('d-none');
+            document.getElementById('appSection').classList.remove('d-none');
+            initApp();
+        } catch (e) {
+            localStorage.removeItem('crm_user');
+        }
+    }
+
+    const clientForm = document.getElementById('addClientForm');
+    if (clientForm) {
+        clientForm.addEventListener('submit', handleAddClient);
+    }
+});
+
+document.getElementById('loginForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const emailInput = document.getElementById('loginEmail').value.trim().toLowerCase();
+    const passwordInput = document.getElementById('loginPassword').value.trim();
+    const errorDiv = document.getElementById('loginError');
+
+    errorDiv.classList.add('d-none');
+    const targetUser = validUsers.find(u => u.email.toLowerCase() === emailInput);
+
+    if (!targetUser || targetUser.pass !== passwordInput) {
+        errorDiv.innerText = "البريد الإلكتروني أو كلمة السر غير صحيحة!";
+        errorDiv.classList.remove('d-none');
+        return;
+    }
+
+    currentUser = { email: targetUser.email, role: targetUser.role, name: targetUser.name, pass: targetUser.pass };
+    localStorage.setItem('crm_user', JSON.stringify(currentUser));
+
+    document.getElementById('loginSection').classList.add('d-none');
+    document.getElementById('appSection').classList.remove('d-none');
+    
+    initApp();
+});
+
+function handleLogout() {
+    currentUser = null;
+    localStorage.removeItem('crm_user');
+    document.getElementById('loginSection').classList.remove('d-none');
+    document.getElementById('appSection').classList.add('d-none');
+}
+
+function initApp() {
+    document.getElementById('userDisplayName').innerText = currentUser.name || currentUser.email;
+    document.getElementById('userRoleBadge').innerText = currentUser.role;
+    
+    if (currentUser.role === 'Admin') {
+        document.getElementById('userRoleBadge').className = "badge bg-danger mt-1";
+    } else {
+        document.getElementById('userRoleBadge').className = "badge bg-warning text-dark mt-1";
+    }
+
+    fetchClients(); 
+    populateDropdowns();  
+}
+
+function switchTab(tabName) {
+    document.querySelectorAll('.tab-content-item').forEach(el => el.classList.add('d-none'));
+    document.querySelectorAll('.sidebar nav a').forEach(el => el.classList.remove('active'));
+
+    if (tabName === 'clients') {
+        document.getElementById('tabClients').classList.remove('d-none');
+        document.getElementById('navClients').classList.add('active');
+        fetchClients(); 
+    }
+    if (tabName === 'followups') {
+        document.getElementById('tabFollowups').classList.remove('d-none');
+        document.getElementById('navFollowups').classList.add('active');
+    }
+    if (tabName === 'bookings') {
+        document.getElementById('tabBookings').classList.remove('d-none');
+        document.getElementById('navBookings').classList.add('active');
+    }
+    if (tabName === 'commissions') {
+        document.getElementById('tabCommissions').classList.remove('d-none');
+        document.getElementById('navCommissions').classList.add('active');
+    }
+    if (tabName === 'reports') {
+        document.getElementById('tabReports').classList.remove('d-none');
+        document.getElementById('navReports').classList.add('active');
+    }
+    if (tabName === 'settings') {
+        document.getElementById('tabSettings').classList.remove('d-none');
+        document.getElementById('navSettings').classList.add('active');
+    }
+}
+
+function populateDropdowns() {
+    const addSelect = document.getElementById('assignedEmployee');
+    if (addSelect) {
+        addSelect.innerHTML = '';
+        validUsers.forEach(emp => {
+            addSelect.innerHTML += `<option value="${emp.name}">${emp.name}</option>`;
+        });
+    }
+}
+
+function openAddClientModal() {
+    document.getElementById('clientModalTitle').innerText = "Add New Client";
+    document.getElementById('editingClientId').value = "";
+    document.getElementById('addClientForm').reset();
+    populateDropdowns(); 
+}
+
+// دالة الحفظ المحدثة مع التنبيهات الفورية لفحص سبب أي مشكلة محتملة
+async function handleAddClient(event) {
+    event.preventDefault();
+    alert("تم الضغط على زر حفظ العميل بنجاح!");
+
+    const clientData = {
+        name: document.getElementById('clientName').value.trim(),
+        phone: document.getElementById('clientPhone').value.trim(),
+        passport: document.getElementById('clientPassport').value.trim(),
+        source: document.getElementById('clientSource').value,
+        status: document.getElementById('clientStatusSelect').value,
+        assignedTo: document.getElementById('assignedEmployee').value,
+        notes: document.getElementById('clientNotes').value.trim()
+    };
+
+    try {
+        const response = await fetch(`${API_URL}/api/clients`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(clientData)
+        });
+
+        if (response.ok) {
+            alert('تم الحفظ بنجاح على السيرفر!');
+            document.getElementById('addClientForm').reset();
+            
+            const modalEl = document.getElementById('addClientModal');
+            const modalInstance = bootstrap.Modal.getInstance(modalEl);
+            if (modalInstance) {
+                modalInstance.hide();
+            }
+            
+            fetchClients(); 
+        } else {
+            alert('السيرفر رفض الطلب (Response Status Not OK).');
+        }
+    } catch (error) {
+        alert('حدث خطأ في الاتصال بالشبكة: ' + error.message);
+    }
+}
+
+function renderClients() {
+    const tbody = document.getElementById('clientsTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    
+    let list = Array.isArray(clients) ? clients : [];
+
+    if (currentUser && currentUser.role === 'Sales') {
+        list = list.filter(c => c.assignedTo === currentUser.name);
+    }
+
+    const phoneQuery = document.getElementById('clientPhoneSearch') ? document.getElementById('clientPhoneSearch'].value.trim() : "";
+    if (phoneQuery !== "") {
+        list = list.filter(c => c.phone && c.phone.includes(phoneQuery));
+    }
+
+    if (list.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">لا توجد بيانات عملاء مسجلة حالياً</td></tr>`;
+        return;
+    }
+
+    list.forEach((client, index) => {
+        tbody.innerHTML += `
+            <tr>
+                <td><span class="badge bg-dark">#${index + 1}</span></td>
+                <td><strong>${client.name}</strong></td>
+                <td><span class="badge bg-secondary">${client.source || '-'}</span></td>
+                <td><small><i class="fa-solid fa-phone me-1"></i>${client.phone || '-'}</small></td>
+                <td><small>${client.passport || '-'}</small></td>
+                <td><span class="badge bg-light text-dark border">${client.assignedTo || 'غير مسند'}</span></td>
+                <td><span class="badge bg-primary">${client.status || 'جديد'}</span></td>
+                <td><small class="text-muted">${client.notes || '-'}</small></td>
+                <td><button class="btn btn-sm btn-outline-primary" title="تعديل"><i class="fa-solid fa-pen-to-square"></i></button></td>
+            </tr>
+        `;
+    });
+}
+</script>
 </body>
 </html>
