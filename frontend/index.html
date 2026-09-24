@@ -172,7 +172,7 @@
                     <i class="fa-solid fa-phone-volume me-2"></i> Follow-ups 
                     <span id="sidebarFollowupBadge" class="badge bg-danger ms-2 d-none" style="font-size: 10px;">0</span>
                 </a>
-                <a href="#" id="navBookings" onclick="switchTab('bookings')"><i class="fa-solid fa-receipt me-2"></i> Bookings</a>
+                <a href="#" id="navBookings" onclick="switchTab('bookings')"><i class="fa-solid fa-receipt me-2"></i> Bookings & Installments</a>
                 <a href="#" id="navCommissions" onclick="switchTab('commissions')"><i class="fa-solid fa-hand-holding-dollar me-2"></i> Commissions</a>
                 <a href="#" id="navReports" onclick="switchTab('reports')"><i class="fa-solid fa-chart-line me-2"></i> Reports</a>
                 <a href="#" id="navSettings" onclick="switchTab('settings')"><i class="fa-solid fa-gear me-2"></i> Settings</a>
@@ -284,10 +284,10 @@
                 </div>
             </div>
 
-            <!-- Tab 3: Confirmed Trips & Bookings -->
+            <!-- Tab 3: Confirmed Trips & Bookings (with Installments) -->
             <div id="tabBookings" class="tab-content-item d-none">
                 <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h2 class="fw-bold text-roving-green">Confirmed Trips & Bookings</h2>
+                    <h2 class="fw-bold text-roving-green">Bookings & Installments (الحجوزات والأقساط)</h2>
                     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addBookingModal" onclick="openAddBookingModal()">
                         <i class="fa-solid fa-plus me-1"></i> Add New Booking
                     </button>
@@ -302,7 +302,7 @@
                                     <th>Client Name</th>
                                     <th>Category</th>
                                     <th>Net Price</th>
-                                    <th>Cost Price</th>
+                                    <th>Paid / Remaining</th>
                                     <th>Profit</th>
                                     <th>Status</th>
                                     <th>Details & Notes</th>
@@ -488,12 +488,12 @@
     </div>
 </div>
 
-<!-- Modal: Add / Edit Booking -->
+<!-- Modal: Add / Edit Booking & Installments -->
 <div class="modal fade" id="addBookingModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title fw-bold text-roving-green" id="bookingModalTitle">إضافة حجز جديد (New Booking)</h5>
+                <h5 class="modal-title fw-bold text-roving-green" id="bookingModalTitle">إضافة حجز جديد وتفاصيل الأقساط</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -520,24 +520,35 @@
                         </div>
 
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">سعر البيع / صافي العميل (Net Price) <span class="text-danger">*</span></label>
-                            <input type="number" step="0.01" id="bookingNetPrice" class="form-control" placeholder="0.00" oninput="calculateBookingProfit()" required>
+                            <label class="form-label fw-semibold">سعر البيع / الإجمالي (Net Price) <span class="text-danger">*</span></label>
+                            <input type="number" step="0.01" id="bookingNetPrice" class="form-control" placeholder="0.00" oninput="calculateBookingFinancials()" required>
                         </div>
 
                         <div class="col-md-4">
                             <label class="form-label fw-semibold">سعر التكلفة (Cost Price) <span class="text-danger">*</span></label>
-                            <input type="number" step="0.01" id="bookingCostPrice" class="form-control" placeholder="0.00" oninput="calculateBookingProfit()" required>
+                            <input type="number" step="0.01" id="bookingCostPrice" class="form-control" placeholder="0.00" oninput="calculateBookingFinancials()" required>
                         </div>
 
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">صافي الربح (Profit) <span class="text-success">(محسوب تلقائياً)</span></label>
+                            <label class="form-label fw-semibold">صافي الربح (Profit) <span class="text-success">(تلقائي)</span></label>
                             <input type="text" id="bookingProfitDisplay" class="form-control bg-light fw-bold text-success" value="0.00" readonly>
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">حالة الحجز (Status) <span class="text-danger">*</span></label>
+                            <label class="form-label fw-semibold">المبلغ المدفوع حالياً (Paid Amount) <span class="text-primary">(أقساط/دفعات)</span></label>
+                            <input type="number" step="0.01" id="bookingPaidAmount" class="form-control" placeholder="0.00" oninput="calculateBookingFinancials()" required>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">المبلغ المتبقي على العميل (Remaining) <span class="text-danger">(أقساط مستحقة)</span></label>
+                            <input type="text" id="bookingRemainingDisplay" class="form-control bg-light fw-bold text-danger" value="0.00" readonly>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">حالة الحجز والدفع <span class="text-danger">*</span></label>
                             <select id="bookingStatus" class="form-select" required>
-                                <option value="مؤكد (Confirmed)">مؤكد (Confirmed)</option>
+                                <option value="مؤكد - مدفوع بالكامل">مؤكد - مدفوع بالكامل</option>
+                                <option value="مؤكد - عليه أقساط (متبقي فلوس)">مؤكد - عليه أقساط (متبقي فلوس)</option>
                                 <option value="قيد المراجعة (Pending)">قيد المراجعة (Pending)</option>
                                 <option value="ملغي (Cancelled)">ملغي (Cancelled)</option>
                             </select>
@@ -550,17 +561,17 @@
 
                         <div class="col-12">
                             <label class="form-label fw-semibold">تفاصيل الحجز (Trip Details)</label>
-                            <textarea id="bookingDetails" class="form-control" rows="2" placeholder="تفاصيل خط سير الرحلة، أرقام الرحلات، الفندق، إلخ..."></textarea>
+                            <textarea id="bookingDetails" class="form-control" rows="2" placeholder="تفاصيل خط سير الرحلة، أرقام الرحلات، إلخ..."></textarea>
                         </div>
 
                         <div class="col-12">
-                            <label class="form-label fw-semibold">ملاحظات إضافية (Notes)</label>
-                            <textarea id="bookingNotes" class="form-control" rows="2" placeholder="ملاحظات أخرى..."></textarea>
+                            <label class="form-label fw-semibold">ملاحظات الأقساط والدفعات (Installments Notes)</label>
+                            <textarea id="bookingNotes" class="form-control" rows="2" placeholder="مثال: دفع قسط اول 5000 والباقي على قسطين..."></textarea>
                         </div>
                     </div>
 
                     <div class="mt-4">
-                        <button type="submit" class="btn btn-primary w-100 fw-bold" id="saveBookingBtn">حفظ تفاصيل الحجز</button>
+                        <button type="submit" class="btn btn-primary w-100 fw-bold" id="saveBookingBtn">حفظ تفاصيل الحجز والأقساط</button>
                     </div>
                 </form>
             </div>
@@ -630,11 +641,12 @@ window.addEventListener('DOMContentLoaded', () => {
             currentUser = JSON.parse(savedUser);
             document.getElementById('loginSection').classList.add('d-none');
             document.getElementById('appSection').classList.remove('d-none');
-            loadUserNotifications();
+            loadServerNotifications();
             loadFollowups();
             loadBookings();
             initApp();
             setInterval(checkDueFollowups, 10000);
+            setInterval(loadServerNotifications, 15000); // تحديث دوري للإشعارات من السيرفر
         } catch (e) {
             localStorage.removeItem('crm_user');
         }
@@ -677,11 +689,12 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
     document.getElementById('loginSection').classList.add('d-none');
     document.getElementById('appSection').classList.remove('d-none');
     
-    loadUserNotifications();
+    loadServerNotifications();
     loadFollowups();
     loadBookings();
     initApp();
     setInterval(checkDueFollowups, 10000);
+    setInterval(loadServerNotifications, 15000);
 });
 
 function handleLogout() {
@@ -779,7 +792,7 @@ function populateClientDropdowns() {
 
     const bookingSelect = document.getElementById('bookingClientSelect');
     if (bookingSelect) {
-        bookingSelect.innerHTML = '<option value="" disabled selected>-- اختر العميل الحجز --</option>';
+        bookingSelect.innerHTML = '<option value="" disabled selected>-- اختر العميل للحجز --</option>';
         clients.forEach(c => {
             bookingSelect.innerHTML += `<option value="${c._id}">${c.name} (${c.phone || 'بدون رقم'})</option>`;
         });
@@ -803,24 +816,37 @@ function openAddFollowupModal() {
 }
 
 function openAddBookingModal() {
-    document.getElementById('bookingModalTitle').innerText = "إضافة حجز جديد (New Booking)";
+    document.getElementById('bookingModalTitle').innerText = "إضافة حجز جديد وتفاصيل الأقساط";
     document.getElementById('editingBookingId').value = "";
     document.getElementById('addBookingForm').reset();
     document.getElementById('bookingProfitDisplay').value = "0.00";
+    document.getElementById('bookingRemainingDisplay').value = "0.00";
     populateClientDropdowns();
     populateDropdowns();
 }
 
-function calculateBookingProfit() {
+function calculateBookingFinancials() {
     const net = parseFloat(document.getElementById('bookingNetPrice').value) || 0;
     const cost = parseFloat(document.getElementById('bookingCostPrice').value) || 0;
+    const paid = parseFloat(document.getElementById('bookingPaidAmount').value) || 0;
+    
     const profit = net - cost;
+    const remaining = net - paid;
+
     const profitDisplay = document.getElementById('bookingProfitDisplay');
+    const remainingDisplay = document.getElementById('bookingRemainingDisplay');
+
     profitDisplay.value = profit.toFixed(2);
-    if (profit < 0) {
-        profitDisplay.className = "form-control bg-light fw-bold text-danger";
+    profitDisplay.className = profit < 0 ? "form-control bg-light fw-bold text-danger" : "form-control bg-light fw-bold text-success";
+
+    remainingDisplay.value = remaining.toFixed(2);
+    remainingDisplay.className = remaining > 0 ? "form-control bg-light fw-bold text-danger" : "form-control bg-light fw-bold text-success";
+
+    const statusSelect = document.getElementById('bookingStatus');
+    if (remaining > 0) {
+        statusSelect.value = "مؤكد - عليه أقساط (متبقي فلوس)";
     } else {
-        profitDisplay.className = "form-control bg-light fw-bold text-success";
+        statusSelect.value = "مؤكد - مدفوع بالكامل";
     }
 }
 
@@ -851,7 +877,9 @@ function handleSaveBooking(e) {
     const category = document.getElementById('bookingCategory').value;
     const netPrice = parseFloat(document.getElementById('bookingNetPrice').value) || 0;
     const costPrice = parseFloat(document.getElementById('bookingCostPrice').value) || 0;
+    const paidAmount = parseFloat(document.getElementById('bookingPaidAmount').value) || 0;
     const profit = netPrice - costPrice;
+    const remaining = netPrice - paidAmount;
     const status = document.getElementById('bookingStatus').value;
     const assignedTo = document.getElementById('bookingAssignedTo').value;
     const details = document.getElementById('bookingDetails').value.trim();
@@ -866,6 +894,8 @@ function handleSaveBooking(e) {
             booking.category = category;
             booking.netPrice = netPrice;
             booking.costPrice = costPrice;
+            booking.paidAmount = paidAmount;
+            booking.remaining = remaining;
             booking.profit = profit;
             booking.status = status;
             booking.assignedTo = assignedTo;
@@ -873,7 +903,7 @@ function handleSaveBooking(e) {
             booking.notes = notes;
 
             saveBookingsToStorage();
-            showNotification('تم تحديث تفاصيل الحجز بنجاح!', 'success');
+            showNotification('تم تحديث تفاصيل الحجز والأقساط بنجاح!', 'success');
         }
     } else {
         const newBooking = {
@@ -884,6 +914,8 @@ function handleSaveBooking(e) {
             category: category,
             netPrice: netPrice,
             costPrice: costPrice,
+            paidAmount: paidAmount,
+            remaining: remaining,
             profit: profit,
             status: status,
             assignedTo: assignedTo,
@@ -894,8 +926,8 @@ function handleSaveBooking(e) {
         bookings.unshift(newBooking);
         saveBookingsToStorage();
 
-        addNotification({
-            text: `تم تسجيل حجز جديد (${newBooking.category}) للعميل (${client.name}) بقيمة ربح ${profit}`,
+        addServerNotification({
+            text: `تم تسجيل حجز جديد (${newBooking.category}) للعميل (${client.name}) - المتبقي عليه: ${remaining}`,
             targetUser: assignedTo,
             type: 'update'
         });
@@ -912,13 +944,15 @@ function editBooking(id) {
     const booking = bookings.find(b => b.id === id);
     if (!booking) return;
 
-    document.getElementById('bookingModalTitle').innerText = "تعديل تفاصيل الحجز";
+    document.getElementById('bookingModalTitle').innerText = "تعديل تفاصيل الحجز والأقساط";
     document.getElementById('editingBookingId').value = booking.id;
     document.getElementById('bookingClientSelect').value = booking.clientId;
     document.getElementById('bookingCategory').value = booking.category;
     document.getElementById('bookingNetPrice').value = booking.netPrice;
     document.getElementById('bookingCostPrice').value = booking.costPrice;
+    document.getElementById('bookingPaidAmount').value = booking.paidAmount || 0;
     document.getElementById('bookingProfitDisplay').value = booking.profit.toFixed(2);
+    document.getElementById('bookingRemainingDisplay').value = (booking.remaining !== undefined ? booking.remaining : (booking.netPrice - (booking.paidAmount || 0))).toFixed(2);
     document.getElementById('bookingStatus').value = booking.status;
     document.getElementById('bookingAssignedTo').value = booking.assignedTo;
     document.getElementById('bookingDetails').value = booking.details || '';
@@ -956,6 +990,10 @@ function renderBookings() {
         let statusBadge = 'bg-success';
         if (b.status.includes('Pending')) statusBadge = 'bg-warning text-dark';
         if (b.status.includes('Cancelled')) statusBadge = 'bg-danger';
+        if (b.status.includes('أقساط')) statusBadge = 'bg-danger';
+
+        const paid = b.paidAmount || 0;
+        const rem = b.remaining !== undefined ? b.remaining : (b.netPrice - paid);
 
         tbody.innerHTML += `
             <tr>
@@ -963,12 +1001,15 @@ function renderBookings() {
                 <td><strong>${b.clientName}</strong><br><small class="text-muted"><i class="fa-solid fa-phone me-1"></i>${b.clientPhone}</small></td>
                 <td><span class="badge bg-secondary">${b.category}</span></td>
                 <td><span class="fw-semibold text-primary">${b.netPrice.toFixed(2)}</span></td>
-                <td><span class="text-muted">${b.costPrice.toFixed(2)}</span></td>
+                <td>
+                    <small class="text-success">مدفوع: <strong>${paid.toFixed(2)}</strong></small><br>
+                    <small class="${rem > 0 ? 'text-danger fw-bold' : 'text-muted'}">متبقي: <strong>${rem.toFixed(2)}</strong></small>
+                </td>
                 <td><strong class="text-success">${b.profit >= 0 ? '+' : ''}${b.profit.toFixed(2)}</strong></td>
                 <td><span class="badge ${statusBadge}">${b.status}</span></td>
                 <td>
                     <small><strong>تفاصيل:</strong> ${b.details || '-'}</small><br>
-                    <small class="text-muted"><strong>ملاحظات:</strong> ${b.notes || '-'}</small>
+                    <small class="text-muted"><strong>أقساط/ملاحظات:</strong> ${b.notes || '-'}</small>
                 </td>
                 <td>
                     <button class="btn btn-sm btn-outline-primary me-1" onclick="editBooking(${b.id})" title="تعديل"><i class="fa-solid fa-pen-to-square"></i></button>
@@ -1066,7 +1107,7 @@ function handleSaveFollowup(e) {
         followups.unshift(newFollowup);
         saveFollowupsToStorage();
 
-        addNotification({
+        addServerNotification({
             text: `تمت جدولة متابعة جديدة (${newFollowup.type}) للعميل (${client.name})`,
             targetUser: newFollowup.assignedTo,
             type: 'followup'
@@ -1097,7 +1138,7 @@ function checkDueFollowups() {
                 if (!f.notified) {
                     f.notified = true;
                     saveFollowupsToStorage();
-                    addNotification({
+                    addServerNotification({
                         text: `⚠️ حان موعد متابعة العميل (${f.clientName}) - النوع: [${f.type}]`,
                         targetUser: f.assignedTo,
                         type: 'urgent'
@@ -1261,8 +1302,8 @@ async function executeTransfer() {
             const modalEl = document.getElementById('transferClientModal');
             bootstrap.Modal.getInstance(modalEl).hide();
 
-            addNotification({
-                text: `تم تحويل العميل (${client.name}) من (${oldOwner}) إلى (${newOwner})`,
+            addServerNotification({
+                text: `تم تحويل العميل (${client.name}) من (${oldOwner}) إلى (${newOwner}) بواسطة (${currentUser.name})`,
                 targetUser: newOwner,
                 type: 'transfer'
             });
@@ -1277,38 +1318,52 @@ async function executeTransfer() {
     }
 }
 
-function loadUserNotifications() {
+// نظام الإشعارات المتصل بالسيرفر (مشترك لجميع الموظفين)
+async function loadServerNotifications() {
     if (!currentUser) return;
-    const saved = localStorage.getItem(`notifications_${currentUser.email}`);
-    if (saved) {
-        try {
-            notifications = JSON.parse(saved);
-        } catch(e) {
-            notifications = [];
+    try {
+        const response = await fetch(`${API_URL}/api/notifications`);
+        if (response.ok) {
+            const data = await response.json();
+            notifications = Array.isArray(data) ? data : [];
+            renderNotificationsUI();
         }
-    } else {
-        notifications = [];
+    } catch (e) {
+        // Fallback to localStorage if server endpoint unavailable
+        const saved = localStorage.getItem(`roving_shared_notifications`);
+        if (saved) {
+            try { notifications = JSON.parse(saved); } catch(err) { notifications = []; }
+        }
+        renderNotificationsUI();
     }
-    renderNotificationsUI();
 }
 
-function saveUserNotifications() {
-    if (!currentUser) return;
-    localStorage.setItem(`notifications_${currentUser.email}`, JSON.stringify(notifications));
-}
-
-function addNotification(notifObj) {
+async function addServerNotification(notifObj) {
     const fullObj = {
-        id: Date.now(),
         text: notifObj.text,
         type: notifObj.type || 'update',
         targetUser: notifObj.targetUser || 'All',
         read: false,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        sender: currentUser ? currentUser.name : 'System'
     };
 
+    try {
+        const response = await fetch(`${API_URL}/api/notifications`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(fullObj)
+        });
+        if (response.ok) {
+            loadServerNotifications();
+            return;
+        }
+    } catch(e) {}
+
+    // Fallback storage if API fails
+    fullObj.id = Date.now();
     notifications.unshift(fullObj);
-    saveUserNotifications();
+    localStorage.setItem(`roving_shared_notifications`, JSON.stringify(notifications));
     renderNotificationsUI();
 }
 
@@ -1344,12 +1399,13 @@ function renderNotificationsUI() {
         if (n.type === 'transfer') iconClass = "fa-right-left text-success";
 
         const bgClass = n.read ? 'bg-white text-muted' : 'bg-light fw-bold text-dark border-start border-3 border-danger';
+        const notifId = n._id || n.id;
         listContainer.innerHTML += `
             <li>
-                <div class="dropdown-item-text small py-2 border-bottom ${bgClass}" style="white-space: normal; cursor: pointer;" onclick="markSingleRead(${n.id})">
+                <div class="dropdown-item-text small py-2 border-bottom ${bgClass}" style="white-space: normal; cursor: pointer;" onclick="markSingleRead('${notifId}')">
                     <div class="d-flex justify-content-between align-items-center">
                         <span><i class="fa-solid ${iconClass} me-1"></i> ${n.text}</span>
-                        <small class="text-muted ms-2" style="font-size: 10px;">${n.time}</small>
+                        <small class="text-muted ms-2" style="font-size: 10px;">${n.time || ''}</small>
                     </div>
                 </div>
             </li>
@@ -1357,16 +1413,25 @@ function renderNotificationsUI() {
     });
 }
 
-function markSingleRead(id) {
-    const notif = notifications.find(n => n.id === id);
+async function markSingleRead(id) {
+    const notif = notifications.find(n => (n._id == id || n.id == id));
     if (notif && !notif.read) {
         notif.read = true;
-        saveUserNotifications();
+        try {
+            if (notif._id) {
+                await fetch(`${API_URL}/api/notifications/${notif._id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ read: true })
+                });
+            }
+        } catch(e) {}
+        localStorage.setItem(`roving_shared_notifications`, JSON.stringify(notifications));
         renderNotificationsUI();
     }
 }
 
-function markAllNotificationsRead() {
+async function markAllNotificationsRead() {
     let changed = false;
     notifications.forEach(n => {
         if (!n.read) {
@@ -1375,7 +1440,7 @@ function markAllNotificationsRead() {
         }
     });
     if (changed) {
-        saveUserNotifications();
+        localStorage.setItem(`roving_shared_notifications`, JSON.stringify(notifications));
         renderNotificationsUI();
     }
 }
@@ -1399,7 +1464,7 @@ async function handleSaveClient(event) {
     const editingId = document.getElementById('editingClientId').value;
     const clientData = {
         name: document.getElementById('clientName').value.trim(),
-        phone: document.getElementById('clientPhone').value.trim(),
+        phone: document.getElementById('clientPhone.value')?.trim() || document.getElementById('clientPhone').value.trim(),
         passport: document.getElementById('clientPassport').value.trim(),
         source: document.getElementById('clientSource').value,
         status: document.getElementById('clientStatusSelect').value,
@@ -1430,9 +1495,9 @@ async function handleSaveClient(event) {
         });
 
         if (response.ok) {
-            const actionText = editingId !== "" ? `تم تعديل بيانات العميل (${clientData.name})` : `تم إضافة عميل جديد (${clientData.name})`;
+            const actionText = editingId !== "" ? `تم تعديل بيانات العميل (${clientData.name}) بواسطة (${currentUser.name})` : `تم إضافة عميل جديد (${clientData.name}) وإسناده إليك بواسطة (${currentUser.name})`;
             
-            addNotification({
+            addServerNotification({
                 text: actionText,
                 targetUser: clientData.assignedTo,
                 type: 'update'
@@ -1471,7 +1536,7 @@ async function deleteClient(id) {
 
         if (response.ok) {
             if (targetClient) {
-                addNotification({
+                addServerNotification({
                     text: `تم حذف العميل (${targetClient.name})`,
                     targetUser: targetClient.assignedTo || 'All',
                     type: 'delete'
