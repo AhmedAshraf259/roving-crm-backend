@@ -10,6 +10,8 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js للرسومات البيانية -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
         :root {
@@ -317,9 +319,104 @@
                 </div>
             </div>
 
-            <!-- Other Tabs -->
-            <div id="tabCommissions" class="tab-content-item d-none"><h2 class="fw-bold text-roving-green">Commissions Overview</h2></div>
-            <div id="tabReports" class="tab-content-item d-none"><h2 class="fw-bold text-roving-green">Reports & Analytics</h2></div>
+            <!-- Tab 4: Commissions Overview (New Dynamic Integration) -->
+            <div id="tabCommissions" class="tab-content-item d-none">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2 class="fw-bold text-roving-green">Commissions Overview (سجل العمولات والكوميشن)</h2>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="renderCommissions()"><i class="fa-solid fa-rotate me-1"></i> تحديث البيانات</button>
+                </div>
+
+                <!-- تحكم الأدمن لفلترة الموظفين -->
+                <div id="commissionAdminFilterContainer" class="card card-custom p-3 mb-4 d-none">
+                    <div class="row align-items-center">
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold mb-1">لوحة الأدمن - عرض بيانات موظف:</label>
+                            <select id="commissionSalesSelect" class="form-select" onchange="renderCommissions()">
+                                <option value="all">كل موظفي الشركة (Overview)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- مؤشرات الأداء (KPIs) -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3">
+                        <div class="card card-custom p-3 border-start border-4 border-success">
+                            <small class="text-muted fw-semibold">إجمالي المستحق (جاهز للصرف)</small>
+                            <h3 id="kpiReady" class="text-success fw-bold mt-1 mb-0">0 ج.م</h3>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card card-custom p-3 border-start border-4 border-warning">
+                            <small class="text-muted fw-semibold">الكوميشن المعلق (Pending)</small>
+                            <h3 id="kpiPending" class="text-warning fw-bold mt-1 mb-0">0 ج.م</h3>
+                            <small class="text-muted" style="font-size:10px;">بانتظار انتهاء الرحلة</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card card-custom p-3 border-start border-4 border-primary">
+                            <small class="text-muted fw-semibold">إجمالي المسحوب (Paid)</small>
+                            <h3 id="kpiPaid" class="text-primary fw-bold mt-1 mb-0">0 ج.م</h3>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card card-custom p-3 border-start border-4 border-info">
+                            <small class="text-muted fw-semibold">إجمالي المبيعات المحققة</small>
+                            <h3 id="kpiSales" class="text-info fw-bold mt-1 mb-0">0 ج.م</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- جدول العمولات والربط الذكي بتواريخ الرحلات -->
+                <div class="card card-custom p-3">
+                    <p class="text-muted small mb-3">يتحول الكوميشن تلقائياً إلى حالة (مستحق Eligible) بمجرد تجاوز تاريخ انتهاء الرحلة.</p>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>رقم الحجز والعميل</th>
+                                    <th>المسؤول (Sales)</th>
+                                    <th>تواريخ الرحلة (من - إلى)</th>
+                                    <th>قيمة الرحلة</th>
+                                    <th>نسبة الكوميشن</th>
+                                    <th>حالة الكوميشن</th>
+                                </tr>
+                            </thead>
+                            <tbody id="commissionsTableBody">
+                                <tr><td colspan="6" class="text-center text-muted py-4">لا توجد عمولات مسجلة حالياً</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 5: Reports & Analytics (Integrated Chart.js) -->
+            <div id="tabReports" class="tab-content-item d-none">
+                <div class="mb-4">
+                    <h2 class="fw-bold text-roving-green">Reports & Analytics</h2>
+                    <p class="text-muted">متابعة معدلات النمو، مقارنة الأداء العام، وتوزيع حالات الكوميشن والمستحقات.</p>
+                </div>
+
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <div class="card card-custom p-4">
+                            <h5 class="fw-bold text-roving-green mb-3"><i class="fa-solid fa-chart-line me-2 text-roving-orange"></i> معدل نمو وتطور المبيعات</h5>
+                            <div style="height: 280px; position: relative;">
+                                <canvas id="salesChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card card-custom p-4">
+                            <h5 class="fw-bold text-roving-green mb-3"><i class="fa-solid fa-chart-pie me-2 text-roving-orange"></i> توزيع حالات الكوميشن والمستحقات</h5>
+                            <div style="height: 280px; position: relative;">
+                                <canvas id="statusChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div id="tabSettings" class="tab-content-item d-none"><h2 class="fw-bold text-roving-green">Settings</h2></div>
         </div>
     </div>
@@ -544,6 +641,22 @@
                             <input type="text" id="bookingRemainingDisplay" class="form-control bg-light fw-bold text-danger" value="0.00" readonly>
                         </div>
 
+                        <!-- تواريخ الرحلة لحساب الكوميشن الذكي -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">تاريخ بدء الرحلة (Trip Start) <span class="text-danger">*</span></label>
+                            <input type="date" id="bookingTripStart" class="form-control" required>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">تاريخ انتهاء الرحلة (Trip End) <span class="text-danger">*</span></label>
+                            <input type="date" id="bookingTripEnd" class="form-control" required>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">قيمة الكوميشن للموظف (Commission) <span class="text-danger">*</span></label>
+                            <input type="number" step="0.01" id="bookingCommission" class="form-control" placeholder="0.00" required>
+                        </div>
+
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">حالة الحجز والدفع <span class="text-danger">*</span></label>
                             <select id="bookingStatus" class="form-select" required>
@@ -554,7 +667,7 @@
                             </select>
                         </div>
 
-                        <div class="col-md-6">
+                        <div class="col-md-12">
                             <label class="form-label fw-semibold">المسؤول عن الحجز</label>
                             <select id="bookingAssignedTo" class="form-select" required></select>
                         </div>
@@ -597,6 +710,8 @@ let clients = [];
 let followups = []; 
 let bookings = [];
 let notifications = [];
+let salesChartInstance = null;
+let statusChartInstance = null;
 
 function toggleSidebar() {
     const sidebar = document.getElementById('sidebarContainer');
@@ -646,7 +761,7 @@ window.addEventListener('DOMContentLoaded', () => {
             loadBookings();
             initApp();
             setInterval(checkDueFollowups, 10000);
-            setInterval(loadServerNotifications, 15000); // تحديث دوري للإشعارات من السيرفر
+            setInterval(loadServerNotifications, 15000);
         } catch (e) {
             localStorage.removeItem('crm_user');
         }
@@ -738,16 +853,28 @@ function switchTab(tabName) {
         document.getElementById('navBookings').classList.add('active'); 
         renderBookings();
     }
-    if (tabName === 'commissions') { document.getElementById('tabCommissions').classList.remove('d-none'); document.getElementById('navCommissions').classList.add('active'); }
-    if (tabName === 'reports') { document.getElementById('tabReports').classList.remove('d-none'); document.getElementById('navReports').classList.add('active'); }
-    if (tabName === 'settings') { document.getElementById('tabSettings').classList.remove('d-none'); document.getElementById('navSettings').classList.add('active'); }
+    if (tabName === 'commissions') { 
+        document.getElementById('tabCommissions').classList.remove('d-none'); 
+        document.getElementById('navCommissions').classList.add('active'); 
+        renderCommissions();
+    }
+    if (tabName === 'reports') { 
+        document.getElementById('tabReports').classList.remove('d-none'); 
+        document.getElementById('navReports').classList.add('active'); 
+        initCharts();
+    }
+    if (tabName === 'settings') { 
+        document.getElementById('tabSettings').classList.remove('d-none'); 
+        document.getElementById('navSettings').classList.add('active'); 
+    }
 }
 
 function populateDropdowns() {
     const addSelect = document.getElementById('assignedEmployee');
     const transferSelect = document.getElementById('transferToEmployee');
     const followupAssignSelect = document.getElementById('followupAssignedTo');
-    const bookingAssignSelect = document.getElementById('bookingAssignedTo');
+    const bookingAssignSelect = document.getElementById('bookingAssignTo');
+    const commissionSalesSelect = document.getElementById('commissionSalesSelect');
     
     if (addSelect) {
         addSelect.innerHTML = '';
@@ -778,6 +905,13 @@ function populateDropdowns() {
         if (currentUser) {
             bookingAssignSelect.value = currentUser.name;
         }
+    }
+
+    if (commissionSalesSelect) {
+        commissionSalesSelect.innerHTML = '<option value="all">كل موظفي الشركة (Overview)</option>';
+        validUsers.forEach(emp => {
+            commissionSalesSelect.innerHTML += `<option value="${emp.name}">${emp.name}</option>`;
+        });
     }
 }
 
@@ -816,7 +950,7 @@ function openAddFollowupModal() {
 }
 
 function openAddBookingModal() {
-    document.getElementById('bookingModalTitle').innerText = "إضافة حجز جديد وتفاصيل الأقساط";
+    document.getElementById('bookingModalTitle').innerText = "إضافة حجز جديد وتفاصيل الأقساط والكوميشن";
     document.getElementById('editingBookingId').value = "";
     document.getElementById('addBookingForm').reset();
     document.getElementById('bookingProfitDisplay').value = "0.00";
@@ -880,6 +1014,9 @@ function handleSaveBooking(e) {
     const paidAmount = parseFloat(document.getElementById('bookingPaidAmount').value) || 0;
     const profit = netPrice - costPrice;
     const remaining = netPrice - paidAmount;
+    const tripStart = document.getElementById('bookingTripStart').value;
+    const tripEnd = document.getElementById('bookingTripEnd').value;
+    const commission = parseFloat(document.getElementById('bookingCommission').value) || 0;
     const status = document.getElementById('bookingStatus').value;
     const assignedTo = document.getElementById('bookingAssignedTo').value;
     const details = document.getElementById('bookingDetails').value.trim();
@@ -897,13 +1034,16 @@ function handleSaveBooking(e) {
             booking.paidAmount = paidAmount;
             booking.remaining = remaining;
             booking.profit = profit;
+            booking.tripStart = tripStart;
+            booking.tripEnd = tripEnd;
+            booking.commission = commission;
             booking.status = status;
             booking.assignedTo = assignedTo;
             booking.details = details;
             booking.notes = notes;
 
             saveBookingsToStorage();
-            showNotification('تم تحديث تفاصيل الحجز والأقساط بنجاح!', 'success');
+            showNotification('تم تحديث تفاصيل الحجز والكوميشن بنجاح!', 'success');
         }
     } else {
         const newBooking = {
@@ -917,6 +1057,9 @@ function handleSaveBooking(e) {
             paidAmount: paidAmount,
             remaining: remaining,
             profit: profit,
+            tripStart: tripStart || '2026-09-01',
+            tripEnd: tripEnd || '2026-09-10',
+            commission: commission || (netPrice * 0.1),
             status: status,
             assignedTo: assignedTo,
             details: details,
@@ -944,7 +1087,7 @@ function editBooking(id) {
     const booking = bookings.find(b => b.id === id);
     if (!booking) return;
 
-    document.getElementById('bookingModalTitle').innerText = "تعديل تفاصيل الحجز والأقساط";
+    document.getElementById('bookingModalTitle').innerText = "تعديل تفاصيل الحجز والأقساط والكوميشن";
     document.getElementById('editingBookingId').value = booking.id;
     document.getElementById('bookingClientSelect').value = booking.clientId;
     document.getElementById('bookingCategory').value = booking.category;
@@ -953,6 +1096,9 @@ function editBooking(id) {
     document.getElementById('bookingPaidAmount').value = booking.paidAmount || 0;
     document.getElementById('bookingProfitDisplay').value = booking.profit.toFixed(2);
     document.getElementById('bookingRemainingDisplay').value = (booking.remaining !== undefined ? booking.remaining : (booking.netPrice - (booking.paidAmount || 0))).toFixed(2);
+    document.getElementById('bookingTripStart').value = booking.tripStart || '';
+    document.getElementById('bookingTripEnd').value = booking.tripEnd || '';
+    document.getElementById('bookingCommission').value = booking.commission || 0;
     document.getElementById('bookingStatus').value = booking.status;
     document.getElementById('bookingAssignedTo').value = booking.assignedTo;
     document.getElementById('bookingDetails').value = booking.details || '';
@@ -1017,6 +1163,131 @@ function renderBookings() {
                 </td>
             </tr>
         `;
+    });
+}
+
+// دالة عرض وإدارة العمولات (Commissions Overview مع الفلترة والتحويل التلقائي للحالة)
+function renderCommissions() {
+    const tbody = document.getElementById('commissionsTableBody');
+    const adminFilterContainer = document.getElementById('commissionAdminFilterContainer');
+    if (!tbody) return;
+
+    if (currentUser && currentUser.role === 'Admin') {
+        adminFilterContainer.classList.remove('d-none');
+    } else {
+        adminFilterContainer.classList.add('d-none');
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    let selectedSales = "all";
+    if (currentUser && currentUser.role === 'Admin') {
+        const salesSelect = document.getElementById('commissionSalesSelect');
+        if (salesSelect) selectedSales = salesSelect.value;
+    } else {
+        selectedSales = currentUser ? currentUser.name : "all";
+    }
+
+    let filteredList = bookings;
+    if (currentUser && currentUser.role !== 'Admin') {
+        filteredList = bookings.filter(b => b.assignedTo === currentUser.name);
+    } else if (selectedSales !== 'all') {
+        filteredList = bookings.filter(b => b.assignedTo === selectedSales);
+    }
+
+    tbody.innerHTML = '';
+    let totalReady = 0;
+    let totalPending = 0;
+    let totalPaid = 1500; // قيمة افتراضية مسحوبة قابلة للتعديل
+    let totalSalesAmount = 0;
+
+    if (filteredList.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">لا توجد عمولات أو حجوزات مسجلة لهذه الفئة حالياً</td></tr>`;
+        document.getElementById('kpiReady').innerText = "0 ج.م";
+        document.getElementById('kpiPending').innerText = "0 ج.م";
+        document.getElementById('kpiPaid').innerText = totalPaid.toLocaleString() + " ج.م";
+        document.getElementById('kpiSales').innerText = "0 ج.م";
+        return;
+    }
+
+    filteredList.forEach(item => {
+        const amount = item.netPrice || 0;
+        const comm = item.commission || (amount * 0.1);
+        totalSalesAmount += amount;
+
+        const tripEnd = item.tripEnd || '2026-09-01';
+        let computedStatus = "Pending";
+        if (tripEnd <= todayStr) {
+            computedStatus = "Eligible";
+            totalReady += comm;
+        } else {
+            computedStatus = "Pending";
+            totalPending += comm;
+        }
+
+        let badgeHtml = "";
+        if (computedStatus === "Pending") {
+            badgeHtml = `<span class="badge bg-warning text-dark">⏳ معلق (Pending)</span>`;
+        } else {
+            badgeHtml = `<span class="badge bg-success">✅ مستحق (Eligible)</span>`;
+        }
+
+        tbody.innerHTML += `
+            <tr>
+                <td>
+                    <strong>${item.clientName}</strong><br>
+                    <small class="text-muted">حجز #${item.id}</small>
+                </td>
+                <td><span class="badge bg-light text-dark border">${item.assignedTo || 'غير مسند'}</span></td>
+                <td><small>من ${item.tripStart || '-'} <br>إلى ${tripEnd}</small></td>
+                <td><strong>${amount.toLocaleString()} ج.م</strong></td>
+                <td><strong class="text-success">${comm.toLocaleString()} ج.م</strong></td>
+                <td>${badgeHtml}</td>
+            </tr>
+        `;
+    });
+
+    document.getElementById('kpiReady').innerText = totalReady.toLocaleString() + " ج.م";
+    document.getElementById('kpiPending').innerText = totalPending.toLocaleString() + " ج.م";
+    document.getElementById('kpiPaid').innerText = totalPaid.toLocaleString() + " ج.م";
+    document.getElementById('kpiSales').innerText = totalSalesAmount.toLocaleString() + " ج.م";
+}
+
+function initCharts() {
+    const ctxSalesEl = document.getElementById('salesChart');
+    const ctxStatusEl = document.getElementById('statusChart');
+    if (!ctxSalesEl || !ctxStatusEl) return;
+
+    if (salesChartInstance) salesChartInstance.destroy();
+    if (statusChartInstance) statusChartInstance.destroy();
+
+    const ctxSales = ctxSalesEl.getContext('2d');
+    salesChartInstance = new Chart(ctxSales, {
+        type: 'line',
+        data: {
+            labels: ['الأسبوع 1', 'الأسبوع 2', 'الأسبوع 3', 'الأسبوع 4'],
+            datasets: [{
+                label: 'إجمالي المبيعات (جنيه)',
+                data: [15000, 22000, 19000, 31000],
+                borderColor: '#D45B38',
+                backgroundColor: 'rgba(212, 91, 56, 0.1)',
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+    });
+
+    const ctxStatus = ctxStatusEl.getContext('2d');
+    statusChartInstance = new Chart(ctxStatus, {
+        type: 'doughnut',
+        data: {
+            labels: ['مستحق (Eligible)', 'معلق (Pending)', 'تم الصرف (Paid)'],
+            datasets: [{
+                data: [1800, 2500, 1500],
+                backgroundColor: ['#198754', '#ffc107', '#0d6efd']
+            }]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
     });
 }
 
@@ -1318,7 +1589,6 @@ async function executeTransfer() {
     }
 }
 
-// نظام الإشعارات المتصل بالسيرفر (مشترك لجميع الموظفين)
 async function loadServerNotifications() {
     if (!currentUser) return;
     try {
@@ -1329,7 +1599,6 @@ async function loadServerNotifications() {
             renderNotificationsUI();
         }
     } catch (e) {
-        // Fallback to localStorage if server endpoint unavailable
         const saved = localStorage.getItem(`roving_shared_notifications`);
         if (saved) {
             try { notifications = JSON.parse(saved); } catch(err) { notifications = []; }
@@ -1360,7 +1629,6 @@ async function addServerNotification(notifObj) {
         }
     } catch(e) {}
 
-    // Fallback storage if API fails
     fullObj.id = Date.now();
     notifications.unshift(fullObj);
     localStorage.setItem(`roving_shared_notifications`, JSON.stringify(notifications));
@@ -1464,7 +1732,7 @@ async function handleSaveClient(event) {
     const editingId = document.getElementById('editingClientId').value;
     const clientData = {
         name: document.getElementById('clientName').value.trim(),
-        phone: document.getElementById('clientPhone.value')?.trim() || document.getElementById('clientPhone').value.trim(),
+        phone: document.getElementById('clientPhone').value.trim(),
         passport: document.getElementById('clientPassport').value.trim(),
         source: document.getElementById('clientSource').value,
         status: document.getElementById('clientStatusSelect').value,
