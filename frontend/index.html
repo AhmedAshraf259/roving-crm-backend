@@ -121,7 +121,7 @@
                 <input type="password" id="loginPassword" class="form-control" placeholder="••••••••" required>
             </div>
             <div id="loginError" class="alert alert-danger py-2 d-none" role="alert"></div>
-            <button type="submit" id="loginSubmitBtn" class="btn btn-primary w-100 py-2 fw-bold">Sign In</button>
+            <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">Sign In</button>
         </form>
     </div>
 </div>
@@ -203,35 +203,17 @@
                 </div>
             </div>
 
-            <!-- Tab 2: Follow-ups -->
-            <div id="tabFollowups" class="tab-content-item d-none">
-                <h2 class="fw-bold text-roving-green">Follow-ups & Tasks Schedule</h2>
-            </div>
-
-            <!-- Tab 3: Bookings -->
-            <div id="tabBookings" class="tab-content-item d-none">
-                <h2 class="fw-bold text-roving-green">Confirmed Trips & Bookings</h2>
-            </div>
-
-            <!-- Tab 4: Commissions -->
-            <div id="tabCommissions" class="tab-content-item d-none">
-                <h2 class="fw-bold text-roving-green">Commissions Overview</h2>
-            </div>
-
-            <!-- Tab 5: Reports -->
-            <div id="tabReports" class="tab-content-item d-none">
-                <h2 class="fw-bold text-roving-green">Reports & Analytics</h2>
-            </div>
-
-            <!-- Tab 6: Settings -->
-            <div id="tabSettings" class="tab-content-item d-none">
-                <h2 class="fw-bold text-roving-green">Settings</h2>
-            </div>
+            <!-- Other Tabs -->
+            <div id="tabFollowups" class="tab-content-item d-none"><h2 class="fw-bold text-roving-green">Follow-ups & Tasks Schedule</h2></div>
+            <div id="tabBookings" class="tab-content-item d-none"><h2 class="fw-bold text-roving-green">Confirmed Trips & Bookings</h2></div>
+            <div id="tabCommissions" class="tab-content-item d-none"><h2 class="fw-bold text-roving-green">Commissions Overview</h2></div>
+            <div id="tabReports" class="tab-content-item d-none"><h2 class="fw-bold text-roving-green">Reports & Analytics</h2></div>
+            <div id="tabSettings" class="tab-content-item d-none"><h2 class="fw-bold text-roving-green">Settings</h2></div>
         </div>
     </div>
 </div>
 
-<!-- Modal: Add Client -->
+<!-- Modal: Add / Edit Client -->
 <div class="modal fade" id="addClientModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -311,10 +293,10 @@
 const API_URL = "https://roving-crm-backend.onrender.com";
 
 let validUsers = [
-    { email: "asmaa.ashraf.1312002@gmail.com", pass: "Asmaa@2026", role: "Admin", name: "Asmaa Ashraf", commissionRate: 10 },
-    { email: "ahmedashraf88513@gmail.com", pass: "AhmedA#88", role: "Admin", name: "Ahmed Ashraf", commissionRate: 10 },
-    { email: "ahmedwanas11@gmail.com", pass: "Wanas!Pass2026", role: "Admin", name: "Ahmed Wanas", commissionRate: 10 },
-    { email: "sales1@roving.com", pass: "SalesRoving#1", role: "Sales", name: "Sales Agent 1", commissionRate: 8 }
+    { email: "asmaa.ashraf.1312002@gmail.com", pass: "Asmaa@2026", role: "Admin", name: "Asmaa Ashraf" },
+    { email: "ahmedashraf88513@gmail.com", pass: "AhmedA#88", role: "Admin", name: "Ahmed Ashraf" },
+    { email: "ahmedwanas11@gmail.com", pass: "Wanas!Pass2026", role: "Admin", name: "Ahmed Wanas" },
+    { email: "sales1@roving.com", pass: "SalesRoving#1", role: "Sales", name: "Sales Agent 1" }
 ];
 
 let currentUser = null;
@@ -370,7 +352,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     const clientForm = document.getElementById('addClientForm');
     if (clientForm) {
-        clientForm.addEventListener('submit', handleAddClient);
+        clientForm.addEventListener('submit', handleSaveClient);
     }
 });
 
@@ -428,26 +410,11 @@ function switchTab(tabName) {
         document.getElementById('navClients').classList.add('active');
         fetchClients(); 
     }
-    if (tabName === 'followups') {
-        document.getElementById('tabFollowups').classList.remove('d-none');
-        document.getElementById('navFollowups').classList.add('active');
-    }
-    if (tabName === 'bookings') {
-        document.getElementById('tabBookings').classList.remove('d-none');
-        document.getElementById('navBookings').classList.add('active');
-    }
-    if (tabName === 'commissions') {
-        document.getElementById('tabCommissions').classList.remove('d-none');
-        document.getElementById('navCommissions').classList.add('active');
-    }
-    if (tabName === 'reports') {
-        document.getElementById('tabReports').classList.remove('d-none');
-        document.getElementById('navReports').classList.add('active');
-    }
-    if (tabName === 'settings') {
-        document.getElementById('tabSettings').classList.remove('d-none');
-        document.getElementById('navSettings').classList.add('active');
-    }
+    if (tabName === 'followups') { document.getElementById('tabFollowups').classList.remove('d-none'); document.getElementById('navFollowups').classList.add('active'); }
+    if (tabName === 'bookings') { document.getElementById('tabBookings').classList.remove('d-none'); document.getElementById('navBookings').classList.add('active'); }
+    if (tabName === 'commissions') { document.getElementById('tabCommissions').classList.remove('d-none'); document.getElementById('navCommissions').classList.add('active'); }
+    if (tabName === 'reports') { document.getElementById('tabReports').classList.remove('d-none'); document.getElementById('navReports').classList.add('active'); }
+    if (tabName === 'settings') { document.getElementById('tabSettings').classList.remove('d-none'); document.getElementById('navSettings').classList.add('active'); }
 }
 
 function populateDropdowns() {
@@ -467,10 +434,28 @@ function openAddClientModal() {
     populateDropdowns(); 
 }
 
-async function handleAddClient(event) {
-    event.preventDefault();
-    alert("تم الضغط على زر حفظ العميل بنجاح!");
+function editClient(id) {
+    const client = clients.find(c => c._id === id);
+    if (!client) return;
 
+    document.getElementById('clientModalTitle').innerText = "Edit Client Details";
+    document.getElementById('editingClientId').value = client._id;
+    document.getElementById('clientName').value = client.name || '';
+    document.getElementById('clientSource').value = client.source || '';
+    document.getElementById('clientStatusSelect').value = client.status || 'New';
+    document.getElementById('assignedEmployee').value = client.assignedTo || '';
+    document.getElementById('clientPhone').value = client.phone || '';
+    document.getElementById('clientPassport').value = client.passport || '';
+    document.getElementById('clientNotes').value = client.notes || '';
+
+    const modal = new bootstrap.Modal(document.getElementById('addClientModal'));
+    modal.show();
+}
+
+async function handleSaveClient(event) {
+    event.preventDefault();
+
+    const editingId = document.getElementById('editingClientId').value;
     const clientData = {
         name: document.getElementById('clientName').value.trim(),
         phone: document.getElementById('clientPhone').value.trim(),
@@ -481,29 +466,67 @@ async function handleAddClient(event) {
         notes: document.getElementById('clientNotes').value.trim()
     };
 
+    // التحقق من الصلاحيات: لو السيلز بيعدل، يحتاج موافقة
+    if (currentUser.role === 'Sales' && editingId !== "") {
+        alert("تنبيه (مبيعات): طلب التعديل الخاص بك قيد الانتظار ويتطلب موافقة الأدمن (Admin Approval).");
+        const modalEl = document.getElementById('addClientModal');
+        bootstrap.Modal.getInstance(modalEl).hide();
+        return;
+    }
+
     try {
-        const response = await fetch(`${API_URL}/api/clients`, {
-            method: 'POST',
+        let url = `${API_URL}/api/clients`;
+        let method = 'POST';
+
+        if (editingId !== "") {
+            url = `${API_URL}/api/clients/${editingId}`;
+            method = 'PUT';
+        }
+
+        const response = await fetch(url, {
+            method: method,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(clientData)
         });
 
         if (response.ok) {
-            alert('تم الحفظ بنجاح على السيرفر!');
+            alert(editingId !== "" ? 'تم تعديل بيانات العميل بنجاح!' : 'تم حفظ العميل بنجاح!');
             document.getElementById('addClientForm').reset();
             
             const modalEl = document.getElementById('addClientModal');
             const modalInstance = bootstrap.Modal.getInstance(modalEl);
-            if (modalInstance) {
-                modalInstance.hide();
-            }
+            if (modalInstance) modalInstance.hide();
             
             fetchClients(); 
         } else {
-            alert('السيرفر رفض الطلب (Response Status Not OK).');
+            alert('فشل في تنفيذ العملية على السيرفر.');
         }
     } catch (error) {
         alert('حدث خطأ في الاتصال بالشبكة: ' + error.message);
+    }
+}
+
+async function deleteClient(id) {
+    if (currentUser.role === 'Sales') {
+        alert("تنبيه (مبيعات): طلب الحذف الخاص بك مرسل للأدمن بانتظار الموافقة.");
+        return;
+    }
+
+    if (!confirm("هل أنت متأكد من حذف هذا العميل نهائياً؟")) return;
+
+    try {
+        const response = await fetch(`${API_URL}/api/clients/${id}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            alert('تم حذف العميل بنجاح.');
+            fetchClients();
+        } else {
+            alert('فشل حذف العميل.');
+        }
+    } catch (error) {
+        alert('خطأ في الاتصال: ' + error.message);
     }
 }
 
@@ -530,17 +553,23 @@ function renderClients() {
     }
 
     list.forEach((client, index) => {
+        // حساب رقم الملف ليبدأ من RT-00350 تصاعدياً
+        const fileNumber = `RT-${(350 + index).toString().padStart(5, '0')}`;
+        
         tbody.innerHTML += `
             <tr>
-                <td><span class="badge bg-dark">#${index + 1}</span></td>
+                <td><span class="badge bg-dark">${fileNumber}</span></td>
                 <td><strong>${client.name}</strong></td>
                 <td><span class="badge bg-secondary">${client.source || '-'}</span></td>
                 <td><small><i class="fa-solid fa-phone me-1"></i>${client.phone || '-'}</small></td>
                 <td><small>${client.passport || '-'}</small></td>
                 <td><span class="badge bg-light text-dark border">${client.assignedTo || 'غير مسند'}</span></td>
-                <td><span class="badge bg-primary">${client.status || 'جديد'}</span></td>
+                <td><span class="badge bg-primary">${client.status || 'New'}</span></td>
                 <td><small class="text-muted">${client.notes || '-'}</small></td>
-                <td><button class="btn btn-sm btn-outline-primary" title="تعديل"><i class="fa-solid fa-pen-to-square"></i></button></td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary me-1" onclick="editClient('${client._id}')" title="تعديل"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteClient('${client._id}')" title="حذف"><i class="fa-solid fa-trash"></i></button>
+                </td>
             </tr>
         `;
     });
