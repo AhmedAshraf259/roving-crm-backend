@@ -766,11 +766,8 @@ async function fetchClients() {
             const apiClients = Array.isArray(data) ? data : [];
             
             // دمج العملاء مع تفضيل وتحديث القائمة المشتركة
-            const mergedMap = new Map();
-            apiClients.forEach(c => mergedMap.set(c._id || c.id, c));
-            localClients.forEach(c => mergedMap.set(c._id || c.id, c));
-            
-            clients = Array.from(mergedMap.values());
+            clients = apiClients;
+            localStorage.setItem('roving_local_clients', JSON.stringify(clients));
         } else {
             clients = localClients;
         }
@@ -1089,17 +1086,16 @@ function packageRowConvertedTotal(r){const base=r.type==='Hotel'?(Number(r.night
 function formatMoney(n){return Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});}
 function renderPackageCostRows(){const wrap=document.getElementById('packageCostRows');if(!wrap)return;if(!packageCostRows.length){wrap.innerHTML='<div class="text-muted small p-2">No package costs added yet.</div>';return;}const bc=document.getElementById('bookingCurrency')?.value||'EGP';wrap.innerHTML=packageCostRows.map((r,i)=>`<div class="border rounded p-2 mb-2 bg-white"><div class="row g-2 align-items-end"><div class="col-md-2"><label class="form-label small fw-semibold">Cost Type</label><select class="form-select form-select-sm" onchange="updatePackageRow(${i},'type',this.value)">${['Hotel','Flight','Visa','Transportation','Tour / Activities','Other'].map(t=>`<option ${r.type===t?'selected':''}>${t}</option>`).join('')}</select></div><div class="col-md-2"><label class="form-label small fw-semibold">Name / Details</label><input class="form-control form-control-sm" value="${escapeHtml(r.name)}" placeholder="Hotel / Airline / Visa..." oninput="updatePackageRow(${i},'name',this.value)"></div><div class="col-md-1"><label class="form-label small fw-semibold">Nights</label><input type="number" min="1" class="form-control form-control-sm" value="${r.type==='Hotel'?(r.nights||1):1}" ${r.type==='Hotel'?'':'disabled'} oninput="updatePackageRow(${i},'nights',this.value)"></div><div class="col-md-2"><label class="form-label small fw-semibold">Rate / Total</label><input type="number" min="0" step="0.01" class="form-control form-control-sm" value="${r.rate||0}" oninput="updatePackageRow(${i},'rate',this.value)"></div><div class="col-md-2"><label class="form-label small fw-semibold">Supplier</label><select class="form-select form-select-sm package-supplier-select" onchange="updatePackageRow(${i},'supplierId',this.value)"><option value="">-- Select Supplier --</option>${suppliers.map(s=>`<option value="${s.id}" ${String(r.supplierId)===String(s.id)?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}</select></div><div class="col-md-1"><label class="form-label small fw-semibold">Currency</label><select class="form-select form-select-sm" onchange="updatePackageRow(${i},'currency',this.value);updatePackageRow(${i},'fx',1)">${['EGP','USD','EUR','GBP','AED','SAR','TRY','GEL','AZN','OMR','QAR','BHD','ALL','IDR','MYR'].map(c=>`<option ${r.currency===c?'selected':''}>${c}</option>`).join('')}</select></div><div class="col-md-1"><label class="form-label small fw-semibold">FX → ${bc}</label><input type="number" min="0" step="0.000001" class="form-control form-control-sm" value="${r.fx??1}" oninput="updatePackageRow(${i},'fx',this.value)"></div><div class="col-md-1"><button type="button" class="btn btn-sm btn-outline-danger" onclick="removePackageCostRow(${i})"><i class="fa-solid fa-trash"></i></button></div><div class="col-12 small text-muted">${r.type==='Hotel'?'Hotel total = nights × rate':'Cost = entered rate/total'} · Converted: <strong>${formatMoney(packageRowConvertedTotal(r))} ${bc}</strong></div></div></div>`).join('');}
 function calculateBookingFinancials(){const net=parseFloat(document.getElementById('bookingNetPrice').value)||0;let cost=parseFloat(document.getElementById('bookingCostPrice').value)||0;const paid=parseFloat(document.getElementById('bookingPaidAmount').value)||0;const cat=document.getElementById('bookingCategory').value;const cur=document.getElementById('bookingCurrency').value||'EGP';if(cat==='Full Package'){cost=packageCostRows.reduce((sum,r)=>sum+packageRowConvertedTotal(r),0);document.getElementById('bookingCostPrice').value=cost.toFixed(2);document.getElementById('packageCostTotalDisplay').value=`${formatMoney(cost)} ${cur}`;}const profit=net-cost,remaining=net-paid;document.getElementById('bookingProfitDisplay').value=`${formatMoney(profit)} ${cur}`;document.getElementById('bookingRemainingDisplay').value=`${formatMoney(remaining)} ${cur}`;document.getElementById('bookingStatus').value=remaining>0?'Installments Due':'Paid in Full';}
-function loadBookings(){const saved=localStorage.getItem('roving_bookings');bookings=saved?JSON.parse(saved):[];}
+async function loadBookings(){try{const r=await fetch(`${API_URL}/api/bookings`);if(r.ok){bookings=await r.json();localStorage.setItem('roving_bookings',JSON.stringify(bookings));}else throw 0;}catch(e){bookings=JSON.parse(localStorage.getItem('roving_bookings')||'[]');}renderBookings();}
+async function saveBookingToAPI(obj,id){const r=await fetch(id?`${API_URL}/api/bookings/${encodeURIComponent(id)}`:`${API_URL}/api/bookings`,{method:id?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(obj)});if(!r.ok)throw new Error('Booking save failed');return await r.json();}
 function saveBookingsToStorage(){localStorage.setItem('roving_bookings',JSON.stringify(bookings));}
-function loadSuppliers(){suppliers=JSON.parse(localStorage.getItem('roving_suppliers')||'[]');renderSuppliers();populateSupplierSelects();}
+async function loadSuppliers(){try{const r=await fetch(`${API_URL}/api/suppliers`);if(r.ok){suppliers=await r.json();localStorage.setItem('roving_suppliers',JSON.stringify(suppliers));}else throw 0;}catch(e){suppliers=JSON.parse(localStorage.getItem('roving_suppliers')||'[]');}renderSuppliers();populateSupplierSelects();}
 function saveSuppliersToStorage(){localStorage.setItem('roving_suppliers',JSON.stringify(suppliers));}
 function openSupplierModal(){document.getElementById('supplierModalTitle').innerText='Add Supplier';document.getElementById('editingSupplierId').value='';document.getElementById('supplierForm').reset();document.getElementById('supplierCurrency').value='USD';}
-function handleSaveSupplier(e){e.preventDefault();const id=document.getElementById('editingSupplierId').value;const obj={id:id?Number(id):Date.now(),name:document.getElementById('supplierName').value.trim(),type:document.getElementById('supplierType').value,currency:document.getElementById('supplierCurrency').value,contact:document.getElementById('supplierContact').value.trim(),notes:document.getElementById('supplierNotes').value.trim()};if(!obj.name)return;if(id){const idx=suppliers.findIndex(s=>s.id==id);if(idx!==-1)suppliers[idx]=obj;}else suppliers.unshift(obj);saveSuppliersToStorage();renderSuppliers();populateSupplierSelects();bootstrap.Modal.getInstance(document.getElementById('supplierModal')).hide();showNotification('Supplier saved successfully!','success');}
-function renderSuppliers(){const tbody=document.getElementById('suppliersTableBody');if(!tbody)return;if(!suppliers.length){tbody.innerHTML='<tr><td colspan="6" class="text-center text-muted py-4">No suppliers recorded</td></tr>';return;}tbody.innerHTML=suppliers.map(s=>`<tr><td><strong>${escapeHtml(s.name)}</strong></td><td><span class="badge bg-secondary">${escapeHtml(s.type||'-')}</span></td><td>${escapeHtml(s.contact||'-')}</td><td><strong>${escapeHtml(s.currency||'-')}</strong></td><td><small>${escapeHtml(s.notes||'-')}</small></td><td><button class="btn btn-sm btn-outline-primary me-1" onclick="editSupplier(${s.id})"><i class="fa-solid fa-pen-to-square"></i></button><button class="btn btn-sm btn-outline-danger" onclick="deleteSupplier(${s.id})"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');}
-function editSupplier(id){const s=suppliers.find(x=>x.id===id);if(!s)return;document.getElementById('editingSupplierId').value=s.id;document.getElementById('supplierName').value=s.name;document.getElementById('supplierType').value=s.type||'Other';document.getElementById('supplierCurrency').value=s.currency||'USD';document.getElementById('supplierContact').value=s.contact||'';document.getElementById('supplierNotes').value=s.notes||'';document.getElementById('supplierModalTitle').innerText='Edit Supplier';new bootstrap.Modal(document.getElementById('supplierModal')).show();}
-function deleteSupplier(id){suppliers=suppliers.filter(x=>x.id!==id);saveSuppliersToStorage();renderSuppliers();populateSupplierSelects();}
-async function handleSaveBooking(e){e.preventDefault();const editingId=document.getElementById('editingBookingId').value;const clientId=document.getElementById('bookingClientSelect').value;const client=clients.find(c=>c._id===clientId);if(!client)return;calculateBookingFinancials();const netPrice=parseFloat(document.getElementById('bookingNetPrice').value)||0;const costPrice=parseFloat(document.getElementById('bookingCostPrice').value)||0;const paidAmount=parseFloat(document.getElementById('bookingPaidAmount').value)||0;const bookingObj={id:editingId!==''?Number(editingId):Date.now(),clientId:client._id,clientName:client.name,clientPhone:client.phone||'N/A',category:document.getElementById('bookingCategory').value,peopleCount:Math.max(1,parseInt(document.getElementById('bookingPeopleCount').value)||1),currency:document.getElementById('bookingCurrency').value,netPrice,costPrice,paidAmount,remaining:netPrice-paidAmount,profit:netPrice-costPrice,status:document.getElementById('bookingStatus').value,assignedTo:document.getElementById('bookingAssignedTo').value,details:document.getElementById('bookingDetails').value.trim(),notes:document.getElementById('bookingNotes').value.trim(),packageCosts:document.getElementById('bookingCategory').value==='Full Package'?packageCostRows:[]};if(editingId!==''){const idx=bookings.findIndex(b=>b.id==editingId);if(idx!==-1)bookings[idx]=bookingObj;showNotification('Booking updated successfully!','success');}else{bookings.unshift(bookingObj);showNotification('Booking added successfully!','success');}saveBookingsToStorage();bootstrap.Modal.getInstance(document.getElementById('addBookingModal')).hide();renderBookings();}
-
+async function handleSaveSupplier(e){e.preventDefault();const id=document.getElementById('editingSupplierId').value;const obj={name:document.getElementById('supplierName').value.trim(),type:document.getElementById('supplierType').value,currency:document.getElementById('supplierCurrency').value,contact:document.getElementById('supplierContact').value.trim(),notes:document.getElementById('supplierNotes').value.trim()};if(!obj.name)return;try{const r=await fetch(id?`${API_URL}/api/suppliers/${encodeURIComponent(id)}`:`${API_URL}/api/suppliers`,{method:id?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(obj)});if(!r.ok)throw 0;const saved=await r.json();if(id){const i=suppliers.findIndex(x=>String(x._id||x.id)===String(id));if(i!==-1)suppliers[i]=saved;}else suppliers.unshift(saved);saveSuppliersToStorage();renderSuppliers();populateSupplierSelects();bootstrap.Modal.getInstance(document.getElementById('supplierModal')).hide();showNotification('Supplier saved successfully!','success');}catch(e){showNotification('Supplier could not be saved to server.','danger');}}
+function renderSuppliers(){const tbody=document.getElementById('suppliersTableBody');if(!tbody)return;if(!suppliers.length){tbody.innerHTML='<tr><td colspan="6" class="text-center text-muted py-4">No suppliers recorded</td></tr>';return;}tbody.innerHTML=suppliers.map(s=>{const id=s._id||s.id;return `<tr><td><strong>${escapeHtml(s.name)}</strong></td><td>${escapeHtml(s.type||'-')}</td><td>${escapeHtml(s.contact||'-')}</td><td>${escapeHtml(s.currency||'-')}</td><td>${escapeHtml(s.notes||'-')}</td><td><button class="btn btn-sm btn-outline-primary me-1" onclick="editSupplier('${id}')"><i class="fa-solid fa-pen-to-square"></i></button><button class="btn btn-sm btn-outline-danger" onclick="deleteSupplier('${id}')"><i class="fa-solid fa-trash"></i></button></td></tr>`}).join('');}
+function editSupplier(id){const s=suppliers.find(x=>String(x._id||x.id)===String(id));if(!s)return;document.getElementById('editingSupplierId').value=s._id||s.id;document.getElementById('supplierName').value=s.name;document.getElementById('supplierType').value=s.type||'Other';document.getElementById('supplierCurrency').value=s.currency||'USD';document.getElementById('supplierContact').value=s.contact||'';document.getElementById('supplierNotes').value=s.notes||'';document.getElementById('supplierModalTitle').innerText='Edit Supplier';new bootstrap.Modal(document.getElementById('supplierModal')).show();}
+async function deleteSupplier(id){try{const r=await fetch(`${API_URL}/api/suppliers/${encodeURIComponent(id)}`,{method:'DELETE'});if(!r.ok)throw 0;suppliers=suppliers.filter(x=>String(x._id||x.id)!==String(id));saveSuppliersToStorage();renderSuppliers();populateSupplierSelects();}catch(e){showNotification('Supplier delete failed.','danger');}}
 function renderBookings() {
     const tbody = document.getElementById('bookingsTableBody');
     if (!tbody) return;
@@ -1138,109 +1134,18 @@ function renderBookings() {
     });
 }
 
-function loadFollowups() {
-    const saved = localStorage.getItem('roving_followups');
-    followups = saved ? JSON.parse(saved) : [];
-}
-
-function saveFollowupsToStorage() {
-    localStorage.setItem('roving_followups', JSON.stringify(followups));
-}
-
-function handleSaveFollowup(e) {
-    e.preventDefault();
-    const editingId = document.getElementById('editingFollowupId').value;
-    const client = clients.find(c => c._id === document.getElementById('followupClientSelect').value);
-    if (!client) return;
-
-    const followupObj = {
-        id: editingId !== "" ? Number(editingId) : Date.now(),
-        clientId: client._id,
-        clientName: client.name,
-        clientPhone: client.phone || 'N/A',
-        type: document.getElementById('followupType').value,
-        status: document.getElementById('followupStatusSelect').value,
-        dateTime: document.getElementById('followupDateTime').value,
-        assignedTo: document.getElementById('followupAssignedTo').value,
-        priority: document.getElementById('followupPriority').value,
-        notes: document.getElementById('followupNotes').value.trim(),
-        notified: false
-    };
-
-    if (editingId !== "") {
-        const idx = followups.findIndex(f => f.id == editingId);
-        if (idx !== -1) followups[idx] = followupObj;
-        showNotification('Follow-up updated successfully!', 'success');
-    } else {
-        followups.unshift(followupObj);
-        showNotification('Follow-up added successfully!', 'success');
-    }
-
-    saveFollowupsToStorage();
-    bootstrap.Modal.getInstance(document.getElementById('addFollowupModal')).hide();
-    renderFollowups();
-}
-
-function renderFollowups() {
-    const tbody = document.getElementById('followupsTableBody');
-    if (!tbody) return;
-    tbody.innerHTML = '';
-
-    let list = followups;
-    if (currentUser && currentUser.role === 'Sales') {
-        list = list.filter(f => f.assignedTo === currentUser.name);
-    }
-
-    if (list.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">No follow-ups recorded</td></tr>`;
-        return;
-    }
-
-    list.forEach(f => {
-        tbody.innerHTML += `
-            <tr>
-                <td><strong>${f.clientName}</strong></td>
-                <td><small><i class="fa-solid fa-phone me-1"></i>${f.clientPhone}</small></td>
-                <td><span class="badge bg-dark">${f.type}</span></td>
-                <td><small>${f.dateTime.replace('T', ' ')}</small></td>
-                <td><span class="badge bg-light text-dark border">${f.assignedTo}</span></td>
-                <td><span class="badge bg-secondary">${f.priority}</span></td>
-                <td><span class="badge bg-primary">${f.status}</span></td>
-                <td><small class="text-muted">${f.notes || '-'}</small></td>
-                <td>
-                    <button class="btn btn-sm btn-outline-success me-1" onclick="completeFollowup(${f.id})"><i class="fa-solid fa-check"></i></button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteFollowup(${f.id})"><i class="fa-solid fa-trash"></i></button>
-                </td>
-            </tr>
-        `;
-    });
-}
-
-function completeFollowup(id) {
-    const f = followups.find(x => x.id === id);
-    if (!f) return;
-    f.status = 'Completed';
-    saveFollowupsToStorage();
-    renderFollowups();
-    showNotification('Follow-up marked as completed!', 'success');
-}
-
-function deleteFollowup(id) {
-    followups = followups.filter(x => x.id !== id);
-    saveFollowupsToStorage();
-    renderFollowups();
-}
-
+async function loadFollowups(){try{const r=await fetch(`${API_URL}/api/followups`);if(r.ok){followups=await r.json();localStorage.setItem('roving_followups',JSON.stringify(followups));}else throw 0;}catch(e){followups=JSON.parse(localStorage.getItem('roving_followups')||'[]');}renderFollowups();}
+function saveFollowupsToStorage(){localStorage.setItem('roving_followups',JSON.stringify(followups));}
+async function handleSaveFollowup(e){e.preventDefault();const editingId=document.getElementById('editingFollowupId').value;const client=clients.find(c=>String(c._id||c.id)===String(document.getElementById('followupClientSelect').value));if(!client)return;const obj={clientId:String(client._id||client.id),clientName:client.name,clientPhone:client.phone||'N/A',type:document.getElementById('followupType').value,status:document.getElementById('followupStatusSelect').value,dateTime:document.getElementById('followupDateTime').value,assignedTo:document.getElementById('followupAssignedTo').value,priority:document.getElementById('followupPriority').value,notes:document.getElementById('followupNotes').value.trim(),notified:false};try{const r=await fetch(editingId?`${API_URL}/api/followups/${encodeURIComponent(editingId)}`:`${API_URL}/api/followups`,{method:editingId?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(obj)});if(!r.ok)throw 0;const saved=await r.json();if(editingId){const i=followups.findIndex(f=>String(f._id||f.id)===String(editingId));if(i!==-1)followups[i]=saved;}else followups.unshift(saved);saveFollowupsToStorage();bootstrap.Modal.getInstance(document.getElementById('addFollowupModal')).hide();renderFollowups();showNotification('Follow-up saved successfully!','success');}catch(e){showNotification('Follow-up could not be saved to server.','danger');}}
+function renderFollowups(){const tbody=document.getElementById('followupsTableBody');if(!tbody)return;let list=followups;if(currentUser&&currentUser.role==='Sales')list=list.filter(f=>f.assignedTo===currentUser.name);if(!list.length){tbody.innerHTML='<tr><td colspan="9" class="text-center text-muted py-4">No follow-ups recorded</td></tr>';return;}tbody.innerHTML=list.map(f=>{const id=f._id||f.id;return `<tr><td><strong>${escapeHtml(f.clientName)}</strong></td><td>${escapeHtml(f.clientPhone||'-')}</td><td>${escapeHtml(f.type||'-')}</td><td>${escapeHtml((f.dateTime||'').replace('T',' '))}</td><td>${escapeHtml(f.assignedTo||'-')}</td><td>${escapeHtml(f.priority||'-')}</td><td>${escapeHtml(f.status||'-')}</td><td>${escapeHtml(f.notes||'-')}</td><td><button class="btn btn-sm btn-outline-success" onclick="completeFollowup('${id}')">✓</button> <button class="btn btn-sm btn-outline-danger" onclick="deleteFollowup('${id}')">×</button></td></tr>`}).join('');}
+async function completeFollowup(id){const f=followups.find(x=>String(x._id||x.id)===String(id));if(!f)return;try{f.status='Completed';const r=await fetch(`${API_URL}/api/followups/${encodeURIComponent(id)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(f)});if(!r.ok)throw 0;const saved=await r.json();const i=followups.findIndex(x=>String(x._id||x.id)===String(id));if(i!==-1)followups[i]=saved;saveFollowupsToStorage();renderFollowups();}catch(e){showNotification('Update failed.','danger');}}
+async function deleteFollowup(id){try{const r=await fetch(`${API_URL}/api/followups/${encodeURIComponent(id)}`,{method:'DELETE'});if(!r.ok)throw 0;followups=followups.filter(x=>String(x._id||x.id)!==String(id));saveFollowupsToStorage();renderFollowups();}catch(e){showNotification('Delete failed.','danger');}}
 function editBooking(id) {
-    const b=bookings.find(x=>x.id===id); if(!b)return;
-    document.getElementById('editingBookingId').value=b.id; document.getElementById('bookingClientSelect').value=b.clientId; document.getElementById('bookingCategory').value=b.category; document.getElementById('bookingPeopleCount').value=b.peopleCount||1; document.getElementById('bookingCurrency').value=b.currency||'EGP'; document.getElementById('bookingNetPrice').value=b.netPrice; document.getElementById('bookingCostPrice').value=b.costPrice; document.getElementById('bookingPaidAmount').value=b.paidAmount||0; document.getElementById('bookingStatus').value=b.status; document.getElementById('bookingAssignedTo').value=b.assignedTo; document.getElementById('bookingDetails').value=b.details||''; document.getElementById('bookingNotes').value=b.notes||''; packageCostRows=Array.isArray(b.packageCosts)?JSON.parse(JSON.stringify(b.packageCosts)):[]; handleBookingCategoryChange(); calculateBookingFinancials(); new bootstrap.Modal(document.getElementById('addBookingModal')).show();
+    const b=bookings.find(x=>String(x._id||x.id)===String(id)); if(!b)return;
+    document.getElementById('editingBookingId').value=b._id||b.id; document.getElementById('bookingClientSelect').value=b.clientId; document.getElementById('bookingCategory').value=b.category; document.getElementById('bookingPeopleCount').value=b.peopleCount||1; document.getElementById('bookingCurrency').value=b.currency||'EGP'; document.getElementById('bookingNetPrice').value=b.netPrice; document.getElementById('bookingCostPrice').value=b.costPrice; document.getElementById('bookingPaidAmount').value=b.paidAmount||0; document.getElementById('bookingStatus').value=b.status; document.getElementById('bookingAssignedTo').value=b.assignedTo; document.getElementById('bookingDetails').value=b.details||''; document.getElementById('bookingNotes').value=b.notes||''; packageCostRows=Array.isArray(b.packageCosts)?JSON.parse(JSON.stringify(b.packageCosts)):[]; handleBookingCategoryChange(); calculateBookingFinancials(); new bootstrap.Modal(document.getElementById('addBookingModal')).show();
 }
 
-function deleteBooking(id) {
-    bookings = bookings.filter(x => x.id !== id);
-    saveBookingsToStorage();
-    renderBookings();
-}
+async function deleteBooking(id){try{const r=await fetch(`${API_URL}/api/bookings/${encodeURIComponent(id)}`,{method:"DELETE"});if(!r.ok)throw 0;bookings=bookings.filter(x=>String(x._id||x.id)!==String(id));saveBookingsToStorage();renderBookings();}catch(e){showNotification("Booking delete failed.","danger");}}
 
 function renderCommissions() {
     const tbody = document.getElementById('commissionsTableBody');
@@ -1738,41 +1643,7 @@ async function executeDeleteClient(clientId) {
     }
 }
 
-async function executeSaveClient(clientData) {
-    let localClients = JSON.parse(localStorage.getItem('roving_local_clients')) || [];
-    const editingId = clientData._id || clientData.id;
-
-    const existingIndex = localClients.findIndex(
-        c => String(c._id || c.id) === String(editingId)
-    );
-
-    if (existingIndex !== -1) {
-        localClients[existingIndex] = clientData;
-    } else {
-        localClients.unshift(clientData);
-    }
-
-    localStorage.setItem('roving_local_clients', JSON.stringify(localClients));
-
-    // Only real API IDs should be sent to the server.
-    // Locally created IDs are kept in localStorage until a backend record exists.
-    if (editingId && !String(editingId).startsWith('local_')) {
-        try {
-            const response = await fetch(`${API_URL}/api/clients/${encodeURIComponent(editingId)}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(clientData)
-            });
-
-            if (!response.ok) {
-                console.warn('Server edit returned:', response.status);
-            }
-        } catch (error) {
-            console.warn('Server edit sync skipped:', error);
-        }
-    }
-}
-
+async function executeSaveClient(clientData){const editingId=clientData._id||clientData.id;const isReal=editingId&&!String(editingId).startsWith('local_');const url=isReal?`${API_URL}/api/clients/${encodeURIComponent(editingId)}`:`${API_URL}/api/clients`;const r=await fetch(url,{method:isReal?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(clientData)});if(!r.ok)throw new Error('Client save failed');const saved=await r.json();const i=clients.findIndex(c=>String(c._id||c.id)===String(editingId));if(i!==-1)clients[i]=saved;else clients.unshift(saved);localStorage.setItem('roving_local_clients',JSON.stringify(clients));return saved;}
 async function deleteClient(clientId) {
     const client = clients.find(c => String(c._id || c.id) === String(clientId));
     if (!client) return;
