@@ -189,7 +189,7 @@
                 
                 <!-- Notifications Bell -->
                 <div class="dropdown">
-                    <button class="btn btn-light position-relative border shadow-sm px-3 py-2 rounded-pill" type="button" id="notificationDropdownBtn" data-bs-toggle="dropdown" aria-expanded="false" onclick="markAllNotificationsRead()">
+                    <button class="btn btn-light position-relative border shadow-sm px-3 py-2 rounded-pill" type="button" id="notificationDropdownBtn" data-bs-toggle="dropdown" aria-expanded="false" onclick="renderNotificationsUI()">
                         <i class="fa-solid fa-bell text-roving-orange fa-lg"></i>
                         <span id="notificationBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">0</span>
                     </button>
@@ -1264,221 +1264,525 @@ function checkBroadcast() {
 }
 
 // Notifications and Client Direct Transfer Feature
-function addNotification(targetUser, message) {
-    const notif = {
-        id: Date.now() + Math.random(),
+// ------------------------------------------------------------
+// Approval notifications use ONE shared key: roving_notifications.
+// Admin users see pending approval requests in the bell dropdown.
+// Sales users receive the final approve/reject result in their own
+// roving_user_notifications list.
+//
+// IMPORTANT:
+// localStorage is shared between tabs/windows on the SAME browser/origin,
+// but it is NOT shared between different computers/devices. For approval
+// notifications to work across different devices, the backend must persist
+// these approval requests. The frontend below is prepared for that later,
+// while the localStorage flow works immediately on the same browser.
+
+const APPROVAL_STORAGE_KEY = 'roving_notifications';
+const USER_NOTIFICATION_STORAGE_KEY = 'roving_user_notifications';
+
+function getApprovalNotifications() {
+    try {
+        const value = JSON.parse(localStorage.getItem(APPROVAL_STORAGE_KEY));
+        return Array.isArray(value) ? value : [];
+    } catch (error) {
+        return [];
+    }
+}
+
+function saveApprovalNotifications(notifications) {
+    localStorage.setItem(APPROVAL_STORAGE_KEY, JSON.stringify(notifications));
+}
+
+function getUserNotifications() {
+    try {
+        const value = JSON.parse(localStorage.getItem(USER_NOTIFICATION_STORAGE_KEY));
+        return Array.isArray(value) ? value : [];
+    } catch (error) {
+        return [];
+    }
+}
+
+function saveUserNotifications(notifications) {
+    localStorage.setItem(USER_NOTIFICATION_STORAGE_KEY, JSON.stringify(notifications));
+}
+
+function addNotification(targetUser, message, extra = {}) {
+    const notifications = getUserNotifications();
+
+    notifications.unshift({
+        id: 'user_notif_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
         targetUser: targetUser,
         message: message,
+        title: extra.title || 'إشعار جديد',
+        type: extra.type || 'info',
         read: false,
-        time: new Date().toLocaleTimeString()
+        timestamp: new Date().toLocaleString(),
+        ...extra
+    });
+
+    saveUserNotifications(notifications);
+
+    if (currentUser) {
+        pendingNotifications = getUserNotifications();
+        renderNotificationsUI();
+    }
+}
+
+function createApprovalRequest(requestType, payload, title, message) {
+    const notification = {
+        id: 'approval_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+        title: title,
+        message: message,
+        type: 'approval_request',
+        requestType: requestType,
+        payload: payload,
+        requestedBy: currentUser ? currentUser.name : 'Unknown User',
+        requestedByEmail: currentUser ? currentUser.email : '',
+        targetRole: 'Admin',
+        status: 'pending',
+        read: false,
+        timestamp: new Date().toLocaleString(),
+        createdAt: new Date().toISOString()
     };
-    pendingNotifications.push(notif);
-    localStorage.setItem('roving_user_notifications', JSON.stringify(pendingNotifications));
+
+    const notifications = getApprovalNotifications();
+    notifications.unshift(notification);
+    saveApprovalNotifications(notifications);
+
+    // Notify every admin in the local user list as well.
+    // This is useful when the admin is logged in in another tab/window.
+    const admins = validUsers.filter(u => String(u.role).trim().toLowerCase() === 'admin');
+    admins.forEach(admin => {
+        addNotification(
+            admin.name,
+            message,
+            {
+                title: title,
+                type: 'approval_request',
+                approvalId: notification.id,
+                read: false
+            }
+        );
+    });
+
+    renderNotificationsUI();
+    return notification;
+}
+
+function renderNotifications() {
     renderNotificationsUI();
 }
 
-// 1. دالة موحدة لجلب وعرض إشعارات الأدمن والطلبات المعلقة
-function renderNotifications() {
-    const container = document.getElementById('notificationsContainer') || document.getElementById('notificationsList');
-    if (!container) return;
+function renderNotificationsUI() {
+    const container = document.getElementById('notificationListContainer');
+    const badge = document.getElementById('notificationBadge');
 
-    // توحيد مفتاح التخزين لضمان تطابقه في كل التطبيق
-    let notifications = JSON.parse(localStorage.getItem('roving_notifications')) || [];
-    container.innerHTML = '';
+    if (!container || !currentUser) return;
 
-    if (notifications.length === 0) {
-        container.innerHTML = `<div class="text-center text-muted p-3">لا توجد إشعارات</div>`;
+    const isAdmin = String(currentUser.role || '').trim().toLowerCase() === 'admin';
+    const approvalNotifications = getApprovalNotifications();
+    const userNotifications = getUserNotifications();
+
+    let items = [];
+
+    if (isAdmin) {
+        // Admin must see approval requests directly in the bell.
+        items = approvalNotifications.map(n => ({
+            ...n,
+            source: 'approval'
+        }));
+
+        // Also include normal user notifications addressed to this admin.
+        userNotifications
+            .filter(n => n.targetUser === currentUser.name || n.targetUser === 'All')
+            .forEach(n => {
+                if (!n.approvalId || !items.some(x => x.id === n.approvalId)) {
+                    items.push({
+                        ...n,
+                        source: 'user'
+                    });
+                }
+            });
+    } else {
+        // Sales sees their own notifications, including approval results.
+        items = userNotifications
+            .filter(n => n.targetUser === currentUser.name || n.targetUser === 'All')
+            .map(n => ({
+                ...n,
+                source: 'user'
+            }));
+    }
+
+    // Newest first.
+    items.sort((a, b) => {
+        const aTime = new Date(a.createdAt || a.timestamp || 0).getTime() || 0;
+        const bTime = new Date(b.createdAt || b.timestamp || 0).getTime() || 0;
+        return bTime - aTime;
+    });
+
+    const pendingAdminRequests = isAdmin
+        ? approvalNotifications.filter(n => n.type === 'approval_request' && n.status === 'pending').length
+        : 0;
+
+    const unreadUserNotifications = userNotifications.filter(n =>
+        (n.targetUser === currentUser.name || n.targetUser === 'All') && !n.read
+    ).length;
+
+    const unreadCount = pendingAdminRequests + unreadUserNotifications;
+
+    if (badge) {
+        badge.innerText = unreadCount;
+        badge.classList.toggle('d-none', unreadCount === 0);
+    }
+
+    if (items.length === 0) {
+        container.innerHTML = `
+            <li class="text-center text-muted small py-3">
+                <i class="fa-regular fa-bell-slash me-1"></i>
+                No new notifications
+            </li>
+        `;
         return;
     }
 
-    notifications.forEach(notif => {
+    container.innerHTML = '';
+
+    items.forEach(notif => {
+        const isApproval =
+            notif.source === 'approval' &&
+            notif.type === 'approval_request' &&
+            notif.status === 'pending' &&
+            isAdmin;
+
         let actionButtons = '';
-        
-        // التحقق مما إذا كان الإشعار طلب موافقة معلق والأدمن هو المطلع عليه
-        if (notif.type === 'approval_request' && notif.status === 'pending') {
+
+        if (isApproval) {
             actionButtons = `
-                <div class="mt-2">
-                    <button class="btn btn-sm btn-success me-1" onclick="handleNotificationAction('${notif.id}', 'accept')">
+                <div class="mt-2 d-flex gap-2">
+                    <button
+                        class="btn btn-sm btn-success"
+                        onclick="handleNotificationAction('${notif.id}', 'accept')">
                         <i class="fa-solid fa-check me-1"></i>موافقة
                     </button>
-                    <button class="btn btn-sm btn-danger" onclick="handleNotificationAction('${notif.id}', 'reject')">
+                    <button
+                        class="btn btn-sm btn-danger"
+                        onclick="handleNotificationAction('${notif.id}', 'reject')">
                         <i class="fa-solid fa-xmark me-1"></i>رفض
                     </button>
                 </div>
             `;
-        } else if (notif.status === 'accepted') {
-            actionButtons = `<div class="mt-1 text-success small"><i class="fa-solid fa-check-circle"></i> تم قبول الطلب وتنفيذه</div>`;
-        } else if (notif.status === 'rejected') {
-            actionButtons = `<div class="mt-1 text-danger small"><i class="fa-solid fa-times-circle"></i> تم رفض الطلب</div>`;
+        } else if (notif.source === 'approval' && notif.status === 'accepted') {
+            actionButtons = `
+                <div class="mt-1 text-success small">
+                    <i class="fa-solid fa-check-circle me-1"></i>
+                    تم قبول الطلب وتنفيذه
+                </div>
+            `;
+        } else if (notif.source === 'approval' && notif.status === 'rejected') {
+            actionButtons = `
+                <div class="mt-1 text-danger small">
+                    <i class="fa-solid fa-times-circle me-1"></i>
+                    تم رفض الطلب
+                </div>
+            `;
         }
 
+        const borderClass =
+            notif.status === 'pending' && isApproval
+                ? 'border-warning'
+                : 'border-secondary';
+
         container.innerHTML += `
-            <div class="alert alert-secondary p-2 mb-2 border-start border-4 ${notif.status === 'pending' ? 'border-warning' : 'border-secondary'}">
-                <div class="d-flex justify-content-between">
-                    <strong>${notif.title || 'إشعار جديد'}</strong>
-                    <small class="text-muted">${notif.timestamp || ''}</small>
+            <li class="list-unstyled">
+                <div class="alert alert-light p-2 mb-2 border-start border-4 ${borderClass} shadow-sm">
+                    <div class="d-flex justify-content-between align-items-start gap-2">
+                        <strong class="small">${escapeHtml(notif.title || 'إشعار جديد')}</strong>
+                        <small class="text-muted text-nowrap">${escapeHtml(notif.timestamp || '')}</small>
+                    </div>
+
+                    <div class="small mt-1">
+                        ${escapeHtml(notif.message || '')}
+                    </div>
+
+                    ${notif.requestedBy ? `
+                        <div class="small text-muted mt-1">
+                            <i class="fa-solid fa-user me-1"></i>
+                            Requested by: ${escapeHtml(notif.requestedBy)}
+                        </div>
+                    ` : ''}
+
+                    ${actionButtons}
                 </div>
-                <p class="mb-1 small">${notif.message || ''}</p>
-                ${actionButtons}
-            </div>
+            </li>
         `;
     });
 }
 
-// 2. دالة التعامل مع قرار الأدمن (موافقة أو رفض) وتنفيذ الطلب فوراً
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 async function handleNotificationAction(notificationId, action) {
-    let notifications = JSON.parse(localStorage.getItem('roving_notifications')) || [];
-    const notifIndex = notifications.findIndex(n => n.id === notificationId);
-    if (notifIndex === -1) return;
-
-    const notif = notifications[notifIndex];
-
-    if (action === 'accept') {
-        notif.status = 'accepted';
-        
-        // تنفيذ الطلب بناءً على نوعه
-        if (notif.requestType === 'DELETE_CLIENT') {
-            await executeDeleteClient(notif.payload.clientId);
-            if (typeof showNotification === 'function') showNotification('تمت الموافقة وحذف العميل بنجاح', 'success');
-        } else if (notif.requestType === 'EDIT_CLIENT') {
-            await executeSaveClient(notif.payload.clientData);
-            if (typeof showNotification === 'function') showNotification('تمت الموافقة وتعديل بيانات العميل بنجاح', 'success');
-        }
-    } else {
-        notif.status = 'rejected';
-        if (typeof showNotification === 'function') {
-            showNotification('تم رفض الطلب بنجاح', 'info');
-        }
-    }
-
-    notifications[notifIndex] = notif;
-    localStorage.setItem('roving_notifications', JSON.stringify(notifications));
-    
-    // تحديث الواجهات
-    renderNotifications();
-    if (typeof fetchClients === 'function') fetchClients();
-}
-
-// دالة تنفيذ الحذف الفعلي بعد موافقة الأدمن
-async function executeDeleteClient(clientId) {
-    let localClients = JSON.parse(localStorage.getItem('roving_local_clients')) || [];
-    localClients = localClients.filter(c => (c._id || c.id) !== clientId);
-    localStorage.setItem('roving_local_clients', JSON.stringify(localClients));
-
-    try {
-        await fetch(`${API_URL}/api/clients/${clientId}`, { method: 'DELETE' });
-    } catch (error) {
-        console.log("Server delete sync skipped.");
-    }
-}
-
-// دالة تنفيذ الحفظ/التعديل الفعلي بعد موافقة الأدمن
-async function executeSaveClient(clientData) {
-    let localClients = JSON.parse(localStorage.getItem('roving_local_clients')) || [];
-    const editingId = clientData._id;
-    
-    localClients = localClients.map(c => (c._id === editingId || c.id === editingId) ? clientData : c);
-    localStorage.setItem('roving_local_clients', JSON.stringify(localClients));
-
-    try {
-        await fetch(`${API_URL}/api/clients/${editingId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(clientData)
-        });
-    } catch (error) {
-        console.log("Server edit sync skipped.");
-    }
-}
-
-// دالة مساعدة لتنفيذ الحذف الفعلي
-async function deleteClient(clientId) {
-    const client = clients.find(c => (c._id || c.id) === clientId);
-    if (!client) return;
-
-    // التأكد من الصلاحية: إذا كان المستخدم الحالي موظف مبيعات (Sales)
-    if (currentUser && currentUser.role && currentUser.role.trim().toLowerCase() === 'sales') {
-        const notificationId = 'notif_' + Date.now();
-        const notification = {
-            id: notificationId,
-            title: 'طلب حذف عميل جديد',
-            message: `الموظف (${currentUser.name}) يطلب حذف العميل: (${client.name})`,
-            type: 'approval_request',
-            requestType: 'DELETE_CLIENT',
-            payload: { clientId: clientId },
-            status: 'pending',
-            timestamp: new Date().toLocaleTimeString()
-        };
-
-        // حفظ الإشعار في localStorage الخاص بالإشعارات
-        let notifications = JSON.parse(localStorage.getItem('roving_notifications')) || [];
-        notifications.unshift(notification);
-        localStorage.setItem('roving_notifications', JSON.stringify(notifications));
-
-        if (typeof showNotification === 'function') {
-            showNotification('تم إرسال طلب الحذف إلى الأدمن بنجاح', 'warning');
-        } else {
-            alert('تم إرسال طلب الحذف إلى الأدمن بنجاح');
-        }
-        
-        // تحديث عرض الإشعارات إذا كانت الدالة موجودة
-        if (typeof renderNotifications === 'function') renderNotifications();
+    if (!currentUser || String(currentUser.role).trim().toLowerCase() !== 'admin') {
+        showNotification('Only Admin users can approve or reject requests.', 'danger');
         return;
     }
 
-    // إذا كان المستخدم Admin، يتم الحذف مباشرة
-    if (confirm('هل أنت متأكد من حذف هذا العميل؟')) {
-        let localClients = JSON.parse(localStorage.getItem('roving_local_clients')) || [];
-        localClients = localClients.filter(c => (c._id || c.id) !== clientId);
-        localStorage.setItem('roving_local_clients', JSON.stringify(localClients));
+    const notifications = getApprovalNotifications();
+    const notifIndex = notifications.findIndex(n => n.id === notificationId);
 
+    if (notifIndex === -1) {
+        showNotification('Approval request was not found.', 'danger');
+        return;
+    }
+
+    const notif = notifications[notifIndex];
+
+    if (notif.status !== 'pending') {
+        showNotification('This request has already been processed.', 'info');
+        renderNotificationsUI();
+        return;
+    }
+
+    if (action === 'accept') {
         try {
-            await fetch(`${API_URL}/api/clients/${clientId}`, { method: 'DELETE' });
-        } catch (error) {
-            console.log("Server delete skipped.");
-        }
+            if (notif.requestType === 'DELETE_CLIENT') {
+                await executeDeleteClient(notif.payload.clientId);
+            } else if (notif.requestType === 'EDIT_CLIENT') {
+                await executeSaveClient(notif.payload.clientData);
+            } else {
+                throw new Error('Unknown approval request type.');
+            }
 
-        if (typeof showNotification === 'function') {
-            showNotification('تم حذف العميل بنجاح', 'success');
+            notif.status = 'accepted';
+            notif.processedBy = currentUser.name;
+            notif.processedAt = new Date().toISOString();
+
+            // Inform the Sales user that the request was approved.
+            addNotification(
+                notif.requestedBy,
+                `تمت الموافقة على طلبك: ${notif.title || 'طلب موافقة'} وتم تنفيذ العملية.`,
+                {
+                    title: 'تمت الموافقة على الطلب',
+                    type: 'approval_result',
+                    approvalId: notif.id,
+                    read: false
+                }
+            );
+
+            showNotification('تمت الموافقة على الطلب وتنفيذه بنجاح.', 'success');
+        } catch (error) {
+            console.error('Approval execution failed:', error);
+            showNotification('حدث خطأ أثناء تنفيذ الطلب بعد الموافقة.', 'danger');
+            return;
         }
-        fetchClients();
+    } else if (action === 'reject') {
+        notif.status = 'rejected';
+        notif.processedBy = currentUser.name;
+        notif.processedAt = new Date().toISOString();
+
+        addNotification(
+            notif.requestedBy,
+            `تم رفض طلبك: ${notif.title || 'طلب موافقة'} من قِبل الأدمن.`,
+            {
+                title: 'تم رفض الطلب',
+                type: 'approval_result',
+                approvalId: notif.id,
+                read: false
+            }
+        );
+
+        showNotification('تم رفض الطلب بنجاح.', 'info');
+    }
+
+    notifications[notifIndex] = notif;
+    saveApprovalNotifications(notifications);
+
+    pendingNotifications = getUserNotifications();
+    renderNotificationsUI();
+
+    if (typeof fetchClients === 'function') {
+        await fetchClients();
     }
 }
-// دالة مساعدة لتنفيذ الحفظ/التعديل الفعلي
-async function executeSaveClient(clientData) {
+
+async function executeDeleteClient(clientId) {
     let localClients = JSON.parse(localStorage.getItem('roving_local_clients')) || [];
-    const editingId = clientData._id;
-    
-    localClients = localClients.map(c => (c._id === editingId || c.id === editingId) ? clientData : c);
+
+    localClients = localClients.filter(c => String(c._id || c.id) !== String(clientId));
     localStorage.setItem('roving_local_clients', JSON.stringify(localClients));
 
     try {
-        await fetch(`${API_URL}/api/clients/${editingId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(clientData)
+        const response = await fetch(`${API_URL}/api/clients/${encodeURIComponent(clientId)}`, {
+            method: 'DELETE'
         });
+
+        if (!response.ok && response.status !== 404) {
+            console.warn('Server delete returned:', response.status);
+        }
     } catch (error) {
-        console.log("Server sync skipped.");
+        console.warn('Server delete sync skipped:', error);
     }
 }
+
+async function executeSaveClient(clientData) {
+    let localClients = JSON.parse(localStorage.getItem('roving_local_clients')) || [];
+    const editingId = clientData._id || clientData.id;
+
+    const existingIndex = localClients.findIndex(
+        c => String(c._id || c.id) === String(editingId)
+    );
+
+    if (existingIndex !== -1) {
+        localClients[existingIndex] = clientData;
+    } else {
+        localClients.unshift(clientData);
+    }
+
+    localStorage.setItem('roving_local_clients', JSON.stringify(localClients));
+
+    // Only real API IDs should be sent to the server.
+    // Locally created IDs are kept in localStorage until a backend record exists.
+    if (editingId && !String(editingId).startsWith('local_')) {
+        try {
+            const response = await fetch(`${API_URL}/api/clients/${encodeURIComponent(editingId)}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(clientData)
+            });
+
+            if (!response.ok) {
+                console.warn('Server edit returned:', response.status);
+            }
+        } catch (error) {
+            console.warn('Server edit sync skipped:', error);
+        }
+    }
+}
+
+async function deleteClient(clientId) {
+    const client = clients.find(c => String(c._id || c.id) === String(clientId));
+    if (!client) return;
+
+    const isSales = currentUser &&
+        String(currentUser.role || '').trim().toLowerCase() === 'sales';
+
+    if (isSales) {
+        const alreadyPending = getApprovalNotifications().some(n =>
+            n.type === 'approval_request' &&
+            n.requestType === 'DELETE_CLIENT' &&
+            n.status === 'pending' &&
+            String(n.payload?.clientId) === String(clientId)
+        );
+
+        if (alreadyPending) {
+            showNotification('يوجد بالفعل طلب حذف معلق لهذا العميل.', 'warning');
+            return;
+        }
+
+        createApprovalRequest(
+            'DELETE_CLIENT',
+            { clientId: clientId },
+            'طلب حذف عميل جديد',
+            `الموظف (${currentUser.name}) يطلب حذف العميل: (${client.name})`
+        );
+
+        showNotification('تم إرسال طلب حذف العميل إلى الأدمن للموافقة.', 'warning');
+        return;
+    }
+
+    if (!confirm('هل أنت متأكد من حذف هذا العميل؟')) {
+        return;
+    }
+
+    await executeDeleteClient(clientId);
+
+    showNotification('تم حذف العميل بنجاح.', 'success');
+    await fetchClients();
+}
+
 function markAllNotificationsRead() {
     if (!currentUser) return;
-    pendingNotifications.forEach(n => {
-        if (n.targetUser === currentUser.name || currentUser.role === 'Admin' || n.targetUser === 'All') {
+
+    const notifications = getUserNotifications();
+
+    notifications.forEach(n => {
+        if (n.targetUser === currentUser.name || n.targetUser === 'All') {
             n.read = true;
         }
     });
-    localStorage.setItem('roving_user_notifications', JSON.stringify(pendingNotifications));
+
+    saveUserNotifications(notifications);
+    pendingNotifications = notifications;
+
     renderNotificationsUI();
 }
 
-// Polling for live notifications every 3 seconds
+function markNotificationAsRead(notificationId) {
+    const notifications = getUserNotifications();
+
+    const item = notifications.find(n => n.id === notificationId);
+    if (item) {
+        item.read = true;
+        saveUserNotifications(notifications);
+        pendingNotifications = notifications;
+        renderNotificationsUI();
+    }
+}
+
+// Listen for localStorage changes so Admin/Sales tabs update immediately.
+window.addEventListener('storage', function(event) {
+    if (
+        event.key === APPROVAL_STORAGE_KEY ||
+        event.key === USER_NOTIFICATION_STORAGE_KEY ||
+        event.key === 'roving_users'
+    ) {
+        pendingNotifications = getUserNotifications();
+        renderNotificationsUI();
+        if (typeof renderClients === 'function') renderClients();
+    }
+});
+
+// Polling fallback for the current page.
 setInterval(() => {
-    if (currentUser) {
-        const stored = JSON.parse(localStorage.getItem('roving_user_notifications')) || [];
-        if (stored.length !== pendingNotifications.length) {
-            pendingNotifications = stored;
+    if (!currentUser) return;
+
+    const latestUserNotifications = getUserNotifications();
+    const latestApprovalNotifications = getApprovalNotifications();
+
+    const currentUserJson = JSON.stringify(pendingNotifications);
+    const latestUserJson = JSON.stringify(latestUserNotifications);
+
+    if (currentUserJson !== latestUserJson) {
+        pendingNotifications = latestUserNotifications;
+        renderNotificationsUI();
+    }
+
+    // Re-render approval requests periodically so a newly created request
+    // appears even when browser storage events are not fired.
+    if (String(currentUser.role).trim().toLowerCase() === 'admin') {
+        const currentRenderedApprovalState = JSON.stringify(
+            getApprovalNotifications().map(n => ({
+                id: n.id,
+                status: n.status,
+                timestamp: n.timestamp
+            }))
+        );
+
+        const latestApprovalState = JSON.stringify(
+            latestApprovalNotifications.map(n => ({
+                id: n.id,
+                status: n.status,
+                timestamp: n.timestamp
+            }))
+        );
+
+        if (currentRenderedApprovalState !== latestApprovalState) {
             renderNotificationsUI();
         }
     }
@@ -1486,15 +1790,13 @@ setInterval(() => {
 
 async function handleSaveClient(event) {
     if (event) event.preventDefault();
+
     const editingId = document.getElementById('editingClientId').value;
-    
-    const nameInput = document.getElementById('clientName').value.trim();
-    const phoneInput = document.getElementById('clientPhone').value.trim();
 
     const clientData = {
         _id: editingId !== "" ? editingId : 'local_' + Date.now(),
-        name: nameInput,
-        phone: phoneInput,
+        name: document.getElementById('clientName').value.trim(),
+        phone: document.getElementById('clientPhone').value.trim(),
         passport: document.getElementById('clientPassport').value.trim(),
         source: document.getElementById('clientSource').value,
         status: document.getElementById('clientStatusSelect').value,
@@ -1502,93 +1804,63 @@ async function handleSaveClient(event) {
         notes: document.getElementById('clientNotes').value.trim()
     };
 
-    // إذا كان المستخدم Sales ويحاول "تعديل" عميل حالي
-    if (currentUser && currentUser.role && currentUser.role.trim().toLowerCase() === 'sales' && editingId !== "") {
-        const notificationId = 'notif_' + Date.now();
-        const notification = {
-            id: notificationId,
-            title: 'طلب تعديل عميل جديد',
-            message: `الموظف (${currentUser.name}) يطلب تعديل بيانات العميل: (${clientData.name})`,
-            type: 'approval_request',
-            requestType: 'EDIT_CLIENT',
-            payload: { clientData: clientData },
-            status: 'pending',
-            timestamp: new Date().toLocaleTimeString()
-        };
+    const isSales = currentUser &&
+        String(currentUser.role || '').trim().toLowerCase() === 'sales';
 
-        let notifications = JSON.parse(localStorage.getItem('roving_notifications')) || [];
-        notifications.unshift(notification);
-        localStorage.setItem('roving_notifications', JSON.stringify(notifications));
+    // SALES + EDIT = approval request.
+    if (isSales && editingId !== "") {
+        const alreadyPending = getApprovalNotifications().some(n =>
+            n.type === 'approval_request' &&
+            n.requestType === 'EDIT_CLIENT' &&
+            n.status === 'pending' &&
+            String(n.payload?.clientData?._id) === String(editingId)
+        );
 
-        if (typeof showNotification === 'function') {
-            showNotification('تم إرسال طلب التعديل إلى الأدمن للموافقة عليه', 'warning');
-        } else {
-            alert('تم إرسال طلب التعديل إلى الأدمن للموافقة عليه');
+        if (alreadyPending) {
+            showNotification('يوجد بالفعل طلب تعديل معلق لهذا العميل.', 'warning');
+            return;
         }
+
+        createApprovalRequest(
+            'EDIT_CLIENT',
+            { clientData: clientData },
+            'طلب تعديل عميل جديد',
+            `الموظف (${currentUser.name}) يطلب تعديل بيانات العميل: (${clientData.name})`
+        );
+
+        showNotification('تم إرسال طلب تعديل بيانات العميل إلى الأدمن للموافقة.', 'warning');
 
         const modalEl = document.getElementById('addClientModal');
         if (modalEl) {
             const modalInstance = bootstrap.Modal.getInstance(modalEl);
             if (modalInstance) modalInstance.hide();
         }
-        
-        if (typeof renderNotifications === 'function') renderNotifications();
+
         return;
     }
 
-    // (باقي كود الحفظ العادي للإضافة الجديدة أو للأدمن يوضع هنا...)
-}
-// دالة الحذف الذكية حسب الصلاحية
-async function deleteClient(clientId) {
-    const client = clients.find(c => (c._id || c.id) === clientId);
-    if (!client) return;
+    // NEW CLIENT or ADMIN EDIT = execute immediately.
+    await executeSaveClient(clientData);
 
-    // إذا كان المستخدم الحالي موظف مبيعات، يتم إرسال طلب حذف للأدمن
-    if (currentUser && currentUser.role === 'Sales') {
-        const approvalRequest = {
-            id: 'req_' + Date.now(),
-            type: 'DELETE_CLIENT',
-            clientId: clientId,
-            clientName: client.name,
-            requestedBy: currentUser.name,
-            status: 'Pending',
-            date: new Date().toISOString()
-        };
+    showNotification(
+        editingId !== ""
+            ? 'تم تعديل بيانات العميل بنجاح.'
+            : 'تمت إضافة العميل بنجاح.',
+        'success'
+    );
 
-        saveApprovalRequest(approvalRequest);
-        if (typeof showNotification === 'function') {
-            showNotification('تم إرسال طلب الحذف إلى المدير للموافقة عليه.', 'warning');
-        } else {
-            alert('تم إرسال طلب الحذف إلى المدير للموافقة عليه.');
-        }
-        return;
+    const modalEl = document.getElementById('addClientModal');
+    if (modalEl) {
+        const modalInstance = bootstrap.Modal.getInstance(modalEl);
+        if (modalInstance) modalInstance.hide();
     }
 
-    // إذا كان المستخدم مدير (Admin)، يتم الحذف مباشرة
-    if (confirm('هل أنت متأكد من حذف هذا العميل؟')) {
-        let localClients = JSON.parse(localStorage.getItem('roving_local_clients')) || [];
-        localClients = localClients.filter(c => (c._id || c.id) !== clientId);
-        localStorage.setItem('roving_local_clients', JSON.stringify(localClients));
+    document.getElementById('addClientForm').reset();
+    document.getElementById('editingClientId').value = '';
 
-        try {
-            await `${API_URL}/api/clients/${clientId}`, { method: 'DELETE' };
-        } catch (error) {
-            console.log("Server delete skipped.");
-        }
-
-        if (typeof showNotification === 'function') {
-            showNotification('تم حذف العميل بنجاح', 'success');
-        }
-        fetchClients();
-    }
+    await fetchClients();
 }
 
-// دالة مساعدة لحفظ طلبات الموافقة في الـ LocalStorage لتظهر عند الأدمن
-function saveApprovalRequest(request) {
-    let requests = JSON.parse(localStorage.getItem('roving_approval_requests')) || [];
-    requests.unshift(request);
-    localStorage.setItem('roving_approval_requests', JSON.stringify(requests));
-}
 function editClient(id) {
     const client = clients.find(c => c._id === id);
     if (!client) return;
