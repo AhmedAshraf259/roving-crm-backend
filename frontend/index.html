@@ -1277,45 +1277,55 @@ function addNotification(targetUser, message) {
     renderNotificationsUI();
 }
 
-function renderNotificationsUI() {
-    const listContainer = document.getElementById('notificationListContainer');
-    const badge = document.getElementById('notificationBadge');
-    if (!listContainer || !currentUser) return;
+// 1. دالة موحدة لجلب وعرض إشعارات الأدمن والطلبات المعلقة
+function renderNotifications() {
+    const container = document.getElementById('notificationsContainer') || document.getElementById('notificationsList');
+    if (!container) return;
 
-    pendingNotifications = JSON.parse(localStorage.getItem('roving_user_notifications')) || [];
+    // توحيد مفتاح التخزين لضمان تطابقه في كل التطبيق
+    let notifications = JSON.parse(localStorage.getItem('roving_notifications')) || [];
+    container.innerHTML = '';
 
-    // الأدمن يشاهد كافة الإشعارات (بما فيها تحويلات العملاء للجميع)، والمستخدم العادي يشاهد إشعاراته الموجهة إليه فقط
-    let userNotifs = pendingNotifications;
-    if (currentUser.role !== 'Admin') {
-        userNotifs = pendingNotifications.filter(n => n.targetUser === currentUser.name || n.targetUser === 'All');
-    }
-
-    if (userNotifs.length === 0) {
-        listContainer.innerHTML = `<li class="text-center text-muted small py-3">No new notifications</li>`;
-        if(badge) badge.classList.add('d-none');
+    if (notifications.length === 0) {
+        container.innerHTML = `<div class="text-center text-muted p-3">لا توجد إشعارات</div>`;
         return;
     }
 
-    const unreadCount = userNotifs.filter(n => !n.read).length;
-    if(badge) {
-        if (unreadCount > 0) {
-            badge.innerText = unreadCount;
-            badge.classList.remove('d-none');
-        } else {
-            badge.classList.add('d-none');
+    notifications.forEach(notif => {
+        let actionButtons = '';
+        
+        // التحقق مما إذا كان الإشعار طلب موافقة معلق والأدمن هو المطلع عليه
+        if (notif.type === 'approval_request' && notif.status === 'pending') {
+            actionButtons = `
+                <div class="mt-2">
+                    <button class="btn btn-sm btn-success me-1" onclick="handleNotificationAction('${notif.id}', 'accept')">
+                        <i class="fa-solid fa-check me-1"></i>موافقة
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="handleNotificationAction('${notif.id}', 'reject')">
+                        <i class="fa-solid fa-xmark me-1"></i>رفض
+                    </button>
+                </div>
+            `;
+        } else if (notif.status === 'accepted') {
+            actionButtons = `<div class="mt-1 text-success small"><i class="fa-solid fa-check-circle"></i> تم قبول الطلب وتنفيذه</div>`;
+        } else if (notif.status === 'rejected') {
+            actionButtons = `<div class="mt-1 text-danger small"><i class="fa-solid fa-times-circle"></i> تم رفض الطلب</div>`;
         }
-    }
 
-    listContainer.innerHTML = '';
-    userNotifs.slice().reverse().forEach(n => {
-        listContainer.innerHTML += `
-            <li class="p-2 border-bottom ${n.read ? 'bg-white' : 'bg-light'}">
-                <div class="small text-dark"><i class="fa-solid fa-circle-info text-roving-orange me-1"></i> ${n.message}</div>
-                <div class="text-end" style="font-size: 10px; color: gray;">${n.time}</div>
-            </li>
+        container.innerHTML += `
+            <div class="alert alert-secondary p-2 mb-2 border-start border-4 ${notif.status === 'pending' ? 'border-warning' : 'border-secondary'}">
+                <div class="d-flex justify-content-between">
+                    <strong>${notif.title || 'إشعار جديد'}</strong>
+                    <small class="text-muted">${notif.timestamp || ''}</small>
+                </div>
+                <p class="mb-1 small">${notif.message || ''}</p>
+                ${actionButtons}
+            </div>
         `;
     });
 }
+
+// 2. دالة التعامل مع قرار الأدمن (موافقة أو رفض) وتنفيذ الطلب فوراً
 async function handleNotificationAction(notificationId, action) {
     let notifications = JSON.parse(localStorage.getItem('roving_notifications')) || [];
     const notifIndex = notifications.findIndex(n => n.id === notificationId);
@@ -1326,13 +1336,11 @@ async function handleNotificationAction(notificationId, action) {
     if (action === 'accept') {
         notif.status = 'accepted';
         
-        // تنفيذ العملية بناءً على نوع الطلب
+        // تنفيذ الطلب بناءً على نوعه
         if (notif.requestType === 'DELETE_CLIENT') {
-            // تنفيذ الحذف محلياً ومن السيرفر
             await executeDeleteClient(notif.payload.clientId);
             if (typeof showNotification === 'function') showNotification('تمت الموافقة وحذف العميل بنجاح', 'success');
         } else if (notif.requestType === 'EDIT_CLIENT') {
-            // تنفيذ التعديل وحفظ البيانات المحدثة
             await executeSaveClient(notif.payload.clientData);
             if (typeof showNotification === 'function') showNotification('تمت الموافقة وتعديل بيانات العميل بنجاح', 'success');
         }
@@ -1346,9 +1354,41 @@ async function handleNotificationAction(notificationId, action) {
     notifications[notifIndex] = notif;
     localStorage.setItem('roving_notifications', JSON.stringify(notifications));
     
-    // إعادة تحميل الإشعارات وقائمة العملاء
+    // تحديث الواجهات
     renderNotifications();
     if (typeof fetchClients === 'function') fetchClients();
+}
+
+// دالة تنفيذ الحذف الفعلي بعد موافقة الأدمن
+async function executeDeleteClient(clientId) {
+    let localClients = JSON.parse(localStorage.getItem('roving_local_clients')) || [];
+    localClients = localClients.filter(c => (c._id || c.id) !== clientId);
+    localStorage.setItem('roving_local_clients', JSON.stringify(localClients));
+
+    try {
+        await fetch(`${API_URL}/api/clients/${clientId}`, { method: 'DELETE' });
+    } catch (error) {
+        console.log("Server delete sync skipped.");
+    }
+}
+
+// دالة تنفيذ الحفظ/التعديل الفعلي بعد موافقة الأدمن
+async function executeSaveClient(clientData) {
+    let localClients = JSON.parse(localStorage.getItem('roving_local_clients')) || [];
+    const editingId = clientData._id;
+    
+    localClients = localClients.map(c => (c._id === editingId || c.id === editingId) ? clientData : c);
+    localStorage.setItem('roving_local_clients', JSON.stringify(localClients));
+
+    try {
+        await fetch(`${API_URL}/api/clients/${editingId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(clientData)
+        });
+    } catch (error) {
+        console.log("Server edit sync skipped.");
+    }
 }
 
 // دالة مساعدة لتنفيذ الحذف الفعلي
