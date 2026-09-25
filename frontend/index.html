@@ -816,28 +816,68 @@ function toggleSidebar() {
 }
 
 async function fetchClients() {
-    // جلب العملاء المخزنين محلياً أولاً لضمان سرعة الظهور وعدم الضياع
     const localClients = JSON.parse(localStorage.getItem('roving_local_clients')) || [];
-    
+
     try {
         const response = await fetch(`${API_URL}/api/clients`);
         if (response.ok) {
-            const data = await response.json();
-            const apiClients = Array.isArray(data) ? data : [];
-            
-            // دمج العملاء مع تفضيل وتحديث القائمة المشتركة
+            let apiClients = await response.json();
+            apiClients = Array.isArray(apiClients) ? apiClients : [];
+
+            // Migrate any client that was created while the old frontend kept
+            // it only in localStorage. This also converts local_* IDs into a
+            // real MongoDB _id, so Transfer can safely use PUT afterwards.
+            const localOnlyClients = localClients.filter(c =>
+                String(c._id || c.id || '').startsWith('local_')
+            );
+
+            let migrated = false;
+            for (const localClient of localOnlyClients) {
+                try {
+                    const payload = { ...localClient };
+                    delete payload._id;
+                    delete payload.id;
+                    const saved = await apiRequest('/api/clients', {
+                        method: 'POST',
+                        body: JSON.stringify(payload)
+                    });
+                    apiClients.unshift(saved);
+                    migrated = true;
+                } catch (migrationError) {
+                    console.warn('Could not migrate local client:', migrationError);
+                }
+            }
+
+            // Keep real server records authoritative. Local real-ID copies are
+            // only used as fallback when the server does not have that record.
             const mergedMap = new Map();
-            apiClients.forEach(c => mergedMap.set(c._id || c.id, c));
-            localClients.forEach(c => mergedMap.set(c._id || c.id, c));
-            
+            apiClients.forEach(c => mergedMap.set(String(c._id || c.id), c));
+            localClients
+                .filter(c => !String(c._id || c.id || '').startsWith('local_'))
+                .forEach(c => {
+                    const key = String(c._id || c.id);
+                    if (!mergedMap.has(key)) mergedMap.set(key, c);
+                });
+
             clients = Array.from(mergedMap.values());
+            localStorage.setItem('roving_local_clients', JSON.stringify(clients));
+
+            if (migrated) {
+                // One clean refresh guarantees the newly generated Mongo IDs
+                // are the IDs used by every action on this page.
+                const refreshed = await apiRequest('/api/clients');
+                if (Array.isArray(refreshed)) {
+                    clients = refreshed;
+                    localStorage.setItem('roving_local_clients', JSON.stringify(refreshed));
+                }
+            }
         } else {
             clients = localClients;
         }
     } catch (error) {
         clients = localClients;
     }
-    
+
     renderClients();
     if (typeof populateClientDropdowns === 'function') {
         populateClientDropdowns();
@@ -1798,36 +1838,43 @@ async function executeDeleteClient(clientId) {
 async function executeSaveClient(clientData) {
     let localClients = JSON.parse(localStorage.getItem('roving_local_clients')) || [];
     const editingId = clientData._id || clientData.id;
+    let savedClient = clientData;
 
+    try {
+        if (!editingId || String(editingId).startsWith('local_')) {
+            // New clients must be created in MongoDB immediately. Keeping a
+            // local_* record only was the reason Transfer later received 400.
+            const payload = { ...clientData };
+            delete payload._id;
+            delete payload.id;
+            savedClient = await apiRequest('/api/clients', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+        } else {
+            savedClient = await apiRequest(`/api/clients/${encodeURIComponent(editingId)}`, {
+                method: 'PUT',
+                body: JSON.stringify(clientData)
+            });
+        }
+    } catch (error) {
+        // Offline fallback: keep the client locally so the user does not lose it.
+        console.warn('Client server sync failed; keeping local copy:', error);
+    }
+
+    const oldKey = String(editingId || '');
     const existingIndex = localClients.findIndex(
-        c => String(c._id || c.id) === String(editingId)
+        c => String(c._id || c.id) === oldKey
     );
 
     if (existingIndex !== -1) {
-        localClients[existingIndex] = clientData;
+        localClients[existingIndex] = savedClient;
     } else {
-        localClients.unshift(clientData);
+        localClients.unshift(savedClient);
     }
 
     localStorage.setItem('roving_local_clients', JSON.stringify(localClients));
-
-    // Only real API IDs should be sent to the server.
-    // Locally created IDs are kept in localStorage until a backend record exists.
-    if (editingId && !String(editingId).startsWith('local_')) {
-        try {
-            const response = await fetch(`${API_URL}/api/clients/${encodeURIComponent(editingId)}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(clientData)
-            });
-
-            if (!response.ok) {
-                console.warn('Server edit returned:', response.status);
-            }
-        } catch (error) {
-            console.warn('Server edit sync skipped:', error);
-        }
-    }
+    return savedClient;
 }
 
 async function deleteClient(clientId) {
@@ -2092,32 +2139,77 @@ function openTransferModal(id) {
 async function executeTransfer() {
     const clientId = document.getElementById('transferClientId').value;
     const newOwner = document.getElementById('transferToEmployee').value;
-    const client = clients.find(c => c._id === clientId);
-    if (!client) return;
+    const client = clients.find(c => String(c._id || c.id) === String(clientId));
+
+    if (!client) {
+        showNotification('لم يتم العثور على العميل.', 'danger');
+        return;
+    }
+
+    if (!newOwner) {
+        showNotification('من فضلك اختر المستخدم أو الأدمن.', 'warning');
+        return;
+    }
 
     try {
-        const response = await fetch(`${API_URL}/api/clients/${clientId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ assignedTo: newOwner })
-        });
-        if (response.ok) {
-            bootstrap.Modal.getInstance(document.getElementById('transferClientModal')).hide();
-            
-            // إرسال إشعار للموظف المحول له وللأدمن
-            addNotification(newOwner, `تم تحويل العميل (${client.name}) إليك من قِبل المستخدم (${currentUser.name})`);
-            if (currentUser.role !== 'Admin') {
-                // إشعار للأدمن بمتابعة التحويل
-                validUsers.filter(u => u.role === 'Admin').forEach(adm => {
-                    addNotification(adm.name, `إشعار تحويل عميل: قام المستخدم (${currentUser.name}) بتحويل العميل (${client.name}) إلى (${newOwner})`);
-                });
-            }
+        const isLocalClient = String(clientId).startsWith('local_');
+        let savedClient;
 
-            showNotification('Client transferred successfully & notification sent!', 'success');
-            fetchClients();
+        if (isLocalClient) {
+            // Old/local clients do not have a Mongo ObjectId. Create the real
+            // server record first, with the new owner already assigned.
+            const payload = { ...client, assignedTo: newOwner };
+            delete payload._id;
+            delete payload.id;
+
+            savedClient = await apiRequest('/api/clients', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+        } else {
+            savedClient = await apiRequest(`/api/clients/${encodeURIComponent(clientId)}`, {
+                method: 'PUT',
+                body: JSON.stringify({ assignedTo: newOwner })
+            });
         }
+
+        // Update the local cache immediately, then refresh from MongoDB.
+        const oldKey = String(client._id || client.id);
+        const localClients = JSON.parse(localStorage.getItem('roving_local_clients') || '[]')
+            .filter(c => String(c._id || c.id) !== oldKey);
+        localClients.unshift(savedClient);
+        localStorage.setItem('roving_local_clients', JSON.stringify(localClients));
+        clients = clients.map(c => String(c._id || c.id) === oldKey ? savedClient : c);
+
+        const modal = bootstrap.Modal.getInstance(document.getElementById('transferClientModal'));
+        if (modal) modal.hide();
+
+        // Direct notification: no approval step for Transfer/Send.
+        await addNotification(
+            newOwner,
+            `تم تحويل العميل (${savedClient.name || client.name}) إليك من قِبل المستخدم (${currentUser.name})`,
+            { title: 'تم تحويل عميل إليك', type: 'client_transfer' }
+        );
+
+        // Notify admins when the transfer was made by a Sales user.
+        if (String(currentUser.role || '').trim().toLowerCase() !== 'admin') {
+            const admins = validUsers.filter(u =>
+                String(u.role || '').trim().toLowerCase() === 'admin'
+            );
+            for (const adm of admins) {
+                await addNotification(
+                    adm.name,
+                    `إشعار تحويل عميل: قام المستخدم (${currentUser.name}) بتحويل العميل (${savedClient.name || client.name}) إلى (${newOwner})`,
+                    { title: 'تحويل عميل', type: 'client_transfer' }
+                );
+            }
+        }
+
+        showNotification('تم تحويل العميل بنجاح وإرسال الإشعار مباشرة.', 'success');
+        await fetchClients();
     } catch (error) {
-        alert('Error: ' + error.message);
+        console.error('Transfer failed:', error);
+        showNotification('فشل تحويل العميل: ' + error.message, 'danger');
     }
 }
 
