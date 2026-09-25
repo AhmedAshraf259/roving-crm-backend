@@ -396,20 +396,35 @@
             <div id="tabReports" class="tab-content-item d-none">
                 <h2 class="fw-bold text-roving-green mb-4">Reports & Analytics</h2>
                 <div class="card card-custom p-4 mb-4">
-                    <h5 class="text-roving-green fw-bold mb-3" id="reportTitle">System Analytics Overview</h5>
-                    <div class="row g-4">
-                        <div class="col-md-6">
-                            <div class="card p-3 border shadow-sm">
-                                <h6 class="text-muted text-center mb-3">Bookings & Profits by Category</h6>
-                                <canvas id="bookingsChart" style="max-height: 280px;"></canvas>
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                        <div>
+                            <h5 class="text-roving-green fw-bold mb-1" id="reportTitle">System Analytics Overview</h5>
+                            <div class="small text-muted">Admin dashboard: sales, costs and profit by employee and service category. Amounts remain separated by currency.</div>
+                        </div>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="renderReportsCharts()"><i class="fa-solid fa-rotate me-1"></i>Refresh</button>
+                    </div>
+                    <div id="adminReportKpis" class="row g-3 mb-4"></div>
+                    <div class="row g-4 mb-4">
+                        <div class="col-lg-7">
+                            <div class="card p-3 border shadow-sm h-100">
+                                <h6 class="text-muted text-center mb-3">Sales & Profit by Service Category</h6>
+                                <canvas id="bookingsChart" style="max-height: 300px;"></canvas>
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div class="card p-3 border shadow-sm">
+                        <div class="col-lg-5">
+                            <div class="card p-3 border shadow-sm h-100">
                                 <h6 class="text-muted text-center mb-3">Clients Status Distribution</h6>
-                                <canvas id="clientsChart" style="max-height: 280px;"></canvas>
+                                <canvas id="clientsChart" style="max-height: 300px;"></canvas>
                             </div>
                         </div>
+                    </div>
+                    <div class="card border shadow-sm mb-4">
+                        <div class="card-header bg-light"><strong class="text-roving-green"><i class="fa-solid fa-layer-group me-2"></i>Sales by Service Category</strong></div>
+                        <div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead><tr><th>Category</th><th>Currency</th><th>Bookings</th><th>People</th><th>Sales</th><th>Cost</th><th>Profit</th><th>Collected</th><th>Remaining</th></tr></thead><tbody id="reportCategoryTableBody"></tbody></table></div>
+                    </div>
+                    <div class="card border shadow-sm">
+                        <div class="card-header bg-light"><strong class="text-roving-green"><i class="fa-solid fa-users me-2"></i>Sales by Employee & Category</strong></div>
+                        <div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead><tr><th>Employee</th><th>Category</th><th>Currency</th><th>Bookings</th><th>People</th><th>Sales</th><th>Profit</th></tr></thead><tbody id="reportEmployeeTableBody"></tbody></table></div>
                     </div>
                 </div>
             </div>
@@ -629,9 +644,9 @@
   <h5 class="modal-title fw-bold text-roving-green" id="bookingModalTitle">Add Booking & Installments</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button>
  </div><div class="modal-body"><form id="addBookingForm"><input type="hidden" id="editingBookingId" value="">
   <div class="row g-3">
-   <div class="col-md-5"><label class="form-label fw-semibold">Select Client <span class="text-danger">*</span></label><select id="bookingClientSelect" class="form-select" required></select></div>
-   <div class="col-md-2"><label class="form-label fw-semibold">Number of People <span class="text-danger">*</span></label><input type="number" min="1" step="1" id="bookingPeopleCount" class="form-control" value="1" required oninput="calculateBookingFinancials()"></div>
+   <div class="col-md-6"><label class="form-label fw-semibold">Select Client <span class="text-danger">*</span></label><select id="bookingClientSelect" class="form-select" required></select></div>
    <div class="col-md-3"><label class="form-label fw-semibold">Category <span class="text-danger">*</span></label><select id="bookingCategory" class="form-select" required onchange="handleBookingCategoryChange()"><option value="" disabled selected>-- Select Category --</option><option value="Flight">Flight</option><option value="Hotel Accommodation">Hotel Accommodation</option><option value="Full Package">Full Package</option><option value="Visa">Visa</option><option value="Transportation">Transportation</option><option value="Other">Other</option></select></div>
+   <div class="col-md-3"><label class="form-label fw-semibold">Number of People <span class="text-danger">*</span></label><input type="number" min="1" step="1" id="bookingPeopleCount" class="form-control" value="1" required></div>
    <div class="col-md-3"><label class="form-label fw-semibold">Booking Currency <span class="text-danger">*</span></label><select id="bookingCurrency" class="form-select" onchange="calculateBookingFinancials()" required><option>EGP</option><option>USD</option><option>EUR</option><option>GBP</option><option>AED</option><option>SAR</option><option>TRY</option><option>GEL</option><option>AZN</option><option>OMR</option><option>QAR</option><option>BHD</option><option>ALL</option><option>IDR</option><option>MYR</option></select></div>
    <div class="col-md-4"><label class="form-label fw-semibold">Net Price <span class="text-danger">*</span></label><input type="number" step="0.01" id="bookingNetPrice" class="form-control" placeholder="0.00" oninput="calculateBookingFinancials()" required></div>
    <div class="col-md-4"><label class="form-label fw-semibold">Cost Price <span class="text-danger">*</span></label><input type="number" step="0.01" id="bookingCostPrice" class="form-control" placeholder="Auto from package details" oninput="calculateBookingFinancials()" required></div>
@@ -1045,7 +1060,6 @@ function openAddBookingModal() {
     document.getElementById('editingBookingId').value = '';
     document.getElementById('addBookingForm').reset();
     document.getElementById('bookingCurrency').value = 'EGP';
-    document.getElementById('bookingPeopleCount').value = 1;
     document.getElementById('bookingProfitDisplay').value = '0.00';
     document.getElementById('bookingRemainingDisplay').value = '0.00';
     packageCostRows = [];
@@ -1073,19 +1087,18 @@ function removePackageCostRow(i){packageCostRows.splice(i,1);renderPackageCostRo
 function updatePackageRow(i,field,value){if(!packageCostRows[i])return;packageCostRows[i][field]=['rate','nights','fx'].includes(field)?(parseFloat(value)||0):value;if(field==='type'&&value!=='Hotel')packageCostRows[i].nights=1;if(field==='supplierId'&&value){const supplier=suppliers.find(x=>String(x.id)===String(value));if(supplier&&supplier.currency)packageCostRows[i].currency=supplier.currency;renderPackageCostRows();}if(field==='type'||field==='currency')renderPackageCostRows();calculateBookingFinancials();}
 function packageRowConvertedTotal(r){const base=r.type==='Hotel'?(Number(r.nights)||0)*(Number(r.rate)||0):(Number(r.rate)||0);return base*(Number(r.fx)||0);}
 function formatMoney(n){return Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});}
-function renderPackageCostRows(){const wrap=document.getElementById('packageCostRows');if(!wrap)return;if(!packageCostRows.length){wrap.innerHTML='<div class="text-muted small p-2">No package costs added yet.</div>';return;}const bc=document.getElementById('bookingCurrency')?.value||'EGP';wrap.innerHTML=packageCostRows.map((r,i)=>`<div class="border rounded p-2 mb-2 bg-white"><div class="row g-2 align-items-end"><div class="col-md-2"><label class="form-label small fw-semibold">Cost Type</label><select class="form-select form-select-sm" onchange="updatePackageRow(${i},'type',this.value)">${['Hotel','Flight','Visa','Transportation','Tour / Activities','Other'].map(t=>`<option ${r.type===t?'selected':''}>${t}</option>`).join('')}</select></div><div class="col-md-2"><label class="form-label small fw-semibold">Name / Details</label><input class="form-control form-control-sm" value="${escapeHtml(r.name)}" placeholder="Hotel / Airline / Visa..." oninput="updatePackageRow(${i},'name',this.value)"></div><div class="col-md-1"><label class="form-label small fw-semibold">Nights</label><input type="number" min="1" class="form-control form-control-sm" value="${r.type==='Hotel'?(r.nights||1):1}" ${r.type==='Hotel'?'':'disabled'} oninput="updatePackageRow(${i},'nights',this.value)"></div><div class="col-md-2"><label class="form-label small fw-semibold">Rate / Total</label><input type="number" min="0" step="0.01" class="form-control form-control-sm" value="${r.rate||0}" oninput="updatePackageRow(${i},'rate',this.value)"></div><div class="col-md-2"><label class="form-label small fw-semibold">Supplier</label><div class="input-group input-group-sm"><select class="form-select form-select-sm package-supplier-select" onchange="updatePackageRow(${i},'supplierId',this.value)"><option value="">-- Select Supplier --</option>${suppliers.map(s=>`<option value="${s.id}" ${String(r.supplierId)===String(s.id)?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}</select><button type="button" class="btn btn-outline-primary" title="Add Supplier" onclick="openSupplierModalForPackage()"><i class="fa-solid fa-plus"></i></button></div></div><div class="col-md-1"><label class="form-label small fw-semibold">Currency</label><select class="form-select form-select-sm" onchange="updatePackageRow(${i},'currency',this.value);updatePackageRow(${i},'fx',1)">${['EGP','USD','EUR','GBP','AED','SAR','TRY','GEL','AZN','OMR','QAR','BHD','ALL','IDR','MYR'].map(c=>`<option ${r.currency===c?'selected':''}>${c}</option>`).join('')}</select></div><div class="col-md-1"><label class="form-label small fw-semibold">FX → ${bc}</label><input type="number" min="0" step="0.000001" class="form-control form-control-sm" value="${r.fx??1}" oninput="updatePackageRow(${i},'fx',this.value)"></div><div class="col-md-1"><button type="button" class="btn btn-sm btn-outline-danger" onclick="removePackageCostRow(${i})"><i class="fa-solid fa-trash"></i></button></div><div class="col-12 small text-muted">${r.type==='Hotel'?'Hotel total = nights × rate':'Cost = entered rate/total'} · Converted: <strong>${formatMoney(packageRowConvertedTotal(r))} ${bc}</strong></div></div></div>`).join('');}
+function renderPackageCostRows(){const wrap=document.getElementById('packageCostRows');if(!wrap)return;if(!packageCostRows.length){wrap.innerHTML='<div class="text-muted small p-2">No package costs added yet.</div>';return;}const bc=document.getElementById('bookingCurrency')?.value||'EGP';wrap.innerHTML=packageCostRows.map((r,i)=>`<div class="border rounded p-2 mb-2 bg-white"><div class="row g-2 align-items-end"><div class="col-md-2"><label class="form-label small fw-semibold">Cost Type</label><select class="form-select form-select-sm" onchange="updatePackageRow(${i},'type',this.value)">${['Hotel','Flight','Visa','Transportation','Tour / Activities','Other'].map(t=>`<option ${r.type===t?'selected':''}>${t}</option>`).join('')}</select></div><div class="col-md-2"><label class="form-label small fw-semibold">Name / Details</label><input class="form-control form-control-sm" value="${escapeHtml(r.name)}" placeholder="Hotel / Airline / Visa..." oninput="updatePackageRow(${i},'name',this.value)"></div><div class="col-md-1"><label class="form-label small fw-semibold">Nights</label><input type="number" min="1" class="form-control form-control-sm" value="${r.type==='Hotel'?(r.nights||1):1}" ${r.type==='Hotel'?'':'disabled'} oninput="updatePackageRow(${i},'nights',this.value)"></div><div class="col-md-2"><label class="form-label small fw-semibold">Rate / Total</label><input type="number" min="0" step="0.01" class="form-control form-control-sm" value="${r.rate||0}" oninput="updatePackageRow(${i},'rate',this.value)"></div><div class="col-md-2"><label class="form-label small fw-semibold">Supplier</label><select class="form-select form-select-sm package-supplier-select" onchange="updatePackageRow(${i},'supplierId',this.value)"><option value="">-- Select Supplier --</option>${suppliers.map(s=>`<option value="${s.id}" ${String(r.supplierId)===String(s.id)?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}</select></div><div class="col-md-1"><label class="form-label small fw-semibold">Currency</label><select class="form-select form-select-sm" onchange="updatePackageRow(${i},'currency',this.value);updatePackageRow(${i},'fx',1)">${['EGP','USD','EUR','GBP','AED','SAR','TRY','GEL','AZN','OMR','QAR','BHD','ALL','IDR','MYR'].map(c=>`<option ${r.currency===c?'selected':''}>${c}</option>`).join('')}</select></div><div class="col-md-1"><label class="form-label small fw-semibold">FX → ${bc}</label><input type="number" min="0" step="0.000001" class="form-control form-control-sm" value="${r.fx??1}" oninput="updatePackageRow(${i},'fx',this.value)"></div><div class="col-md-1"><button type="button" class="btn btn-sm btn-outline-danger" onclick="removePackageCostRow(${i})"><i class="fa-solid fa-trash"></i></button></div><div class="col-12 small text-muted">${r.type==='Hotel'?'Hotel total = nights × rate':'Cost = entered rate/total'} · Converted: <strong>${formatMoney(packageRowConvertedTotal(r))} ${bc}</strong></div></div></div>`).join('');}
 function calculateBookingFinancials(){const net=parseFloat(document.getElementById('bookingNetPrice').value)||0;let cost=parseFloat(document.getElementById('bookingCostPrice').value)||0;const paid=parseFloat(document.getElementById('bookingPaidAmount').value)||0;const cat=document.getElementById('bookingCategory').value;const cur=document.getElementById('bookingCurrency').value||'EGP';if(cat==='Full Package'){cost=packageCostRows.reduce((sum,r)=>sum+packageRowConvertedTotal(r),0);document.getElementById('bookingCostPrice').value=cost.toFixed(2);document.getElementById('packageCostTotalDisplay').value=`${formatMoney(cost)} ${cur}`;}const profit=net-cost,remaining=net-paid;document.getElementById('bookingProfitDisplay').value=`${formatMoney(profit)} ${cur}`;document.getElementById('bookingRemainingDisplay').value=`${formatMoney(remaining)} ${cur}`;document.getElementById('bookingStatus').value=remaining>0?'Installments Due':'Paid in Full';}
 function loadBookings(){const saved=localStorage.getItem('roving_bookings');bookings=saved?JSON.parse(saved):[];}
 function saveBookingsToStorage(){localStorage.setItem('roving_bookings',JSON.stringify(bookings));}
 function loadSuppliers(){suppliers=JSON.parse(localStorage.getItem('roving_suppliers')||'[]');renderSuppliers();populateSupplierSelects();}
 function saveSuppliersToStorage(){localStorage.setItem('roving_suppliers',JSON.stringify(suppliers));}
 function openSupplierModal(){document.getElementById('supplierModalTitle').innerText='Add Supplier';document.getElementById('editingSupplierId').value='';document.getElementById('supplierForm').reset();document.getElementById('supplierCurrency').value='USD';}
-function openSupplierModalForPackage(){openSupplierModal();const modal=new bootstrap.Modal(document.getElementById('supplierModal'));modal.show();}
-function handleSaveSupplier(e){e.preventDefault();const id=document.getElementById('editingSupplierId').value;const obj={id:id?Number(id):Date.now(),name:document.getElementById('supplierName').value.trim(),type:document.getElementById('supplierType').value,currency:document.getElementById('supplierCurrency').value,contact:document.getElementById('supplierContact').value.trim(),notes:document.getElementById('supplierNotes').value.trim()};if(!obj.name)return;if(id){const idx=suppliers.findIndex(s=>s.id==id);if(idx!==-1)suppliers[idx]=obj;}else suppliers.unshift(obj);saveSuppliersToStorage();renderSuppliers();populateSupplierSelects();renderPackageCostRows();bootstrap.Modal.getInstance(document.getElementById('supplierModal')).hide();showNotification('Supplier saved successfully!','success');}
+function handleSaveSupplier(e){e.preventDefault();const id=document.getElementById('editingSupplierId').value;const obj={id:id?Number(id):Date.now(),name:document.getElementById('supplierName').value.trim(),type:document.getElementById('supplierType').value,currency:document.getElementById('supplierCurrency').value,contact:document.getElementById('supplierContact').value.trim(),notes:document.getElementById('supplierNotes').value.trim()};if(!obj.name)return;if(id){const idx=suppliers.findIndex(s=>s.id==id);if(idx!==-1)suppliers[idx]=obj;}else suppliers.unshift(obj);saveSuppliersToStorage();renderSuppliers();populateSupplierSelects();bootstrap.Modal.getInstance(document.getElementById('supplierModal')).hide();showNotification('Supplier saved successfully!','success');}
 function renderSuppliers(){const tbody=document.getElementById('suppliersTableBody');if(!tbody)return;if(!suppliers.length){tbody.innerHTML='<tr><td colspan="6" class="text-center text-muted py-4">No suppliers recorded</td></tr>';return;}tbody.innerHTML=suppliers.map(s=>`<tr><td><strong>${escapeHtml(s.name)}</strong></td><td><span class="badge bg-secondary">${escapeHtml(s.type||'-')}</span></td><td>${escapeHtml(s.contact||'-')}</td><td><strong>${escapeHtml(s.currency||'-')}</strong></td><td><small>${escapeHtml(s.notes||'-')}</small></td><td><button class="btn btn-sm btn-outline-primary me-1" onclick="editSupplier(${s.id})"><i class="fa-solid fa-pen-to-square"></i></button><button class="btn btn-sm btn-outline-danger" onclick="deleteSupplier(${s.id})"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');}
 function editSupplier(id){const s=suppliers.find(x=>x.id===id);if(!s)return;document.getElementById('editingSupplierId').value=s.id;document.getElementById('supplierName').value=s.name;document.getElementById('supplierType').value=s.type||'Other';document.getElementById('supplierCurrency').value=s.currency||'USD';document.getElementById('supplierContact').value=s.contact||'';document.getElementById('supplierNotes').value=s.notes||'';document.getElementById('supplierModalTitle').innerText='Edit Supplier';new bootstrap.Modal(document.getElementById('supplierModal')).show();}
 function deleteSupplier(id){suppliers=suppliers.filter(x=>x.id!==id);saveSuppliersToStorage();renderSuppliers();populateSupplierSelects();}
-async function handleSaveBooking(e){e.preventDefault();const editingId=document.getElementById('editingBookingId').value;const clientId=document.getElementById('bookingClientSelect').value;const client=clients.find(c=>c._id===clientId);if(!client)return;calculateBookingFinancials();const netPrice=parseFloat(document.getElementById('bookingNetPrice').value)||0;const costPrice=parseFloat(document.getElementById('bookingCostPrice').value)||0;const paidAmount=parseFloat(document.getElementById('bookingPaidAmount').value)||0;const bookingObj={id:editingId!==''?Number(editingId):Date.now(),clientId:client._id,clientName:client.name,clientPhone:client.phone||'N/A',category:document.getElementById('bookingCategory').value,currency:document.getElementById('bookingCurrency').value,peopleCount:parseInt(document.getElementById('bookingPeopleCount').value)||1,netPrice,costPrice,paidAmount,remaining:netPrice-paidAmount,profit:netPrice-costPrice,status:document.getElementById('bookingStatus').value,assignedTo:document.getElementById('bookingAssignedTo').value,details:document.getElementById('bookingDetails').value.trim(),notes:document.getElementById('bookingNotes').value.trim(),packageCosts:document.getElementById('bookingCategory').value==='Full Package'?packageCostRows:[]};if(editingId!==''){const idx=bookings.findIndex(b=>b.id==editingId);if(idx!==-1)bookings[idx]=bookingObj;showNotification('Booking updated successfully!','success');}else{bookings.unshift(bookingObj);showNotification('Booking added successfully!','success');}saveBookingsToStorage();bootstrap.Modal.getInstance(document.getElementById('addBookingModal')).hide();renderBookings();}
+async function handleSaveBooking(e){e.preventDefault();const editingId=document.getElementById('editingBookingId').value;const clientId=document.getElementById('bookingClientSelect').value;const client=clients.find(c=>c._id===clientId);if(!client)return;calculateBookingFinancials();const netPrice=parseFloat(document.getElementById('bookingNetPrice').value)||0;const costPrice=parseFloat(document.getElementById('bookingCostPrice').value)||0;const paidAmount=parseFloat(document.getElementById('bookingPaidAmount').value)||0;const bookingObj={id:editingId!==''?Number(editingId):Date.now(),clientId:client._id,clientName:client.name,clientPhone:client.phone||'N/A',category:document.getElementById('bookingCategory').value,peopleCount:Math.max(1,parseInt(document.getElementById('bookingPeopleCount').value)||1),currency:document.getElementById('bookingCurrency').value,netPrice,costPrice,paidAmount,remaining:netPrice-paidAmount,profit:netPrice-costPrice,status:document.getElementById('bookingStatus').value,assignedTo:document.getElementById('bookingAssignedTo').value,details:document.getElementById('bookingDetails').value.trim(),notes:document.getElementById('bookingNotes').value.trim(),packageCosts:document.getElementById('bookingCategory').value==='Full Package'?packageCostRows:[]};if(editingId!==''){const idx=bookings.findIndex(b=>b.id==editingId);if(idx!==-1)bookings[idx]=bookingObj;showNotification('Booking updated successfully!','success');}else{bookings.unshift(bookingObj);showNotification('Booking added successfully!','success');}saveBookingsToStorage();bootstrap.Modal.getInstance(document.getElementById('addBookingModal')).hide();renderBookings();}
 
 function renderBookings() {
     const tbody = document.getElementById('bookingsTableBody');
@@ -1220,7 +1233,7 @@ function deleteFollowup(id) {
 
 function editBooking(id) {
     const b=bookings.find(x=>x.id===id); if(!b)return;
-    document.getElementById('editingBookingId').value=b.id; document.getElementById('bookingClientSelect').value=b.clientId; document.getElementById('bookingCategory').value=b.category; document.getElementById('bookingCurrency').value=b.currency||'EGP'; document.getElementById('bookingPeopleCount').value=b.peopleCount||1; document.getElementById('bookingNetPrice').value=b.netPrice; document.getElementById('bookingCostPrice').value=b.costPrice; document.getElementById('bookingPaidAmount').value=b.paidAmount||0; document.getElementById('bookingStatus').value=b.status; document.getElementById('bookingAssignedTo').value=b.assignedTo; document.getElementById('bookingDetails').value=b.details||''; document.getElementById('bookingNotes').value=b.notes||''; packageCostRows=Array.isArray(b.packageCosts)?JSON.parse(JSON.stringify(b.packageCosts)):[]; handleBookingCategoryChange(); calculateBookingFinancials(); new bootstrap.Modal(document.getElementById('addBookingModal')).show();
+    document.getElementById('editingBookingId').value=b.id; document.getElementById('bookingClientSelect').value=b.clientId; document.getElementById('bookingCategory').value=b.category; document.getElementById('bookingPeopleCount').value=b.peopleCount||1; document.getElementById('bookingCurrency').value=b.currency||'EGP'; document.getElementById('bookingNetPrice').value=b.netPrice; document.getElementById('bookingCostPrice').value=b.costPrice; document.getElementById('bookingPaidAmount').value=b.paidAmount||0; document.getElementById('bookingStatus').value=b.status; document.getElementById('bookingAssignedTo').value=b.assignedTo; document.getElementById('bookingDetails').value=b.details||''; document.getElementById('bookingNotes').value=b.notes||''; packageCostRows=Array.isArray(b.packageCosts)?JSON.parse(JSON.stringify(b.packageCosts)):[]; handleBookingCategoryChange(); calculateBookingFinancials(); new bootstrap.Modal(document.getElementById('addBookingModal')).show();
 }
 
 function deleteBooking(id) {
@@ -2097,77 +2110,100 @@ function renderClients() {
 // Reports & Charts: Admin sees all data, Sales sees their own analytics
 function renderReportsCharts() {
     const reportTitle = document.getElementById('reportTitle');
-    if (currentUser.role === 'Admin') {
-        reportTitle.innerText = "System Analytics Overview (All Users)";
-    } else {
-        reportTitle.innerText = `Analytics Overview for ${currentUser.name}`;
+    const isAdmin = currentUser && String(currentUser.role || '').trim().toLowerCase() === 'admin';
+    reportTitle.innerText = isAdmin ? 'System Analytics Overview (All Users)' : `Analytics Overview for ${currentUser.name}`;
+
+    let filteredBookings = Array.isArray(bookings) ? bookings.slice() : [];
+    let filteredClients = Array.isArray(clients) ? clients.slice() : [];
+    if (!isAdmin) {
+        filteredBookings = filteredBookings.filter(b => b.assignedTo === currentUser.name);
+        filteredClients = filteredClients.filter(c => c.assignedTo === currentUser.name);
     }
 
-    let filteredBookings = bookings;
-    let filteredClients = clients;
+    const fmt = n => Number(n || 0).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+    const peopleOf = b => Math.max(1, parseInt(b.peopleCount) || 1);
+    const group = {};
+    const employeeGroup = {};
+    const currencySet = new Set();
 
-    if (currentUser.role === 'Sales') {
-        filteredBookings = bookings.filter(b => b.assignedTo === currentUser.name);
-        filteredClients = clients.filter(c => c.assignedTo === currentUser.name);
-    }
-
-    // Prepare Bookings by Category data
-    const categories = {};
     filteredBookings.forEach(b => {
-        categories[b.category] = (categories[b.category] || 0) + (b.profit || 0);
+        const category = b.category || 'Other';
+        const currency = b.currency || 'EGP';
+        const key = `${category}||${currency}`;
+        currencySet.add(currency);
+        if (!group[key]) group[key] = {category, currency, bookings:0, people:0, sales:0, cost:0, profit:0, collected:0, remaining:0};
+        const g = group[key];
+        g.bookings += 1;
+        g.people += peopleOf(b);
+        g.sales += Number(b.netPrice)||0;
+        g.cost += Number(b.costPrice)||0;
+        g.profit += Number(b.profit)||0;
+        g.collected += Number(b.paidAmount)||0;
+        g.remaining += Number(b.remaining)||0;
+
+        const emp = b.assignedTo || 'Unassigned';
+        const ek = `${emp}||${category}||${currency}`;
+        if (!employeeGroup[ek]) employeeGroup[ek] = {employee:emp, category, currency, bookings:0, people:0, sales:0, profit:0};
+        const e = employeeGroup[ek];
+        e.bookings += 1;
+        e.people += peopleOf(b);
+        e.sales += Number(b.netPrice)||0;
+        e.profit += Number(b.profit)||0;
     });
 
-    const bookingLabels = Object.keys(categories);
-    const bookingData = Object.values(categories);
+    const categoryRows = Object.values(group).sort((a,b)=>a.category.localeCompare(b.category)||a.currency.localeCompare(b.currency));
+    const employeeRows = Object.values(employeeGroup).sort((a,b)=>a.employee.localeCompare(b.employee)||a.category.localeCompare(b.category));
 
-    // Prepare Clients Status distribution
-    const statuses = {};
-    filteredClients.forEach(c => {
-        const st = c.status || 'New';
-        statuses[st] = (statuses[st] || 0) + 1;
+    const categoryBody = document.getElementById('reportCategoryTableBody');
+    if (categoryBody) {
+        categoryBody.innerHTML = categoryRows.length ? categoryRows.map(r => `<tr><td><strong>${escapeHtml(r.category)}</strong></td><td><span class="badge bg-light text-dark border">${escapeHtml(r.currency)}</span></td><td>${r.bookings}</td><td>${r.people}</td><td>${fmt(r.sales)}</td><td>${fmt(r.cost)}</td><td class="text-success fw-bold">${fmt(r.profit)}</td><td>${fmt(r.collected)}</td><td class="text-danger">${fmt(r.remaining)}</td></tr>`).join('') : '<tr><td colspan="9" class="text-center text-muted py-4">No booking data</td></tr>';
+    }
+    const employeeBody = document.getElementById('reportEmployeeTableBody');
+    if (employeeBody) {
+        employeeBody.innerHTML = employeeRows.length ? employeeRows.map(r => `<tr><td><strong>${escapeHtml(r.employee)}</strong></td><td>${escapeHtml(r.category)}</td><td><span class="badge bg-light text-dark border">${escapeHtml(r.currency)}</span></td><td>${r.bookings}</td><td>${r.people}</td><td>${fmt(r.sales)}</td><td class="text-success fw-bold">${fmt(r.profit)}</td></tr>`).join('') : '<tr><td colspan="7" class="text-center text-muted py-4">No sales data</td></tr>';
+    }
+
+    const kpi = document.getElementById('adminReportKpis');
+    if (kpi) {
+        const bookingCount = filteredBookings.length;
+        const peopleCount = filteredBookings.reduce((s,b)=>s+peopleOf(b),0);
+        const collected = filteredBookings.reduce((s,b)=>s+(Number(b.paidAmount)||0),0);
+        const remaining = filteredBookings.reduce((s,b)=>s+(Number(b.remaining)||0),0);
+        const currencyText = Array.from(currencySet).sort().join(' / ') || 'EGP';
+        kpi.innerHTML = [
+            ['Bookings', bookingCount, 'fa-receipt'],
+            ['People', peopleCount, 'fa-users'],
+            ['Collected', `${fmt(collected)} ${currencyText}`, 'fa-money-bill-wave'],
+            ['Remaining', `${fmt(remaining)} ${currencyText}`, 'fa-hourglass-half']
+        ].map(x=>`<div class="col-md-3"><div class="card border shadow-sm p-3 h-100"><div class="d-flex justify-content-between align-items-center"><div><div class="small text-muted">${x[0]}</div><div class="fs-5 fw-bold text-roving-green">${x[1]}</div></div><i class="fa-solid ${x[2]} fa-lg text-roving-orange"></i></div></div></div>`).join('');
+    }
+
+    // Chart uses separate category/currency labels so currencies are never mixed silently.
+    const chartGroups = {};
+    filteredBookings.forEach(b => {
+        const label = `${b.category || 'Other'} (${b.currency || 'EGP'})`;
+        if (!chartGroups[label]) chartGroups[label] = {sales:0, profit:0};
+        chartGroups[label].sales += Number(b.netPrice)||0;
+        chartGroups[label].profit += Number(b.profit)||0;
     });
+    const labels = Object.keys(chartGroups);
+    const salesData = labels.map(l=>chartGroups[l].sales);
+    const profitData = labels.map(l=>chartGroups[l].profit);
 
-    const clientLabels = Object.keys(statuses);
-    const clientDataValues = Object.values(statuses);
-
-    // Render Bookings Chart
     const ctx1 = document.getElementById('bookingsChart').getContext('2d');
     if (bookingsChartInstance) bookingsChartInstance.destroy();
-    bookingsChartInstance = new Chart(ctx1, {
-        type: 'bar',
-        data: {
-            labels: bookingLabels.length > 0 ? bookingLabels : ['No Data'],
-            datasets: [{
-                label: 'Total Profit ($)',
-                data: bookingData.length > 0 ? bookingData : [0],
-                backgroundColor: '#D45B38',
-                borderRadius: 6
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: { legend: { display: false } }
-        }
-    });
+    bookingsChartInstance = new Chart(ctx1, { type:'bar', data:{labels:labels.length?labels:['No Data'], datasets:[
+        {label:'Sales',data:salesData.length?salesData:[0],backgroundColor:'#D45B38',borderRadius:6},
+        {label:'Profit',data:profitData.length?profitData:[0],backgroundColor:'#293E35',borderRadius:6}
+    ]}, options:{responsive:true,plugins:{legend:{display:true}}} });
 
-    // Render Clients Status Chart
+    const statuses = {};
+    filteredClients.forEach(c => { const st=c.status||'New'; statuses[st]=(statuses[st]||0)+1; });
+    const clientLabels = Object.keys(statuses), clientDataValues = Object.values(statuses);
     const ctx2 = document.getElementById('clientsChart').getContext('2d');
     if (clientsChartInstance) clientsChartInstance.destroy();
-    clientsChartInstance = new Chart(ctx2, {
-        type: 'doughnut',
-        data: {
-            labels: clientLabels.length > 0 ? clientLabels : ['No Data'],
-            datasets: [{
-                data: clientDataValues.length > 0 ? clientDataValues : [1],
-                backgroundColor: ['#293E35', '#D45B38', '#E67E55', '#1A2822', '#6c757d']
-            }]
-        },
-        options: {
-            responsive: true
-        }
-    });
+    clientsChartInstance = new Chart(ctx2, {type:'doughnut',data:{labels:clientLabels.length?clientLabels:['No Data'],datasets:[{data:clientDataValues.length?clientDataValues:[1],backgroundColor:['#293E35','#D45B38','#E67E55','#1A2822','#6c757d']}]},options:{responsive:true}});
 }
-
 function showNotification(message, type = "success") {
     const area = document.getElementById('notificationArea');
     area.innerHTML = `
