@@ -1352,18 +1352,58 @@ async function handleNotificationAction(notificationId, action) {
 }
 
 // دالة مساعدة لتنفيذ الحذف الفعلي
-async function executeDeleteClient(clientId) {
-    let localClients = JSON.parse(localStorage.getItem('roving_local_clients')) || [];
-    localClients = localClients.filter(c => (c._id || c.id) !== clientId);
-    localStorage.setItem('roving_local_clients', JSON.stringify(localClients));
+async function deleteClient(clientId) {
+    const client = clients.find(c => (c._id || c.id) === clientId);
+    if (!client) return;
 
-    try {
-        await fetch(`${API_URL}/api/clients/${clientId}`, { method: 'DELETE' });
-    } catch (error) {
-        console.log("Server delete skipped.");
+    // التأكد من الصلاحية: إذا كان المستخدم الحالي موظف مبيعات (Sales)
+    if (currentUser && currentUser.role && currentUser.role.trim().toLowerCase() === 'sales') {
+        const notificationId = 'notif_' + Date.now();
+        const notification = {
+            id: notificationId,
+            title: 'طلب حذف عميل جديد',
+            message: `الموظف (${currentUser.name}) يطلب حذف العميل: (${client.name})`,
+            type: 'approval_request',
+            requestType: 'DELETE_CLIENT',
+            payload: { clientId: clientId },
+            status: 'pending',
+            timestamp: new Date().toLocaleTimeString()
+        };
+
+        // حفظ الإشعار في localStorage الخاص بالإشعارات
+        let notifications = JSON.parse(localStorage.getItem('roving_notifications')) || [];
+        notifications.unshift(notification);
+        localStorage.setItem('roving_notifications', JSON.stringify(notifications));
+
+        if (typeof showNotification === 'function') {
+            showNotification('تم إرسال طلب الحذف إلى الأدمن بنجاح', 'warning');
+        } else {
+            alert('تم إرسال طلب الحذف إلى الأدمن بنجاح');
+        }
+        
+        // تحديث عرض الإشعارات إذا كانت الدالة موجودة
+        if (typeof renderNotifications === 'function') renderNotifications();
+        return;
+    }
+
+    // إذا كان المستخدم Admin، يتم الحذف مباشرة
+    if (confirm('هل أنت متأكد من حذف هذا العميل؟')) {
+        let localClients = JSON.parse(localStorage.getItem('roving_local_clients')) || [];
+        localClients = localClients.filter(c => (c._id || c.id) !== clientId);
+        localStorage.setItem('roving_local_clients', JSON.stringify(localClients));
+
+        try {
+            await fetch(`${API_URL}/api/clients/${clientId}`, { method: 'DELETE' });
+        } catch (error) {
+            console.log("Server delete skipped.");
+        }
+
+        if (typeof showNotification === 'function') {
+            showNotification('تم حذف العميل بنجاح', 'success');
+        }
+        fetchClients();
     }
 }
-
 // دالة مساعدة لتنفيذ الحفظ/التعديل الفعلي
 async function executeSaveClient(clientData) {
     let localClients = JSON.parse(localStorage.getItem('roving_local_clients')) || [];
@@ -1423,21 +1463,27 @@ async function handleSaveClient(event) {
     };
 
     // إذا كان المستخدم Sales ويحاول "تعديل" عميل حالي
-    if (currentUser && currentUser.role === 'Sales' && editingId !== "") {
-        const approvalRequest = {
-            id: 'req_' + Date.now(),
-            type: 'EDIT_CLIENT',
-            clientData: clientData,
-            requestedBy: currentUser.name,
-            status: 'Pending',
-            date: new Date().toISOString()
+    if (currentUser && currentUser.role && currentUser.role.trim().toLowerCase() === 'sales' && editingId !== "") {
+        const notificationId = 'notif_' + Date.now();
+        const notification = {
+            id: notificationId,
+            title: 'طلب تعديل عميل جديد',
+            message: `الموظف (${currentUser.name}) يطلب تعديل بيانات العميل: (${clientData.name})`,
+            type: 'approval_request',
+            requestType: 'EDIT_CLIENT',
+            payload: { clientData: clientData },
+            status: 'pending',
+            timestamp: new Date().toLocaleTimeString()
         };
-        saveApprovalRequest(approvalRequest);
-        
+
+        let notifications = JSON.parse(localStorage.getItem('roving_notifications')) || [];
+        notifications.unshift(notification);
+        localStorage.setItem('roving_notifications', JSON.stringify(notifications));
+
         if (typeof showNotification === 'function') {
-            showNotification('تم إرسال طلب التعديل إلى المدير للموافقة عليه.', 'warning');
+            showNotification('تم إرسال طلب التعديل إلى الأدمن للموافقة عليه', 'warning');
         } else {
-            alert('تم إرسال طلب التعديل إلى المدير للموافقة عليه.');
+            alert('تم إرسال طلب التعديل إلى الأدمن للموافقة عليه');
         }
 
         const modalEl = document.getElementById('addClientModal');
@@ -1445,11 +1491,12 @@ async function handleSaveClient(event) {
             const modalInstance = bootstrap.Modal.getInstance(modalEl);
             if (modalInstance) modalInstance.hide();
         }
+        
+        if (typeof renderNotifications === 'function') renderNotifications();
         return;
     }
 
-    // (باقي كود الحفظ العادي للأدمن أو الإضافة الجديدة للموظف يوضع هنا كما كان)
-    // ...
+    // (باقي كود الحفظ العادي للإضافة الجديدة أو للأدمن يوضع هنا...)
 }
 // دالة الحذف الذكية حسب الصلاحية
 async function deleteClient(clientId) {
