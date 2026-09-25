@@ -795,22 +795,128 @@ async function fetchClients() {
     }
 }
 
-window.addEventListener('DOMContentLoaded', () => {
-    const savedUser = localStorage.getItem('crm_user');
-    if (savedUser) {
-        try {
-            currentUser = JSON.parse(savedUser);
-            document.getElementById('loginSection').classList.add('d-none');
-            document.getElementById('appSection').classList.remove('d-none');
-            loadFollowups();
-            loadBookings();
-            checkBroadcast();
-            initApp();
-            renderNotificationsUI();
-        } catch (e) {
-            localStorage.removeItem('crm_user');
+// ==================== SECURE SESSION ====================
+// The user must log in again after 1 hour or after closing the browser/tab.
+const SESSION_DURATION_MS = 60 * 60 * 1000;
+const SESSION_USER_KEY = 'crm_session_user';
+const SESSION_STARTED_KEY = 'crm_session_started_at';
+let sessionTimer = null;
+
+function persistCurrentWorkState() {
+    try {
+        // Keep the latest locally available CRM data before any logout/timeout.
+        if (Array.isArray(clients)) localStorage.setItem('roving_local_clients', JSON.stringify(clients));
+        if (Array.isArray(followups)) localStorage.setItem('roving_local_followups', JSON.stringify(followups));
+        if (Array.isArray(bookings)) localStorage.setItem('roving_local_bookings', JSON.stringify(bookings));
+
+        // Preserve unfinished form data so the user's latest work is not lost.
+        const draftForms = {};
+        ['addClientForm','addFollowupForm','addBookingForm'].forEach(formId => {
+            const form = document.getElementById(formId);
+            if (!form) return;
+            const data = {};
+            form.querySelectorAll('input, textarea, select').forEach(field => {
+                if (field.name || field.id) data[field.name || field.id] = field.value;
+            });
+            draftForms[formId] = data;
+        });
+        localStorage.setItem('roving_draft_forms', JSON.stringify(draftForms));
+        localStorage.setItem('roving_last_saved_at', new Date().toISOString());
+    } catch (e) {
+        console.warn('Could not persist current CRM state:', e);
+    }
+}
+
+function restoreDraftForms() {
+    try {
+        const drafts = JSON.parse(localStorage.getItem('roving_draft_forms') || '{}');
+        Object.entries(drafts).forEach(([formId, data]) => {
+            const form = document.getElementById(formId);
+            if (!form || !data) return;
+            Object.entries(data).forEach(([key, value]) => {
+                const field = form.querySelector(`[name="${CSS.escape(key)}"], #${CSS.escape(key)}`);
+                if (field && value !== undefined && value !== null) field.value = value;
+            });
+        });
+    } catch (e) {
+        console.warn('Could not restore CRM drafts:', e);
+    }
+}
+
+function clearSession(showLoginMessage = false) {
+    persistCurrentWorkState();
+    currentUser = null;
+    sessionStorage.removeItem(SESSION_USER_KEY);
+    sessionStorage.removeItem(SESSION_STARTED_KEY);
+    if (sessionTimer) {
+        clearInterval(sessionTimer);
+        sessionTimer = null;
+    }
+
+    const loginSection = document.getElementById('loginSection');
+    const appSection = document.getElementById('appSection');
+    if (loginSection) loginSection.classList.remove('d-none');
+    if (appSection) appSection.classList.add('d-none');
+
+    if (showLoginMessage) {
+        const errorDiv = document.getElementById('loginError');
+        if (errorDiv) {
+            errorDiv.innerText = 'Your session has expired. Please sign in again.';
+            errorDiv.classList.remove('d-none');
         }
     }
+}
+
+function startSession(user) {
+    const startedAt = Date.now();
+    sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(user));
+    sessionStorage.setItem(SESSION_STARTED_KEY, String(startedAt));
+    startSessionTimer();
+}
+
+function startSessionTimer() {
+    if (sessionTimer) clearInterval(sessionTimer);
+
+    const checkSession = () => {
+        const startedAt = Number(sessionStorage.getItem(SESSION_STARTED_KEY) || 0);
+        if (!startedAt || Date.now() - startedAt >= SESSION_DURATION_MS) {
+            clearSession(true);
+        }
+    };
+
+    checkSession();
+    sessionTimer = setInterval(checkSession, 30 * 1000);
+}
+
+function restoreSession() {
+    const savedUser = sessionStorage.getItem(SESSION_USER_KEY);
+    const startedAt = Number(sessionStorage.getItem(SESSION_STARTED_KEY) || 0);
+
+    if (!savedUser || !startedAt || Date.now() - startedAt >= SESSION_DURATION_MS) {
+        clearSession(false);
+        return false;
+    }
+
+    try {
+        currentUser = JSON.parse(savedUser);
+        startSessionTimer();
+        document.getElementById('loginSection').classList.add('d-none');
+        document.getElementById('appSection').classList.remove('d-none');
+        loadFollowups();
+        loadBookings();
+        checkBroadcast();
+        initApp();
+        restoreDraftForms();
+        renderNotificationsUI();
+        return true;
+    } catch (e) {
+        clearSession(false);
+        return false;
+    }
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+    restoreSession();
 
     document.getElementById('addClientForm').addEventListener('submit', handleSaveClient);
     document.getElementById('addFollowupForm').addEventListener('submit', handleSaveFollowup);
@@ -833,7 +939,7 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
     }
 
     currentUser = { email: targetUser.email, role: targetUser.role, name: targetUser.name, pass: targetUser.pass };
-    localStorage.setItem('crm_user', JSON.stringify(currentUser));
+    startSession(currentUser);
 
     document.getElementById('loginSection').classList.add('d-none');
     document.getElementById('appSection').classList.remove('d-none');
@@ -842,14 +948,16 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
     loadBookings();
     checkBroadcast();
     initApp();
+    restoreDraftForms();
     renderNotificationsUI();
 });
 
 function handleLogout() {
-    currentUser = null;
-    localStorage.removeItem('crm_user');
-    document.getElementById('loginSection').classList.remove('d-none');
-    document.getElementById('appSection').classList.add('d-none');
+    // Save the latest work before ending the session. Nothing is deleted.
+    persistCurrentWorkState();
+    clearSession(false);
+    const errorDiv = document.getElementById('loginError');
+    if (errorDiv) errorDiv.classList.add('d-none');
 }
 
 function initApp() {
