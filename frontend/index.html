@@ -156,6 +156,12 @@
             border-left: 5px solid var(--roving-orange);
             background: #fff5f2;
         }
+
+        .followup-alarm-banner { position: sticky; top: 0; z-index: 1040; border: 0; border-left: 5px solid var(--roving-orange); background: #fff8f4; box-shadow: 0 8px 24px rgba(0,0,0,.10); }
+        .followup-alarm-item { border: 1px solid rgba(212,91,56,.20); border-radius: 10px; padding: 10px 12px; background: #fff; margin-bottom: 8px; }
+        .followup-alarm-item:last-child { margin-bottom: 0; }
+        .followup-action-btn { min-width: 34px; }
+        .followup-due-today { background: #fff8f4; }
     </style>
 </head>
 <body>
@@ -163,6 +169,17 @@
 <!-- BROADCAST ANNOUNCEMENT BANNER -->
 <div id="broadcastBanner" class="alert alert-warning text-center rounded-0 mb-0 d-none fw-bold" role="alert">
     <i class="fa-solid fa-bullhorn me-2"></i> <span id="broadcastText"></span>
+</div>
+<!-- FOLLOW-UP ALARM -->
+<div id="followupAlarmBanner" class="alert followup-alarm-banner rounded-0 mb-0 d-none" role="alert">
+    <div class="d-flex align-items-start gap-3">
+        <div class="fs-4 text-roving-orange"><i class="fa-solid fa-bell fa-shake"></i></div>
+        <div class="flex-grow-1">
+            <div class="fw-bold text-roving-green mb-1">Follow-up Reminder — Today</div>
+            <div id="followupAlarmList"></div>
+        </div>
+        <button type="button" class="btn-close" onclick="dismissFollowupAlarm()"></button>
+    </div>
 </div>
 
 <!-- 1. LOGIN SECTION -->
@@ -1155,6 +1172,9 @@ function openAddFollowupModal() {
     document.getElementById('followupStatusSelect').value = "Scheduled";
     populateClientDropdowns();
     populateDropdowns();
+    if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission().catch(() => {});
+    }
 }
 
 function openAddBookingModal() {
@@ -1243,6 +1263,7 @@ function renderBookings() {
 async function loadFollowups() {
     await syncCollection('followups','roving_followups',followups,v=>followups=v);
     renderFollowups();
+    checkFollowupAlarms();
 }
 
 async function saveFollowupsToStorage() {
@@ -1288,10 +1309,16 @@ function renderFollowups() {
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    let list = followups;
-    if (currentUser && currentUser.role === 'Sales') {
-        list = list.filter(f => f.assignedTo === currentUser.name);
+    let list = Array.isArray(followups) ? followups : [];
+    if (currentUser && String(currentUser.role).trim().toLowerCase() === 'sales') {
+        list = list.filter(f => String(f.assignedTo || '').trim().toLowerCase() === String(currentUser.name || '').trim().toLowerCase());
     }
+
+    list = [...list].sort((a,b) => {
+        const ad = new Date(a.dateTime || 0).getTime() || 0;
+        const bd = new Date(b.dateTime || 0).getTime() || 0;
+        return ad - bd;
+    });
 
     if (list.length === 0) {
         tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">No follow-ups recorded</td></tr>`;
@@ -1299,38 +1326,161 @@ function renderFollowups() {
     }
 
     list.forEach(f => {
+        const dt = f.dateTime ? new Date(f.dateTime) : null;
+        const isToday = dt && isSameLocalDay(dt, new Date());
+        const isOverdue = dt && dt.getTime() < Date.now() && String(f.status).toLowerCase() !== 'completed';
+        const rowClass = isToday && String(f.status).toLowerCase() !== 'completed' ? 'followup-due-today' : '';
+        const phone = String(f.clientPhone || '').replace(/[^0-9+]/g, '');
+        const priorityClass = String(f.priority).toLowerCase() === 'high' ? 'bg-danger' : (String(f.priority).toLowerCase() === 'medium' ? 'bg-warning text-dark' : 'bg-secondary');
+        const statusClass = String(f.status).toLowerCase() === 'completed' ? 'bg-success' : (String(f.status).toLowerCase() === 'in progress' ? 'bg-info text-dark' : (String(f.status).toLowerCase() === 'postponed' ? 'bg-warning text-dark' : 'bg-primary'));
+        const dateLabel = dt && !isNaN(dt.getTime()) ? dt.toLocaleString([], {year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : (f.dateTime || '-');
+        const safeId = String(f.id).replace(/'/g, "\\'");
         tbody.innerHTML += `
-            <tr>
-                <td><strong>${f.clientName}</strong></td>
-                <td><small><i class="fa-solid fa-phone me-1"></i>${f.clientPhone}</small></td>
-                <td><span class="badge bg-dark">${f.type}</span></td>
-                <td><small>${f.dateTime.replace('T', ' ')}</small></td>
-                <td><span class="badge bg-light text-dark border">${f.assignedTo}</span></td>
-                <td><span class="badge bg-secondary">${f.priority}</span></td>
-                <td><span class="badge bg-primary">${f.status}</span></td>
-                <td><small class="text-muted">${f.notes || '-'}</small></td>
-                <td>
-                    <button class="btn btn-sm btn-outline-success me-1" onclick="completeFollowup(${f.id})"><i class="fa-solid fa-check"></i></button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteFollowup(${f.id})"><i class="fa-solid fa-trash"></i></button>
+            <tr class="${rowClass}">
+                <td><strong>${escapeHtml(f.clientName || '-')}</strong>${isToday && String(f.status).toLowerCase() !== 'completed' ? '<br><span class="badge bg-danger mt-1"><i class="fa-solid fa-bell me-1"></i>Today</span>' : ''}</td>
+                <td><small><i class="fa-solid fa-phone me-1"></i>${escapeHtml(f.clientPhone || '-')}</small></td>
+                <td><span class="badge bg-dark">${escapeHtml(f.type || '-')}</span></td>
+                <td><small class="${isOverdue ? 'text-danger fw-bold' : ''}">${escapeHtml(dateLabel)}${isOverdue ? ' <span class="badge bg-danger">Overdue</span>' : ''}</small></td>
+                <td><span class="badge bg-light text-dark border">${escapeHtml(f.assignedTo || '-')}</span></td>
+                <td><span class="badge ${priorityClass}">${escapeHtml(f.priority || 'Normal')}</span></td>
+                <td><span class="badge ${statusClass}">${escapeHtml(f.status || '-')}</span></td>
+                <td><small class="text-muted">${escapeHtml(f.notes || '-')}</small></td>
+                <td class="text-nowrap">
+                    <button class="btn btn-sm btn-outline-primary followup-action-btn me-1" title="Edit" onclick="editFollowup('${safeId}')"><i class="fa-solid fa-pen"></i></button>
+                    <button class="btn btn-sm btn-outline-info followup-action-btn me-1" title="Start" onclick="startFollowup('${safeId}')"><i class="fa-solid fa-play"></i></button>
+                    <button class="btn btn-sm btn-outline-success followup-action-btn me-1" title="Complete" onclick="completeFollowup('${safeId}')"><i class="fa-solid fa-check"></i></button>
+                    <button class="btn btn-sm btn-outline-warning followup-action-btn me-1" title="Postpone 1 hour" onclick="postponeFollowup('${safeId}')"><i class="fa-solid fa-clock"></i></button>
+                    <a class="btn btn-sm btn-outline-success followup-action-btn me-1" title="Call" href="tel:${phone}"><i class="fa-solid fa-phone"></i></a>
+                    <a class="btn btn-sm btn-outline-success followup-action-btn me-1" title="WhatsApp" target="_blank" href="https://wa.me/${phone.replace(/^\+/, '')}"><i class="fa-brands fa-whatsapp"></i></a>
+                    <button class="btn btn-sm btn-outline-danger followup-action-btn" title="Delete" onclick="deleteFollowup('${safeId}')"><i class="fa-solid fa-trash"></i></button>
                 </td>
             </tr>
         `;
     });
 }
 
-async function completeFollowup(id) {
-    const f = followups.find(x => x.id === id);
+function isSameLocalDay(a, b) {
+    return a && b && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function editFollowup(id) {
+    const f = followups.find(x => String(x.id) === String(id));
     if (!f) return;
-    f.status = 'Completed';
+    document.getElementById('followupModalTitle').innerText = 'Edit Follow-up Task';
+    document.getElementById('editingFollowupId').value = f.id;
+    populateClientDropdowns();
+    populateDropdowns();
+    document.getElementById('followupClientSelect').value = f.clientId || '';
+    document.getElementById('followupType').value = f.type || 'Phone Call';
+    document.getElementById('followupStatusSelect').value = f.status || 'Scheduled';
+    document.getElementById('followupDateTime').value = f.dateTime || '';
+    document.getElementById('followupAssignedTo').value = f.assignedTo || '';
+    document.getElementById('followupPriority').value = f.priority || 'Normal';
+    document.getElementById('followupNotes').value = f.notes || '';
+    new bootstrap.Modal(document.getElementById('addFollowupModal')).show();
+}
+
+async function startFollowup(id) {
+    const f = followups.find(x => String(x.id) === String(id));
+    if (!f) return;
+    f.status = 'In Progress';
     await saveRecord('followups','roving_followups',f);
     renderFollowups();
+    checkFollowupAlarms(true);
+    showNotification('Follow-up started.', 'info');
+}
+
+async function postponeFollowup(id) {
+    const f = followups.find(x => String(x.id) === String(id));
+    if (!f) return;
+    const base = new Date(f.dateTime || Date.now());
+    base.setHours(base.getHours() + 1);
+    const pad = n => String(n).padStart(2,'0');
+    f.dateTime = `${base.getFullYear()}-${pad(base.getMonth()+1)}-${pad(base.getDate())}T${pad(base.getHours())}:${pad(base.getMinutes())}`;
+    f.status = 'Postponed';
+    f.notified = false;
+    await saveRecord('followups','roving_followups',f);
+    renderFollowups();
+    checkFollowupAlarms(true);
+    showNotification('Follow-up postponed for 1 hour.', 'warning');
+}
+
+async function completeFollowup(id) {
+    const f = followups.find(x => String(x.id) === String(id));
+    if (!f) return;
+    f.status = 'Completed';
+    f.notified = true;
+    await saveRecord('followups','roving_followups',f);
+    renderFollowups();
+    checkFollowupAlarms(true);
     showNotification('Follow-up marked as completed!', 'success');
 }
 
 async function deleteFollowup(id) {
-    followups = followups.filter(x => x.id !== id);
+    const f = followups.find(x => String(x.id) === String(id));
+    if (!f) return;
+    if (!confirm(`Delete follow-up for ${f.clientName || 'this client'}?`)) return;
+    followups = followups.filter(x => String(x.id) !== String(id));
     await deleteRecord('followups','roving_followups',id);
     renderFollowups();
+    checkFollowupAlarms(true);
+    showNotification('Follow-up deleted.', 'success');
+}
+
+function getTodayFollowups() {
+    if (!currentUser) return [];
+    const role = String(currentUser.role || '').trim().toLowerCase();
+    return (Array.isArray(followups) ? followups : []).filter(f => {
+        if (String(f.status || '').toLowerCase() === 'completed') return false;
+        if (role === 'sales' && String(f.assignedTo || '').trim().toLowerCase() !== String(currentUser.name || '').trim().toLowerCase()) return false;
+        const d = new Date(f.dateTime || '');
+        return !isNaN(d.getTime()) && isSameLocalDay(d, new Date());
+    }).sort((a,b) => new Date(a.dateTime) - new Date(b.dateTime));
+}
+
+function dismissFollowupAlarm() {
+    const banner = document.getElementById('followupAlarmBanner');
+    if (banner) banner.classList.add('d-none');
+    const ids = getTodayFollowups().map(f => String(f.id));
+    localStorage.setItem('roving_followup_alarm_dismissed', JSON.stringify({date:new Date().toDateString(), ids}));
+}
+
+function checkFollowupAlarms(forceShow=false) {
+    const banner = document.getElementById('followupAlarmBanner');
+    const listEl = document.getElementById('followupAlarmList');
+    if (!banner || !listEl || !currentUser) return;
+    const today = getTodayFollowups();
+    if (!today.length) { banner.classList.add('d-none'); return; }
+
+    let dismissed = {};
+    try { dismissed = JSON.parse(localStorage.getItem('roving_followup_alarm_dismissed') || '{}'); } catch(e) {}
+    const dismissedIds = dismissed.date === new Date().toDateString() ? (dismissed.ids || []) : [];
+    const visible = forceShow ? today : today.filter(f => !dismissedIds.includes(String(f.id)));
+    if (!visible.length) { banner.classList.add('d-none'); return; }
+
+    listEl.innerHTML = visible.slice(0,5).map(f => {
+        const d = new Date(f.dateTime);
+        const time = d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+        const safeId = String(f.id).replace(/'/g, "\\'");
+        return `<div class="followup-alarm-item d-flex justify-content-between align-items-center gap-2">
+            <div><strong>${escapeHtml(f.clientName || '-')}</strong> <span class="text-muted">— ${escapeHtml(f.type || 'Follow-up')}</span><br><small><i class="fa-regular fa-clock me-1"></i>${time} · ${escapeHtml(f.assignedTo || '')}</small></div>
+            <button class="btn btn-sm btn-primary" onclick="editFollowup('${safeId}')"><i class="fa-solid fa-pen me-1"></i>Open</button>
+        </div>`;
+    }).join('');
+    if (today.length > 5) listEl.innerHTML += `<small class="text-muted">+ ${today.length - 5} more follow-ups today</small>`;
+    banner.classList.remove('d-none');
+
+    if ('Notification' in window && Notification.permission === 'granted') {
+        const sentKey = 'roving_followup_browser_notified_' + new Date().toDateString();
+        let sent=[]; try { sent=JSON.parse(localStorage.getItem(sentKey)||'[]'); } catch(e) {}
+        visible.forEach(f => {
+            if (!sent.includes(String(f.id))) {
+                new Notification('Roving Travel — Follow-up', {body:`Today: ${f.clientName} at ${new Date(f.dateTime).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`});
+                sent.push(String(f.id));
+            }
+        });
+        localStorage.setItem(sentKey, JSON.stringify(sent));
+    }
 }
 
 function editBooking(id) {
@@ -2037,6 +2187,11 @@ setInterval(() => {
     if (typeof loadSuppliers === 'function') loadSuppliers();
     if (typeof loadFollowups === 'function') loadFollowups();
 }, 5000);
+
+// Follow-up alarm watcher: checks every 30 seconds while CRM is open.
+setInterval(() => {
+    if (currentUser) checkFollowupAlarms();
+}, 30000);
 
 async function handleSaveClient(event) {
     if (event) event.preventDefault();
