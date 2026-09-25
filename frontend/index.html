@@ -189,7 +189,7 @@
                 
                 <!-- Notifications Bell -->
                 <div class="dropdown">
-                    <button class="btn btn-light position-relative border shadow-sm px-3 py-2 rounded-pill" type="button" id="notificationDropdownBtn" data-bs-toggle="dropdown" aria-expanded="false" onclick="renderNotificationsUI()">
+                    <button class="btn btn-light position-relative border shadow-sm px-3 py-2 rounded-pill" type="button" id="notificationDropdownBtn" data-bs-toggle="dropdown" aria-expanded="false" onclick="renderNotificationsUI(); markNotificationsOpened();">
                         <i class="fa-solid fa-bell text-roving-orange fa-lg"></i>
                         <span id="notificationBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">0</span>
                     </button>
@@ -1421,7 +1421,7 @@ function renderNotificationsUI() {
     });
 
     const pendingAdminRequests = isAdmin
-        ? approvalNotifications.filter(n => n.type === 'approval_request' && n.status === 'pending').length
+        ? approvalNotifications.filter(n => n.type === 'approval_request' && n.status === 'pending' && !n.read).length
         : 0;
 
     const unreadUserNotifications = userNotifications.filter(n =>
@@ -1704,6 +1704,40 @@ async function deleteClient(clientId) {
 
     showNotification('تم حذف العميل بنجاح.', 'success');
     await fetchClients();
+}
+
+function markNotificationsOpened() {
+    if (!currentUser) return;
+
+    const isAdmin = String(currentUser.role || '').trim().toLowerCase() === 'admin';
+
+    // Opening the bell marks the notifications currently shown to this user
+    // as read. For Admin, approval requests remain pending until accepted
+    // or rejected, but they no longer keep increasing the unread badge.
+    if (isAdmin) {
+        const approvals = getApprovalNotifications();
+        let changed = false;
+        approvals.forEach(n => {
+            if (n.status === 'pending' && !n.read) {
+                n.read = true;
+                changed = true;
+            }
+        });
+        if (changed) saveApprovalNotifications(approvals);
+    }
+
+    const userNotifications = getUserNotifications();
+    let userChanged = false;
+    userNotifications.forEach(n => {
+        if ((n.targetUser === currentUser.name || n.targetUser === 'All') && !n.read) {
+            n.read = true;
+            userChanged = true;
+        }
+    });
+    if (userChanged) saveUserNotifications(userNotifications);
+
+    pendingNotifications = userNotifications;
+    renderNotificationsUI();
 }
 
 function markAllNotificationsRead() {
