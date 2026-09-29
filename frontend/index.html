@@ -669,7 +669,7 @@
   <div class="modal-body">
    <div class="alert alert-light border mb-3"><div class="fw-bold" id="paymentBookingClientName">Client</div><div class="small text-muted">Remaining: <strong id="paymentBookingRemaining">0.00</strong></div></div>
    <div class="mb-3" id="bookingPaymentHistoryWrap"><div class="fw-semibold small mb-2">Previous Payments</div><div id="bookingPaymentHistory" class="border rounded p-2 small text-muted">No payments recorded yet.</div></div>
-   <form id="bookingPaymentForm" onsubmit="handleAddBookingPayment(event)">
+   <form id="bookingPaymentForm">
     <input type="hidden" id="paymentBookingId">
     <div class="mb-3"><label class="form-label fw-semibold">Payment Amount <span class="text-danger">*</span></label><input type="number" id="bookingPaymentAmount" class="form-control" min="0.01" step="0.01" required placeholder="Enter amount paid"></div>
     <div class="mb-3"><label class="form-label fw-semibold">Payment Date <span class="text-danger">*</span></label><input type="datetime-local" id="bookingPaymentDate" class="form-control" required></div>
@@ -1032,6 +1032,18 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('addFollowupForm').addEventListener('submit', handleSaveFollowup);
     document.getElementById('addBookingForm').addEventListener('submit', handleSaveBooking);
     document.getElementById('supplierForm').addEventListener('submit', handleSaveSupplier);
+    // Delegate booking action clicks so string/Mongo IDs are never broken by inline HTML quotes.
+    const bookingActionsBody = document.getElementById('bookingsTableBody');
+    if (bookingActionsBody) bookingActionsBody.addEventListener('click', (event) => {
+        const button = event.target.closest('button[data-booking-action]');
+        if (!button || !bookingActionsBody.contains(button)) return;
+        const id = button.dataset.bookingId;
+        const action = button.dataset.bookingAction;
+        if (action === 'edit') editBooking(id);
+        else if (action === 'payment') addBookingPayment(id);
+        else if (action === 'delete') deleteBooking(id);
+    });
+    document.getElementById('bookingPaymentForm').addEventListener('submit', handleAddBookingPayment);
 });
 
 document.getElementById('loginForm').addEventListener('submit', function(e) {
@@ -1294,9 +1306,9 @@ function renderBookings() {
                 <td><span class="badge bg-success">${b.status}</span></td>
                 <td><small>${b.details || '-'}</small></td>
                 <td>
-                    <button class="btn btn-sm btn-outline-primary me-1" title="Edit Booking" onclick="editBooking(${JSON.stringify(b.id)})"><i class="fa-solid fa-pen-to-square"></i></button>
-                    <button class="btn btn-sm btn-success me-1" title="Add Payment / Installment" onclick="addBookingPayment(${JSON.stringify(b.id)})"><i class="fa-solid fa-money-bill-wave"></i></button>
-                    <button class="btn btn-sm btn-outline-danger" title="Delete Booking" onclick="deleteBooking(${JSON.stringify(b.id)})"><i class="fa-solid fa-trash"></i></button>
+                    <button type="button" class="btn btn-sm btn-outline-primary me-1" title="Edit Booking" aria-label="Edit Booking" data-booking-action="edit" data-booking-id="${escapeHtml(String(b.id))}"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button type="button" class="btn btn-sm btn-success me-1" title="Add Payment / Installment" aria-label="Add Payment / Installment" data-booking-action="payment" data-booking-id="${escapeHtml(String(b.id))}"><i class="fa-solid fa-money-bill-wave"></i></button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" title="Delete Booking" aria-label="Delete Booking" data-booking-action="delete" data-booking-id="${escapeHtml(String(b.id))}"><i class="fa-solid fa-trash"></i></button>
                 </td>
             </tr>
         `;
@@ -1427,17 +1439,19 @@ function localDateTimeValue(date = new Date()) {
 }
 
 function addBookingPayment(id) {
-    const b = bookings.find(x => String(x.id) === String(id));
-    if (!b) return;
-    if ((Number(b.remaining) || 0) <= 0) { showNotification('This booking is already fully paid.', 'info'); return; }
-    document.getElementById('paymentBookingId').value = b.id;
-    document.getElementById('paymentBookingClientName').innerText = `${b.clientName} · ${b.category}`;
-    document.getElementById('paymentBookingRemaining').innerText = `${formatMoney(b.remaining)} ${b.currency || 'EGP'}`;
+    const b = bookings.find(x => String(x.id ?? x._id) === String(id));
+    if (!b) { showNotification('Booking not found. Refresh the page and try again.', 'warning'); return; }
+    const remainingNow = Math.max(0, Number(b.netPrice || 0) - Number(b.paidAmount || 0));
+    b.remaining = remainingNow;
+    if (remainingNow <= 0.000001) { showNotification('This booking is already fully paid.', 'info'); return; }
+    document.getElementById('paymentBookingId').value = b.id ?? b._id;
+    document.getElementById('paymentBookingClientName').innerText = `${b.clientName || 'Client'} · ${b.category || 'Booking'}`;
+    document.getElementById('paymentBookingRemaining').innerText = `${formatMoney(remainingNow)} ${b.currency || 'EGP'}`;
     const history = Array.isArray(b.paymentHistory) ? b.paymentHistory : [];
     const historyEl = document.getElementById('bookingPaymentHistory');
     historyEl.innerHTML = history.length ? `<div class="table-responsive"><table class="table table-sm mb-0"><thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Notes</th></tr></thead><tbody>${[...history].reverse().map(p => `<tr><td>${escapeHtml(p.date ? new Date(p.date).toLocaleString() : '-')}</td><td class="text-success fw-semibold">${formatMoney(Number(p.amount)||0)} ${escapeHtml(b.currency||'EGP')}</td><td>${escapeHtml(p.method||'-')}</td><td>${escapeHtml(p.notes||'-')}</td></tr>`).join('')}</tbody></table></div>` : 'No payments recorded yet.';
     document.getElementById('bookingPaymentAmount').value = '';
-    document.getElementById('bookingPaymentAmount').max = Math.max(0, Number(b.remaining) || 0);
+    document.getElementById('bookingPaymentAmount').max = remainingNow;
     document.getElementById('bookingPaymentDate').value = localDateTimeValue();
     document.getElementById('bookingPaymentMethod').value = 'Cash';
     document.getElementById('bookingPaymentNotes').value = '';
@@ -1447,8 +1461,8 @@ function addBookingPayment(id) {
 async function handleAddBookingPayment(e) {
     e.preventDefault();
     const id = document.getElementById('paymentBookingId').value;
-    const b = bookings.find(x => String(x.id) === String(id));
-    if (!b) { showNotification('Booking not found.', 'danger'); return; }
+    const b = bookings.find(x => String(x.id ?? x._id) === String(id));
+    if (!b) { showNotification('Booking not found. Refresh the page and try again.', 'danger'); return; }
     const amount = Number(document.getElementById('bookingPaymentAmount').value);
     const remaining = Math.max(0, Number(b.netPrice || 0) - Number(b.paidAmount || 0));
     if (!Number.isFinite(amount) || amount <= 0) { showNotification('Enter a payment amount greater than zero.', 'warning'); return; }
@@ -1475,7 +1489,7 @@ async function handleAddBookingPayment(e) {
 
 
 async function deleteBooking(id) {
-    bookings = bookings.filter(x => x.id !== id);
+    bookings = bookings.filter(x => String(x.id ?? x._id) !== String(id));
     await deleteRecord('bookings','roving_bookings',id);
     renderBookings();
 }
