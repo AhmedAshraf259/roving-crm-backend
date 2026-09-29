@@ -648,7 +648,7 @@
   <h5 class="modal-title fw-bold text-roving-green" id="bookingModalTitle">Add Booking & Installments</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button>
  </div><div class="modal-body"><form id="addBookingForm"><input type="hidden" id="editingBookingId" value="">
   <div class="row g-3">
-   <div class="col-md-6"><label class="form-label fw-semibold">Select Client <span class="text-danger">*</span></label><select id="bookingClientSelect" class="form-select" required></select></div>
+   <div class="col-md-6"><label class="form-label fw-semibold">Select Client <span class="text-danger">*</span></label><input type="search" id="bookingClientSearch" class="form-control mb-2" placeholder="Search client by name or phone..." autocomplete="off"><select id="bookingClientSelect" class="form-select" required></select><div class="form-text">Search by customer name or phone number.</div></div>
    <div class="col-md-3"><label class="form-label fw-semibold">Category <span class="text-danger">*</span></label><select id="bookingCategory" class="form-select" required onchange="handleBookingCategoryChange()"><option value="" disabled selected>-- Select Category --</option><option value="Flight">Flight</option><option value="Hotel Accommodation">Hotel Accommodation</option><option value="Full Package">Full Package</option><option value="Visa">Visa</option><option value="Transportation">Transportation</option><option value="Other">Other</option></select></div>
    <div class="col-md-3"><label class="form-label fw-semibold">Number of People <span class="text-danger">*</span></label><input type="number" min="1" step="1" id="bookingPeopleCount" class="form-control" value="1" required></div>
    <div class="col-md-3"><label class="form-label fw-semibold">Booking Currency <span class="text-danger">*</span></label><select id="bookingCurrency" class="form-select" onchange="calculateBookingFinancials()" required><option>EGP</option><option>USD</option><option>EUR</option><option>GBP</option><option>AED</option><option>SAR</option><option>TRY</option><option>GEL</option><option>AZN</option><option>OMR</option><option>QAR</option><option>BHD</option><option>ALL</option><option>IDR</option><option>MYR</option></select></div>
@@ -1034,6 +1034,8 @@ function restoreSession() {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
+    const bookingClientSearch = document.getElementById('bookingClientSearch');
+    if (bookingClientSearch) bookingClientSearch.addEventListener('input', renderBookingClientOptions);
     restoreSession();
     setInterval(() => { if (typeof refreshFollowupAlerts === 'function') refreshFollowupAlerts(); }, 60000);
 
@@ -1163,22 +1165,64 @@ function populateDropdowns() {
     });
 }
 
+function isCurrentUserSales() {
+    return String(currentUser?.role || '').trim().toLowerCase() === 'sales';
+}
+
+function getClientsVisibleToCurrentUser() {
+    const allClients = Array.isArray(clients) ? clients : [];
+    if (!isCurrentUserSales()) return allClients;
+    const currentName = String(currentUser?.name || '').trim().toLowerCase();
+    const currentId = String(currentUser?.id || currentUser?._id || currentUser?.email || '').trim().toLowerCase();
+    return allClients.filter(c => {
+        const assignedTo = String(c.assignedTo || '').trim().toLowerCase();
+        const createdBy = String(c.createdBy || c.createdByName || c.addedBy || '').trim().toLowerCase();
+        const createdById = String(c.createdById || c.addedById || '').trim().toLowerCase();
+        return (assignedTo && assignedTo === currentName) ||
+               (createdBy && createdBy === currentName) ||
+               (currentId && createdById && createdById === currentId);
+    });
+}
+
+function renderBookingClientOptions() {
+    const bookingSelect = document.getElementById('bookingClientSelect');
+    if (!bookingSelect) return;
+    const searchInput = document.getElementById('bookingClientSearch');
+    const query = String(searchInput?.value || '').trim().toLowerCase();
+    const digitsQuery = query.replace(/\D/g, '');
+    const selectedBefore = bookingSelect.value;
+    const visibleClients = getClientsVisibleToCurrentUser().filter(c => {
+        if (!query) return true;
+        const name = String(c.name || '').toLowerCase();
+        const phone = String(c.phone || '').toLowerCase();
+        const phoneDigits = phone.replace(/\D/g, '');
+        return name.includes(query) || phone.includes(query) || (digitsQuery && phoneDigits.includes(digitsQuery));
+    });
+    bookingSelect.innerHTML = '<option value="">-- Select Client --</option>' + visibleClients.map(c => {
+        const id = c._id ?? c.id ?? '';
+        return `<option value="${escapeHtml(String(id))}">${escapeHtml(c.name || 'Unnamed Client')} (${escapeHtml(c.phone || 'No Phone')})</option>`;
+    }).join('');
+    if (visibleClients.some(c => String(c._id ?? c.id ?? '') === String(selectedBefore))) {
+        bookingSelect.value = selectedBefore;
+    }
+}
+
 function populateClientDropdowns() {
+    const visibleClients = getClientsVisibleToCurrentUser();
     const followupSelect = document.getElementById('followupClientSelect');
     if (followupSelect) {
-        followupSelect.innerHTML = '<option value="" disabled selected>-- Select Client --</option>';
-        clients.forEach(c => {
-            followupSelect.innerHTML += `<option value="${c._id}">${c.name} (${c.phone || 'No Phone'})</option>`;
-        });
+        const selected = followupSelect.value;
+        followupSelect.innerHTML = '<option value="">-- Select Client --</option>' + visibleClients.map(c => {
+            const id = c._id ?? c.id ?? '';
+            return `<option value="${escapeHtml(String(id))}">${escapeHtml(c.name || 'Unnamed Client')} (${escapeHtml(c.phone || 'No Phone')})</option>`;
+        }).join('');
+        if (visibleClients.some(c => String(c._id ?? c.id ?? '') === String(selected))) followupSelect.value = selected;
     }
-
+    const searchInput = document.getElementById('bookingClientSearch');
+    if (searchInput) searchInput.value = '';
     const bookingSelect = document.getElementById('bookingClientSelect');
-    if (bookingSelect) {
-        bookingSelect.innerHTML = '<option value="" disabled selected>-- Select Client --</option>';
-        clients.forEach(c => {
-            bookingSelect.innerHTML += `<option value="${c._id}">${c.name} (${c.phone || 'No Phone'})</option>`;
-        });
-    }
+    if (bookingSelect) bookingSelect.value = '';
+    renderBookingClientOptions();
 }
 
 function openAddClientModal() {
@@ -1235,6 +1279,7 @@ function removePackageCostRow(i){packageCostRows.splice(i,1);renderPackageCostRo
 function updatePackageRow(i,field,value){if(!packageCostRows[i])return;packageCostRows[i][field]=['rate','nights','fx'].includes(field)?(parseFloat(value)||0):value;if(field==='type'&&value!=='Hotel')packageCostRows[i].nights=1;if(field==='supplierId'&&value){const supplier=suppliers.find(x=>String(x.id)===String(value));if(supplier&&supplier.currency)packageCostRows[i].currency=supplier.currency;renderPackageCostRows();}if(field==='type'||field==='currency')renderPackageCostRows();calculateBookingFinancials();}
 function packageRowConvertedTotal(r){const base=r.type==='Hotel'?(Number(r.nights)||0)*(Number(r.rate)||0):(Number(r.rate)||0);return base*(Number(r.fx)||0);}
 function formatMoney(n){return Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});}
+function currencyLabel(currency){const code=String(currency||'EGP').toUpperCase();return code==='EGP'?'ج.م':code;}
 function renderPackageCostRows(){const wrap=document.getElementById('packageCostRows');if(!wrap)return;if(!packageCostRows.length){wrap.innerHTML='<div class="text-muted small p-2">No package costs added yet.</div>';return;}const bc=document.getElementById('bookingCurrency')?.value||'EGP';wrap.innerHTML=packageCostRows.map((r,i)=>`<div class="border rounded p-2 mb-2 bg-white"><div class="row g-2 align-items-end"><div class="col-md-2"><label class="form-label small fw-semibold">Cost Type</label><select class="form-select form-select-sm" onchange="updatePackageRow(${i},'type',this.value)">${['Hotel','Flight','Visa','Transportation','Tour / Activities','Other'].map(t=>`<option ${r.type===t?'selected':''}>${t}</option>`).join('')}</select></div><div class="col-md-2"><label class="form-label small fw-semibold">Name / Details</label><input class="form-control form-control-sm" value="${escapeHtml(r.name)}" placeholder="Hotel / Airline / Visa..." oninput="updatePackageRow(${i},'name',this.value)"></div><div class="col-md-1"><label class="form-label small fw-semibold">Nights</label><input type="number" min="1" class="form-control form-control-sm" value="${r.type==='Hotel'?(r.nights||1):1}" ${r.type==='Hotel'?'':'disabled'} oninput="updatePackageRow(${i},'nights',this.value)"></div><div class="col-md-2"><label class="form-label small fw-semibold">Rate / Total</label><input type="number" min="0" step="0.01" class="form-control form-control-sm" value="${r.rate||0}" oninput="updatePackageRow(${i},'rate',this.value)"></div><div class="col-md-2"><label class="form-label small fw-semibold">Supplier</label><select class="form-select form-select-sm package-supplier-select" onchange="updatePackageRow(${i},'supplierId',this.value)"><option value="">-- Select Supplier --</option>${suppliers.map(s=>`<option value="${s.id}" ${String(r.supplierId)===String(s.id)?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}</select></div><div class="col-md-1"><label class="form-label small fw-semibold">Currency</label><select class="form-select form-select-sm" onchange="updatePackageRow(${i},'currency',this.value);updatePackageRow(${i},'fx',1)">${['EGP','USD','EUR','GBP','AED','SAR','TRY','GEL','AZN','OMR','QAR','BHD','ALL','IDR','MYR'].map(c=>`<option ${r.currency===c?'selected':''}>${c}</option>`).join('')}</select></div><div class="col-md-1"><label class="form-label small fw-semibold">FX → ${bc}</label><input type="number" min="0" step="0.000001" class="form-control form-control-sm" value="${r.fx??1}" oninput="updatePackageRow(${i},'fx',this.value)"></div><div class="col-md-1"><button type="button" class="btn btn-sm btn-outline-danger" onclick="removePackageCostRow(${i})"><i class="fa-solid fa-trash"></i></button></div><div class="col-12 small text-muted">${r.type==='Hotel'?'Hotel total = nights × rate':'Cost = entered rate/total'} · Converted: <strong>${formatMoney(packageRowConvertedTotal(r))} ${bc}</strong></div></div></div>`).join('');}
 function calculateBookingFinancials(){const net=parseFloat(document.getElementById('bookingNetPrice').value)||0;let cost=parseFloat(document.getElementById('bookingCostPrice').value)||0;const paid=parseFloat(document.getElementById('bookingPaidAmount').value)||0;const cat=document.getElementById('bookingCategory').value;const cur=document.getElementById('bookingCurrency').value||'EGP';if(cat==='Full Package'){cost=packageCostRows.reduce((sum,r)=>sum+packageRowConvertedTotal(r),0);document.getElementById('bookingCostPrice').value=cost.toFixed(2);document.getElementById('packageCostTotalDisplay').value=`${formatMoney(cost)} ${cur}`;}const profit=net-cost,remaining=net-paid;document.getElementById('bookingProfitDisplay').value=`${formatMoney(profit)} ${cur}`;document.getElementById('bookingRemainingDisplay').value=`${formatMoney(remaining)} ${cur}`;document.getElementById('bookingStatus').value=remaining>0?'Installments Due':'Paid in Full';}
 async function loadBookings(){await syncCollection('bookings','roving_bookings',bookings,v=>bookings=v);renderBookings();renderCommissions();}
@@ -1269,6 +1314,9 @@ async function handleSaveBooking(e) {
         remaining: Math.max(0, netPrice - paidAmount), profit: netPrice - costPrice,
         status: Math.max(0, netPrice - paidAmount) <= 0 ? 'Paid in Full' : 'Installments Due',
         assignedTo: document.getElementById('bookingAssignedTo').value,
+        createdBy: oldBooking?.createdBy || (editingId === '' ? (currentUser?.name || '') : ''),
+        createdByEmail: oldBooking?.createdByEmail || (editingId === '' ? (currentUser?.email || '') : ''),
+        createdByRole: oldBooking?.createdByRole || (editingId === '' ? (currentUser?.role || '') : ''),
         supplierId: document.getElementById('bookingSupplier').value || '',
         supplierName: suppliers.find(x => String(x.id) === String(document.getElementById('bookingSupplier').value))?.name || '',
         serviceStart: document.getElementById('bookingStartDate').value || '',
@@ -1569,27 +1617,43 @@ async function deleteBooking(id) {
 
 function renderCommissions() {
     const tbody = document.getElementById('commissionsTableBody'); if (!tbody) return;
-    const salesUsers = validUsers.filter(u => u.role === 'Sales');
     const isAdmin = currentUser && currentUser.role === 'Admin';
-    const visibleUsers = isAdmin ? salesUsers : salesUsers.filter(u => u.name === currentUser?.name);
+    // Admins can earn commission on bookings they create; Sales earn commission on bookings assigned to them.
+    const commissionUsers = validUsers.filter(u => u.role === 'Sales' || u.role === 'Admin');
+    const visibleUsers = isAdmin ? commissionUsers : commissionUsers.filter(u => u.email === currentUser?.email || u.name === currentUser?.name);
     const rows = [];
     visibleUsers.forEach(user => {
-        const userBookings = bookings.filter(b => b.assignedTo === user.name && b.status !== 'Cancelled');
+        const userIndex = validUsers.indexOf(user);
+        const userBookings = bookings.filter(b => {
+            if (b.status === 'Cancelled') return false;
+            if (user.role === 'Admin') return Boolean(b.createdByEmail && user.email && b.createdByEmail === user.email) || (!b.createdByEmail && Boolean(b.createdBy) && b.createdBy === user.name);
+            return b.assignedTo === user.name;
+        });
         userBookings.forEach(b => {
             const amount = (Number(b.profit) || 0) * (Number(user.commission) || 0) / 100;
             const serviceFinished = Boolean(b.serviceEnd) && new Date(b.serviceEnd) <= new Date();
-            const status = b.commissionReleased ? 'Paid / Released' : (serviceFinished ? 'Due' : 'Pending · Service not finished');
-            rows.push(`<tr><td><strong>${escapeHtml(user.name)}</strong></td><td><span class="badge bg-secondary">${escapeHtml(user.role)}</span></td><td>${formatMoney(Number(b.profit)||0)} ${escapeHtml(b.currency||'EGP')}</td><td>${escapeHtml(b.clientName||'Client')} · ${escapeHtml(b.category||'Booking')}<br><small class="text-muted">${b.serviceStart?escapeHtml(b.serviceStart.replace('T',' ')):'Start date not set'} → ${b.serviceEnd?escapeHtml(b.serviceEnd.replace('T',' ')):'End date not set'}</small></td><td class="fw-bold">${formatMoney(amount)} ${escapeHtml(b.currency||'EGP')}</td><td><span class="badge ${b.commissionReleased?'bg-success':serviceFinished?'bg-warning text-dark':'bg-secondary'}">${status}</span></td><td>${isAdmin && !b.commissionReleased ? `<button class="btn btn-sm btn-success" onclick="releaseCommission('${String(b.id).replace(/'/g, '&#39;')}')">${serviceFinished?'Mark paid':'Release early'}</button>` : (b.commissionReleased ? `<small>${escapeHtml(b.commissionReleasedBy||'Admin')}<br>${escapeHtml(b.commissionReleasedAt||'')}</small>` : '—')}</td></tr>`);
+            const commissionKey = user.email || user.name;
+            const commissionRecord = b.commissionRecords && b.commissionRecords[commissionKey];
+            // Preserve legacy release status for the assigned Sales user only.
+            const legacyReleased = user.role === 'Sales' && b.commissionReleased;
+            const released = commissionRecord ? Boolean(commissionRecord.released) : legacyReleased;
+            const status = released ? 'Paid / Released' : (serviceFinished ? 'Due' : 'Pending · Service not finished');
+            const releasedBy = commissionRecord?.releasedBy || (legacyReleased ? b.commissionReleasedBy : '');
+            const releasedAt = commissionRecord?.releasedAt || (legacyReleased ? b.commissionReleasedAt : '');
+            rows.push(`<tr><td><strong>${escapeHtml(user.name)}</strong></td><td><span class="badge bg-secondary">${escapeHtml(user.role)}</span></td><td>${formatMoney(Number(b.profit)||0)} ${escapeHtml(currencyLabel(b.currency))}</td><td>${escapeHtml(b.clientName||'Client')} · ${escapeHtml(b.category||'Booking')}<br><small class="text-muted">${b.serviceStart?escapeHtml(b.serviceStart.replace('T',' ')):'Start date not set'} → ${b.serviceEnd?escapeHtml(b.serviceEnd.replace('T',' ')):'End date not set'}</small></td><td class="fw-bold">${formatMoney(amount)} ${escapeHtml(currencyLabel(b.currency))}</td><td><span class="badge ${released?'bg-success':serviceFinished?'bg-warning text-dark':'bg-secondary'}">${status}</span></td><td>${isAdmin && !released ? `<button class="btn btn-sm btn-success" onclick="releaseCommission('${String(b.id).replace(/'/g, '&#39;')}', ${userIndex})">${serviceFinished?'Mark paid':'Release early'}</button>` : (released ? `<small>${escapeHtml(releasedBy||'Admin')}<br>${escapeHtml(releasedAt||'')}</small>` : '—')}</td></tr>`);
         });
     });
     tbody.innerHTML = rows.length ? rows.join('') : '<tr><td colspan="7" class="text-center text-muted py-4">No commission records available</td></tr>';
 }
-async function releaseCommission(id) {
+async function releaseCommission(id, userIndex) {
     if (!currentUser || currentUser.role !== 'Admin') { showNotification('Only Admin can release commission.', 'danger'); return; }
-    const b = bookings.find(x => String(x.id) === String(id)); if (!b) return;
-    b.commissionReleased = true; b.commissionReleasedBy = currentUser.name; b.commissionReleasedAt = new Date().toLocaleString();
+    const b = bookings.find(x => String(x.id) === String(id)); const user = validUsers[Number(userIndex)];
+    if (!b || !user) return;
+    const key = user.email || user.name;
+    if (!b.commissionRecords || typeof b.commissionRecords !== 'object') b.commissionRecords = {};
+    b.commissionRecords[key] = { released: true, releasedBy: currentUser.name, releasedAt: new Date().toLocaleString() };
     await saveRecord('bookings','roving_bookings',b); renderCommissions(); renderBookings();
-    showNotification('Commission released to sales record.', 'success');
+    showNotification(`Commission released for ${user.name}.`, 'success');
 }
 
 function renderAdminUsers() {
@@ -2264,8 +2328,11 @@ async function handleSaveClient(event) {
 
     const editingId = document.getElementById('editingClientId').value;
 
+    const priorClient = editingId !== "" ? clients.find(c => String(c._id || c.id) === String(editingId)) : null;
     const clientData = {
         _id: editingId !== "" ? editingId : 'local_' + Date.now(),
+        createdBy: priorClient ? (priorClient.createdBy || priorClient.createdByName || '') : (currentUser?.name || ''),
+        createdById: priorClient ? (priorClient.createdById || '') : (currentUser?.id || currentUser?._id || currentUser?.email || ''),
         name: document.getElementById('clientName').value.trim(),
         phone: document.getElementById('clientPhone').value.trim(),
         passport: document.getElementById('clientPassport').value.trim(),
