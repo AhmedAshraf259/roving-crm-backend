@@ -642,11 +642,65 @@
     </div>
 </div>
 
+<!-- Modal: Follow-up Action -->
+<div class="modal fade" id="followupActionModal" tabindex="-1">
+  <div class="modal-dialog modal-lg"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title fw-bold text-roving-green">Follow-up Action</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <input type="hidden" id="actionFollowupId">
+      <div id="followupActionClientInfo" class="alert alert-light border mb-3"></div>
+      <div class="mb-3"><label class="form-label fw-semibold">Result / Action</label>
+        <div class="d-flex gap-2 flex-wrap">
+          <button type="button" class="btn btn-outline-danger" onclick="handleFollowupOutcome('Lose')"><i class="fa-solid fa-xmark me-1"></i> Lose</button>
+          <button type="button" class="btn btn-outline-success" onclick="handleFollowupOutcome('Booking')"><i class="fa-solid fa-bookmark me-1"></i> Booking</button>
+          <button type="button" class="btn btn-outline-primary" onclick="showNewFollowupFields()"><i class="fa-solid fa-phone me-1"></i> New Follow-up</button>
+        </div>
+      </div>
+      <div id="newFollowupFields" class="d-none">
+        <div class="row g-3">
+          <div class="col-md-6"><label class="form-label fw-semibold">Last Contact Date</label><input type="datetime-local" id="followupLastContactAt" class="form-control" readonly></div>
+          <div class="col-md-6"><label class="form-label fw-semibold">Result</label><input type="text" id="followupResult" class="form-control" placeholder="Client result / response"></div>
+          <div class="col-12"><label class="form-label fw-semibold">New Note</label><textarea id="followupNewNote" class="form-control" rows="3" placeholder="Write the new note. This will be saved separately from the previous note."></textarea></div>
+          <div class="col-md-6"><label class="form-label fw-semibold">Next Follow-up Date & Time</label><input type="datetime-local" id="followupNextDateTime" class="form-control" required></div>
+        </div>
+        <button type="button" class="btn btn-primary w-100 mt-3 fw-bold" onclick="saveNewFollowupFromAction()"><i class="fa-solid fa-plus me-1"></i> Add Follow-up</button>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+<!-- Modal: Follow-up Action -->
+<div class="modal fade" id="followupActionModal" tabindex="-1">
+  <div class="modal-dialog modal-lg"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title fw-bold text-roving-green">Follow-up Action</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <input type="hidden" id="actionFollowupId">
+      <div id="followupActionClientInfo" class="alert alert-light border mb-3"></div>
+      <div class="mb-3"><label class="form-label fw-semibold">Result / Action</label>
+        <div class="d-flex gap-2 flex-wrap">
+          <button type="button" class="btn btn-outline-danger" onclick="handleFollowupOutcome('Lose')"><i class="fa-solid fa-xmark me-1"></i> Lose</button>
+          <button type="button" class="btn btn-outline-success" onclick="handleFollowupOutcome('Booking')"><i class="fa-solid fa-bookmark me-1"></i> Booking</button>
+          <button type="button" class="btn btn-outline-primary" onclick="showNewFollowupFields()"><i class="fa-solid fa-phone me-1"></i> New Follow-up</button>
+        </div>
+      </div>
+      <div id="newFollowupFields" class="d-none">
+        <div class="row g-3">
+          <div class="col-md-6"><label class="form-label fw-semibold">Last Contact Date</label><input type="datetime-local" id="followupLastContactAt" class="form-control" readonly></div>
+          <div class="col-md-6"><label class="form-label fw-semibold">Result</label><input type="text" id="followupResult" class="form-control" placeholder="Client result / response"></div>
+          <div class="col-12"><label class="form-label fw-semibold">New Note</label><textarea id="followupNewNote" class="form-control" rows="3" placeholder="Write the new note. This will be saved separately from the previous note."></textarea></div>
+          <div class="col-md-6"><label class="form-label fw-semibold">Next Follow-up Date & Time</label><input type="datetime-local" id="followupNextDateTime" class="form-control" required></div>
+        </div>
+        <button type="button" class="btn btn-primary w-100 mt-3 fw-bold" onclick="saveNewFollowupFromAction()"><i class="fa-solid fa-plus me-1"></i> Add Follow-up</button>
+      </div>
+    </div>
+  </div></div>
+</div>
+
 <!-- Modal: Add / Edit Booking -->
 <div class="modal fade" id="addBookingModal" tabindex="-1">
  <div class="modal-dialog modal-xl"><div class="modal-content"><div class="modal-header">
   <h5 class="modal-title fw-bold text-roving-green" id="bookingModalTitle">Add Booking & Installments</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button>
- </div><div class="modal-body"><form id="addBookingForm"><input type="hidden" id="editingBookingId" value="">
+ </div><div class="modal-body"><form id="addBookingForm"><input type="hidden" id="editingBookingId" value=""><input type="hidden" id="sourceFollowupId" value=""><input type="hidden" id="sourceFollowupId" value="">
   <div class="row g-3">
    <div class="col-md-6"><label class="form-label fw-semibold">Select Client <span class="text-danger">*</span></label><input type="search" id="bookingClientSearch" class="form-control mb-2" placeholder="Search client by name or phone..." autocomplete="off"><select id="bookingClientSelect" class="form-select" required></select><div class="form-text">Search by customer name or phone number.</div></div>
    <div class="col-md-3"><label class="form-label fw-semibold">Category <span class="text-danger">*</span></label><select id="bookingCategory" class="form-select" required onchange="handleBookingCategoryChange()"><option value="" disabled selected>-- Select Category --</option><option value="Flight">Flight</option><option value="Hotel Accommodation">Hotel Accommodation</option><option value="Full Package">Full Package</option><option value="Visa">Visa</option><option value="Transportation">Transportation</option><option value="Other">Other</option></select></div>
@@ -1338,6 +1392,13 @@ async function handleSaveBooking(e) {
         showNotification('Booking added successfully!', 'success');
     }
     await saveRecord('bookings', 'roving_bookings', bookingObj);
+    const sourceFollowupId = document.getElementById('sourceFollowupId')?.value || '';
+    if (sourceFollowupId) {
+        const source = followups.find(f => String(f.id) === String(sourceFollowupId));
+        if (source) { source.status='Completed'; source.actionOutcome='Booking'; source.lastContactAt=new Date().toISOString(); source.result='Booking'; await saveRecord('followups','roving_followups',source); }
+        document.getElementById('sourceFollowupId').value='';
+        renderFollowups();
+    }
     const modal = bootstrap.Modal.getInstance(document.getElementById('addBookingModal'));
     if (modal) modal.hide();
     renderBookings(); renderCommissions();
@@ -1465,7 +1526,7 @@ function renderFollowups() {
                 <td><small class="text-muted">${escapeHtml(f.notes || '-')}</small>${f.attachmentData ? `<br><a href="${f.attachmentData}" target="_blank" rel="noopener">📎 ${escapeHtml(f.attachmentName || 'View attachment')}</a>` : ''}${f.status !== 'Completed' && f.dateTime && new Date(f.dateTime) < new Date() ? '<br><span class="badge bg-danger">Overdue · Action needed</span>' : ''}</td>
                 <td>
                     <button class="btn btn-sm btn-outline-primary me-1" title="Edit / Reschedule / Reassign" onclick="editFollowup(${f.id})"><i class="fa-solid fa-pen-to-square"></i></button>
-                    <button class="btn btn-sm btn-outline-success me-1" title="Mark action completed" onclick="completeFollowup(${f.id})"><i class="fa-solid fa-check"></i></button>
+                    <button class="btn btn-sm btn-outline-success me-1" title="Choose follow-up result" onclick="openFollowupAction(${f.id})"><i class="fa-solid fa-check"></i></button>
                     <button class="btn btn-sm btn-outline-danger" onclick="deleteFollowup(${f.id})"><i class="fa-solid fa-trash"></i></button>
                 </td>
             </tr>
@@ -1500,6 +1561,41 @@ function refreshFollowupAlerts() {
     const badge = document.getElementById('sidebarFollowupBadge');
     if (badge) { badge.textContent = String(overdue.length + noAction.length); badge.classList.toggle('d-none', overdue.length + noAction.length === 0); }
     if (box) box.innerHTML = overdue.length ? `<div class="alert alert-danger urgent-pulse-banner"><strong>Follow-ups overdue (${overdue.length})</strong><div class="small">${overdue.slice(0,5).map(f=>`${escapeHtml(f.clientName)} — ${escapeHtml(f.assignedTo)} — ${escapeHtml((f.dateTime||'').replace('T',' '))}`).join('<br>')}</div><button class="btn btn-sm btn-outline-danger mt-2" onclick="switchTab('followups')">Review and take action</button></div>` : (noAction.length ? `<div class="alert alert-warning"><strong>${noAction.length} follow-up(s) still need an action.</strong> <button class="btn btn-sm btn-outline-dark" onclick="switchTab('followups')">Open follow-ups</button></div>` : '');
+}
+
+function openFollowupAction(id) {
+    const f=followups.find(x=>String(x.id)===String(id)); if(!f)return;
+    document.getElementById('actionFollowupId').value=f.id;
+    document.getElementById('followupActionClientInfo').innerHTML=`<strong>${escapeHtml(f.clientName||'')}</strong><br><small>${escapeHtml(f.clientPhone||'')}</small><br><span class="text-muted">Previous note: ${escapeHtml(f.notes||'-')}</span>`;
+    const now=new Date(); now.setMinutes(now.getMinutes()-now.getTimezoneOffset());
+    document.getElementById('followupLastContactAt').value=now.toISOString().slice(0,16);
+    document.getElementById('followupResult').value=''; document.getElementById('followupNewNote').value=''; document.getElementById('followupNextDateTime').value='';
+    document.getElementById('newFollowupFields').classList.add('d-none');
+    new bootstrap.Modal(document.getElementById('followupActionModal')).show();
+}
+function showNewFollowupFields(){
+    document.getElementById('newFollowupFields').classList.remove('d-none');
+    const n=document.getElementById('followupNextDateTime'); if(n&&!n.value){const d=new Date(Date.now()+86400000);d.setMinutes(d.getMinutes()-d.getTimezoneOffset());n.value=d.toISOString().slice(0,16);}
+}
+async function handleFollowupOutcome(outcome){
+    const id=document.getElementById('actionFollowupId').value, f=followups.find(x=>String(x.id)===String(id)); if(!f)return;
+    if(outcome==='Lose'){await deleteFollowup(f.id);const m=bootstrap.Modal.getInstance(document.getElementById('followupActionModal'));if(m)m.hide();showNotification('Follow-up marked as Lose and removed automatically.','success');return;}
+    if(outcome==='Booking'){
+        const m=bootstrap.Modal.getInstance(document.getElementById('followupActionModal'));if(m)m.hide();
+        openAddBookingModal(); document.getElementById('sourceFollowupId').value=f.id; populateClientDropdowns();
+        const cs=document.getElementById('bookingClientSelect'); if(cs){cs.value=String(f.clientId);cs.dispatchEvent(new Event('change',{bubbles:true}));}
+        document.getElementById('bookingDetails').value=`Converted from follow-up. Client: ${f.clientName}. Previous note: ${f.notes||''}`.trim();
+        showNotification('Booking form opened for this client. Complete the booking data to move it to Bookings.','info');
+    }
+}
+async function saveNewFollowupFromAction(){
+    const id=document.getElementById('actionFollowupId').value, old=followups.find(x=>String(x.id)===String(id)); if(!old)return;
+    const newNote=document.getElementById('followupNewNote').value.trim(), result=document.getElementById('followupResult').value.trim(), next=document.getElementById('followupNextDateTime').value;
+    if(!newNote||!result||!next){showNotification('Please enter the new note, result, and next follow-up date.','warning');return;}
+    const last=document.getElementById('followupLastContactAt').value||new Date().toISOString();
+    old.status='Completed'; old.actionOutcome='Follow-up'; old.lastContactAt=last; old.result=result; old.lastActionAt=new Date().toISOString(); await saveRecord('followups','roving_followups',old);
+    const nf={id:Date.now(),clientId:old.clientId,clientName:old.clientName,clientPhone:old.clientPhone||'N/A',type:old.type||'Phone Call',status:'Scheduled',dateTime:next,assignedTo:old.assignedTo,priority:old.priority||'Normal',notes:newNote,attachmentData:'',attachmentName:'',notified:false,lastActionAt:'',lastContactAt:last,result,previousFollowupId:old.id,history:[...(Array.isArray(old.history)?old.history:[]),{contactAt:last,result,note:newNote,previousFollowupId:old.id}]};
+    followups.unshift(nf); await saveRecord('followups','roving_followups',nf); const m=bootstrap.Modal.getInstance(document.getElementById('followupActionModal'));if(m)m.hide();renderFollowups();showNotification('New follow-up added successfully. The previous note was kept separately.','success');
 }
 
 async function completeFollowup(id) {
