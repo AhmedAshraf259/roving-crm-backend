@@ -2,158 +2,207 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const nodemailer = require('nodemailer');
 
 const app = express();
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '10mb' }));
 app.use(cors());
 
-const MONGO_URI = process.env.MONGO_URL;
-if (!MONGO_URI) {
-  console.error('MONGO_URL is not configured. Set it in Render Environment Variables.');
+// Configure MONGO_URL and SMTP settings as environment variables on your hosting provider.
+if (!process.env.MONGO_URL) {
+  console.error('MONGO_URL is missing. Add it to your environment variables.');
 }
 
-mongoose.connect(MONGO_URI)
-  .then(() => console.log('تم الاتصال بقاعدة بيانات MongoDB Atlas بنجاح'))
-  .catch(err => console.error('خطأ في الاتصال بقاعدة البيانات:', err));
-
-// Existing clients collection
-const clientSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  phone: String,
-  passport: String,
-  source: String,
-  assignedTo: String,
-  status: { type: String, default: 'جديد' },
-  notes: String,
-  createdAt: { type: Date, default: Date.now }
-});
-const Client = mongoose.model('Client', clientSchema);
-
-// Generic CRM record storage. The frontend keeps its existing object shape;
-// MongoDB stores that object in `data` and uses `recordId` as the stable ID.
-const recordSchema = new mongoose.Schema({
-  recordId: { type: String, required: true, index: true },
-  data: { type: mongoose.Schema.Types.Mixed, required: true },
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
-}, { minimize: false });
-
-function makeModel(name) {
-  return mongoose.models[name] || mongoose.model(name, recordSchema);
-}
-
-const Booking = makeModel('Booking');
-const Supplier = makeModel('Supplier');
-const Followup = makeModel('Followup');
-const Notification = makeModel('Notification');
-const Approval = makeModel('Approval');
-const Broadcast = makeModel('Broadcast');
-
-function cleanRecord(doc) {
-  if (!doc) return null;
-  return { ...(doc.data || {}), id: doc.data?.id ?? doc.recordId };
-}
-
-function registerCrud(path, Model) {
-  app.get(`/api/${path}`, async (req, res) => {
-    try {
-      const docs = await Model.find().sort({ updatedAt: -1, createdAt: -1 });
-      res.json(docs.map(cleanRecord));
-    } catch (err) {
-      console.error(`GET /api/${path}`, err);
-      res.status(500).json({ error: 'خطأ في جلب البيانات' });
-    }
-  });
-
-  app.post(`/api/${path}`, async (req, res) => {
-    try {
-      const data = req.body || {};
-      const recordId = String(data.id || data._id || `${path}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
-      const saved = await Model.findOneAndUpdate(
-        { recordId },
-        { recordId, data: { ...data, id: recordId }, updatedAt: new Date() },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
-      );
-      res.status(201).json(cleanRecord(saved));
-    } catch (err) {
-      console.error(`POST /api/${path}`, err);
-      res.status(400).json({ error: 'خطأ في حفظ البيانات', details: err.message });
-    }
-  });
-
-  app.put(`/api/${path}/:id`, async (req, res) => {
-    try {
-      const recordId = String(req.params.id);
-      const saved = await Model.findOneAndUpdate(
-        { recordId },
-        { recordId, data: { ...(req.body || {}), id: recordId }, updatedAt: new Date() },
-        { upsert: true, new: true }
-      );
-      res.json(cleanRecord(saved));
-    } catch (err) {
-      console.error(`PUT /api/${path}/${req.params.id}`, err);
-      res.status(400).json({ error: 'خطأ في تحديث البيانات', details: err.message });
-    }
-  });
-
-  app.delete(`/api/${path}/:id`, async (req, res) => {
-    try {
-      await Model.deleteOne({ recordId: String(req.params.id) });
-      res.json({ ok: true });
-    } catch (err) {
-      console.error(`DELETE /api/${path}/${req.params.id}`, err);
-      res.status(500).json({ error: 'خطأ في حذف البيانات' });
-    }
-  });
-}
-
-registerCrud('bookings', Booking);
-registerCrud('suppliers', Supplier);
-registerCrud('followups', Followup);
-registerCrud('notifications', Notification);
-registerCrud('approvals', Approval);
-registerCrud('broadcast', Broadcast);
-
-// Existing Clients APIs
-app.get('/api/clients', async (req, res) => {
-  try {
-    const clients = await Client.find().sort({ createdAt: -1 });
-    res.json(clients);
-  } catch (err) {
-    res.status(500).json({ error: 'خطأ في جلب البيانات' });
-  }
-});
-
-app.post('/api/clients', async (req, res) => {
-  try {
-    const newClient = new Client(req.body);
-    const savedClient = await newClient.save();
-    res.status(201).json(savedClient);
-  } catch (err) {
-    res.status(400).json({ error: 'خطأ في حفظ العميل', details: err.message });
-  }
-});
-
-app.put('/api/clients/:id', async (req, res) => {
-  try {
-    const updated = await Client.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!updated) return res.status(404).json({ error: 'العميل غير موجود' });
-    res.json(updated);
-  } catch (err) {
-    res.status(400).json({ error: 'خطأ في تحديث العميل', details: err.message });
-  }
-});
-
-app.delete('/api/clients/:id', async (req, res) => {
-  try {
-    await Client.findByIdAndDelete(req.params.id);
-    res.json({ ok: true });
-  } catch (err) {
-    res.status(400).json({ error: 'خطأ في حذف العميل', details: err.message });
-  }
-});
-
-app.get('/api/health', (req, res) => res.json({ ok: true, database: mongoose.connection.readyState === 1 }));
+mongoose.connect(process.env.MONGO_URL || '')
+  .then(() => {
+    console.log('Connected to MongoDB Atlas');
+    startFollowupEmailScheduler();
+  })
+  .catch(err => console.error('MongoDB connection error:', err.message));
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`السيرفر يعمل على المنفذ ${PORT}`));
+const ALLOWED_COLLECTIONS = new Set([
+  'clients', 'followups', 'bookings', 'suppliers', 'users', 'approvals', 'notifications'
+]);
+
+function collectionFor(name) {
+  if (!ALLOWED_COLLECTIONS.has(name)) throw new Error('Unsupported collection');
+  return mongoose.connection.collection(name);
+}
+
+function recordKeyOf(record) {
+  const value = record?.id ?? record?._id ?? record?.email;
+  if (value === undefined || value === null || String(value).trim() === '') return null;
+  return String(value);
+}
+
+function publicRecord(doc) {
+  if (!doc) return doc;
+  const result = { ...doc, id: doc.recordKey ?? String(doc._id) };
+  delete result.recordKey;
+  delete result._id;
+  // Passwords are never returned from the API.
+  delete result.pass;
+  delete result.password;
+  return result;
+}
+
+app.get('/health', (_req, res) => res.json({ ok: true }));
+
+app.get('/api/:collection', async (req, res) => {
+  try {
+    const collection = collectionFor(req.params.collection);
+    const docs = await collection.find({}).sort({ createdAt: -1, _id: -1 }).toArray();
+    res.json(docs.map(publicRecord));
+  } catch (err) {
+    res.status(500).json({ error: 'Could not fetch records', details: err.message });
+  }
+});
+
+// The frontend saves records using POST for both new and updated records.
+app.post('/api/:collection', async (req, res) => {
+  try {
+    const collection = collectionFor(req.params.collection);
+    const data = { ...(req.body || {}) };
+    const recordKey = recordKeyOf(data);
+    if (!recordKey) return res.status(400).json({ error: 'Record must include id or email' });
+    delete data._id;
+    delete data.pass;
+    delete data.password;
+    data.recordKey = recordKey;
+    if (!data.createdAt) data.createdAt = new Date();
+    await collection.updateOne({ recordKey }, { $set: data }, { upsert: true });
+    const saved = await collection.findOne({ recordKey });
+    res.status(200).json(publicRecord(saved));
+  } catch (err) {
+    res.status(400).json({ error: 'Could not save record', details: err.message });
+  }
+});
+
+app.put('/api/:collection/:id', async (req, res) => {
+  try {
+    const collection = collectionFor(req.params.collection);
+    const data = { ...(req.body || {}), recordKey: String(req.params.id) };
+    delete data._id;
+    delete data.pass;
+    delete data.password;
+    await collection.updateOne({ recordKey: String(req.params.id) }, { $set: data }, { upsert: true });
+    res.json(publicRecord(await collection.findOne({ recordKey: String(req.params.id) })));
+  } catch (err) {
+    res.status(400).json({ error: 'Could not update record', details: err.message });
+  }
+});
+
+app.delete('/api/:collection/:id', async (req, res) => {
+  try {
+    const collection = collectionFor(req.params.collection);
+    const key = String(req.params.id);
+    const result = await collection.deleteOne({ recordKey: key });
+    // Support older records which were stored without recordKey.
+    if (!result.deletedCount) {
+      await collection.deleteOne({ id: /^\d+$/.test(key) ? Number(key) : key });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: 'Could not delete record', details: err.message });
+  }
+});
+
+let mailTransport = null;
+function getMailTransport() {
+  if (mailTransport) return mailTransport;
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) return null;
+  mailTransport = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: String(process.env.SMTP_SECURE || 'false').toLowerCase() === 'true',
+    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+  });
+  return mailTransport;
+}
+
+function normalize(value) { return String(value || '').trim().toLowerCase(); }
+function dateText(value) {
+  if (!value) return 'Not specified';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString('en-GB', { timeZone: process.env.CRM_TIMEZONE || 'Africa/Cairo' });
+}
+function htmlEscape(value) {
+  return String(value ?? '—').replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
+}
+
+async function checkDueFollowups() {
+  const transport = getMailTransport();
+  if (!transport || mongoose.connection.readyState !== 1) return;
+  try {
+    const followupsCollection = collectionFor('followups');
+    const usersCollection = collectionFor('users');
+    const clientsCollection = collectionFor('clients');
+    const now = new Date();
+    const due = await followupsCollection.find({
+      status: { $nin: ['Completed', 'Lose', 'Lost'] },
+      notified: { $ne: true },
+      dateTime: { $exists: true, $ne: '' }
+    }).toArray();
+    if (!due.length) return;
+    const users = await usersCollection.find({}).toArray();
+    const adminEmailsFromEnv = String(process.env.ADMIN_EMAILS || '').split(/[;,]/).map(x => x.trim()).filter(Boolean);
+    const adminEmails = new Set(adminEmailsFromEnv.map(normalize));
+    for (const user of users) {
+      if (normalize(user.role) === 'admin' && user.email) adminEmails.add(normalize(user.email));
+    }
+
+    for (const followup of due) {
+      const when = new Date(followup.dateTime);
+      if (Number.isNaN(when.getTime()) || when > now) continue;
+      const assigned = normalize(followup.assignedTo);
+      const assignedUser = users.find(u => normalize(u.name) === assigned || normalize(u.email) === assigned);
+      const recipients = new Set(adminEmails);
+      if (assignedUser?.email) recipients.add(normalize(assignedUser.email));
+      if (!recipients.size) {
+        console.warn(`No email recipients configured for due follow-up ${followup.recordKey || followup.id || followup._id}`);
+        continue;
+      }
+
+      const clientKey = followup.clientId === undefined || followup.clientId === null ? '' : String(followup.clientId);
+      const client = clientKey ? await clientsCollection.findOne({ $or: [{ recordKey: clientKey }, { id: /^\d+$/.test(clientKey) ? Number(clientKey) : clientKey }] }) : null;
+      const clientName = followup.clientName || client?.name || followup.name || 'Not specified';
+      const subject = `Roving CRM Follow-up Due: ${clientName}`;
+      const rows = [
+        ['Client Name', clientName], ['Phone', followup.clientPhone || client?.phone || followup.phone],
+        ['Email', followup.clientEmail || client?.email || followup.email], ['Lead Source', followup.source || client?.source],
+        ['Assigned To', followup.assignedTo], ['Follow-up Type', followup.type],
+        ['Follow-up Date & Time', dateText(followup.dateTime)], ['Priority', followup.priority],
+        ['Status', followup.status], ['Last Contact', dateText(followup.lastContactAt)],
+        ['Latest Result', followup.result], ['Note', followup.notes]
+      ];
+      const tableRows = rows.map(([label, value]) => `<tr><th style="text-align:left;padding:8px;border:1px solid #ddd;background:#f5f5f5">${htmlEscape(label)}</th><td style="padding:8px;border:1px solid #ddd">${htmlEscape(value || '—')}</td></tr>`).join('');
+      await transport.sendMail({
+        from: process.env.MAIL_FROM || process.env.SMTP_USER,
+        to: [...recipients].join(', '),
+        subject,
+        text: rows.map(([label, value]) => `${label}: ${value || '—'}`).join('\n'),
+        html: `<div style="font-family:Arial,sans-serif"><h2>Roving CRM — Follow-up Reminder</h2><p>A scheduled follow-up is due.</p><table style="border-collapse:collapse;width:100%;max-width:760px">${tableRows}</table></div>`
+      });
+      await followupsCollection.updateOne(
+        { _id: followup._id },
+        { $set: { notified: true, notifiedAt: new Date() } }
+      );
+      console.log(`Follow-up reminder email sent for ${clientName}`);
+    }
+  } catch (err) {
+    console.error('Follow-up email scheduler error:', err.message);
+  }
+}
+
+function startFollowupEmailScheduler() {
+  if (!getMailTransport()) {
+    console.warn('Email scheduler is idle: configure SMTP_HOST, SMTP_USER and SMTP_PASS.');
+    return;
+  }
+  checkDueFollowups();
+  setInterval(checkDueFollowups, 60 * 1000);
+  console.log('Follow-up email scheduler started (checks every minute).');
+}
+
+app.listen(PORT, () => console.log(`Roving CRM backend listening on port ${PORT}`));
