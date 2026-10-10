@@ -1037,21 +1037,7 @@ function clearSession(showLoginMessage = false) {
     }
 }
 
-async function syncUsersForEmailNotifications() {
-    try {
-        const safeUsers = (Array.isArray(validUsers) ? validUsers : []).map(u => ({
-            id: String(u.email || '').toLowerCase(), email: u.email || '', name: u.name || '', role: u.role || ''
-        })).filter(u => u.id && u.email);
-        for (const user of safeUsers) {
-            await apiRequest('/api/users', { method: 'POST', body: JSON.stringify(user) });
-        }
-    } catch (error) {
-        console.warn('Could not sync email recipients with backend:', error);
-    }
-}
-
 function startSession(user) {
-    syncUsersForEmailNotifications();
     const startedAt = Date.now();
     sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(user));
     sessionStorage.setItem(SESSION_STARTED_KEY, String(startedAt));
@@ -1803,7 +1789,6 @@ function updateUserInfo(index) {
     validUsers[index].commission = newRate;
 
     localStorage.setItem('roving_users', JSON.stringify(validUsers));
-    syncUsersForEmailNotifications();
     showNotification('User updated successfully!', 'success');
     populateDropdowns();
 }
@@ -1822,7 +1807,6 @@ function handleAddNewUser(e) {
 
     validUsers.push({ name, email, pass, role, commission });
     localStorage.setItem('roving_users', JSON.stringify(validUsers));
-    syncUsersForEmailNotifications();
     bootstrap.Modal.getInstance(document.getElementById('addUserModal')).hide();
     showNotification('New user created successfully!', 'success');
     renderAdminUsers();
