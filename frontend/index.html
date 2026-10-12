@@ -811,11 +811,7 @@ async function apiRequest(path, options = {}) {
         headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
         ...options
     });
-    if (!response.ok) {
-        let detail = '';
-        try { const payload = await response.json(); detail = payload?.details || payload?.error || ''; } catch (_) {}
-        throw new Error(`API ${response.status}${detail ? `: ${detail}` : ''}`);
-    }
+    if (!response.ok) throw new Error(`API ${response.status}`);
     return response.json();
 }
 
@@ -1487,7 +1483,7 @@ async function handleSaveFollowup(e) {
     }
     const followupObj = {
         ...(oldFollowup || {}),
-        id: editingId !== "" ? Number(editingId) : Date.now(),
+        id: editingId !== "" ? (oldFollowup?.id ?? editingId) : Date.now(),
         clientId: client._id,
         clientName: client.name,
         clientPhone: client.phone || 'N/A',
@@ -1521,7 +1517,7 @@ function renderFollowups() {
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    let list = followups;
+    let list = (Array.isArray(followups) ? followups : []).filter(f => f && typeof f === 'object');
     if (currentUser && currentUser.role === 'Sales') {
         list = list.filter(f => f.assignedTo === currentUser.name);
     }
@@ -1534,14 +1530,14 @@ function renderFollowups() {
     list.forEach(f => {
         tbody.innerHTML += `
             <tr>
-                <td><strong>${f.clientName}</strong></td>
-                <td><small><i class="fa-solid fa-phone me-1"></i>${f.clientPhone}</small></td>
-                <td><span class="badge bg-dark">${f.type}</span></td>
-                <td><small>${f.dateTime.replace('T', ' ')}</small></td>
-                <td><span class="badge bg-light text-dark border">${f.assignedTo}</span></td>
-                <td><span class="badge bg-secondary">${f.priority}</span></td>
-                <td><span class="badge bg-primary">${f.status}</span></td>
-                <td><small class="text-muted">${escapeHtml(f.notes || '-')}</small>${f.attachmentData ? `<br><a href="${f.attachmentData}" target="_blank" rel="noopener">📎 ${escapeHtml(f.attachmentName || 'View attachment')}</a>` : ''}${f.status !== 'Completed' && f.dateTime && new Date(f.dateTime) < new Date() ? '<br><span class="badge bg-danger">Overdue · Action needed</span>' : ''}</td>
+                <td><strong>${escapeHtml(f.clientName || '-')}</strong></td>
+                <td><small><i class="fa-solid fa-phone me-1"></i>${escapeHtml(f.clientPhone || '-')}</small></td>
+                <td><span class="badge bg-dark">${escapeHtml(f.type || '-')}</span></td>
+                <td><small>${String(f.dateTime || f.scheduledAt || f.scheduledDateTime || '').replace('T', ' ') || '-'}</small></td>
+                <td><span class="badge bg-light text-dark border">${escapeHtml(f.assignedTo || '-')}</span></td>
+                <td><span class="badge bg-secondary">${escapeHtml(f.priority || 'Normal')}</span></td>
+                <td><span class="badge bg-primary">${escapeHtml(f.status || 'Scheduled')}</span></td>
+                <td><small class="text-muted">${escapeHtml(f.notes || '-')}</small>${f.attachmentData ? `<br><a href="${f.attachmentData}" target="_blank" rel="noopener">📎 ${escapeHtml(f.attachmentName || 'View attachment')}</a>` : ''}${f.status !== 'Completed' && (f.dateTime || f.scheduledAt || f.scheduledDateTime) && new Date(f.dateTime || f.scheduledAt || f.scheduledDateTime || 0) < new Date() ? '<br><span class="badge bg-danger">Overdue · Action needed</span>' : ''}</td>
                 <td>
                     <button class="btn btn-sm btn-outline-primary me-1" title="Edit / Reschedule / Reassign" onclick="editFollowup(${f.id})"><i class="fa-solid fa-pen-to-square"></i></button>
                     <button class="btn btn-sm btn-outline-success me-1" title="Choose follow-up result" onclick="openFollowupAction(${f.id})"><i class="fa-solid fa-check"></i></button>
@@ -1560,7 +1556,7 @@ function editFollowup(id) {
     document.getElementById('followupModalTitle').innerText = 'Edit / Reschedule Follow-up';
     document.getElementById('editingFollowupId').value = f.id;
     populateClientDropdowns(); populateDropdowns();
-    document.getElementById('followupClientSelect').value = f.clientId;
+    document.getElementById('followupClientSelect').value = String(f.clientId || f.client_id || '');
     document.getElementById('followupType').value = f.type || 'Phone Call';
     document.getElementById('followupStatusSelect').value = f.status || 'Scheduled';
     document.getElementById('followupDateTime').value = f.dateTime || '';
@@ -1573,7 +1569,7 @@ function editFollowup(id) {
 }
 function refreshFollowupAlerts() {
     const now = new Date();
-    const overdue = (followups || []).filter(f => f.status !== 'Completed' && f.dateTime && new Date(f.dateTime) < now && (!currentUser || currentUser.role !== 'Sales' || f.assignedTo === currentUser.name));
+    const overdue = (followups || []).filter(f => f.status !== 'Completed' && (f.dateTime || f.scheduledAt || f.scheduledDateTime) && new Date(f.dateTime || f.scheduledAt || f.scheduledDateTime || 0) < now && (!currentUser || currentUser.role !== 'Sales' || f.assignedTo === currentUser.name));
     const noAction = (followups || []).filter(f => f.status !== 'Completed' && !f.lastActionAt && (!currentUser || currentUser.role !== 'Sales' || f.assignedTo === currentUser.name));
     const box = document.getElementById('urgentFollowupAlertContainer');
     const badge = document.getElementById('sidebarFollowupBadge');
