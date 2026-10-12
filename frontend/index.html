@@ -2533,10 +2533,14 @@ async function handleSaveClient(event) {
 }
 
 function editClient(id) {
-    const client = clients.find(c => c._id === id);
-    if (!client) return;
+    const client = clients.find(c => String(c._id || c.id) === String(id));
+    if (!client) {
+        showNotification('لم يتم العثور على العميل للتعديل. حدّث الصفحة وجرب مرة أخرى.', 'danger');
+        return;
+    }
+    const clientId = String(client._id || client.id);
     document.getElementById('clientModalTitle').innerText = "Edit Client";
-    document.getElementById('editingClientId').value = client._id;
+    document.getElementById('editingClientId').value = clientId;
     document.getElementById('clientName').value = client.name || '';
     document.getElementById('clientSource').value = client.source || '';
     document.getElementById('clientStatusSelect').value = client.status || 'New';
@@ -2548,9 +2552,12 @@ function editClient(id) {
 }
 
 function openTransferModal(id) {
-    const client = clients.find(c => c._id === id);
-    if (!client) return;
-    document.getElementById('transferClientId').value = client._id;
+    const client = clients.find(c => String(c._id || c.id) === String(id));
+    if (!client) {
+        showNotification('لم يتم العثور على العميل للتحويل. حدّث الصفحة وجرب مرة أخرى.', 'danger');
+        return;
+    }
+    document.getElementById('transferClientId').value = String(client._id || client.id);
     document.getElementById('transferClientNameDisplay').innerText = client.name;
     populateDropdowns();
     new bootstrap.Modal(document.getElementById('transferClientModal')).show();
