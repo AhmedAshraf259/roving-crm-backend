@@ -851,8 +851,8 @@ async function saveRecord(apiName, localKey, record) {
     const idx = list.findIndex(x => String(x.id ?? x._id) === id);
     if (idx >= 0) list[idx] = record; else list.unshift(record);
     localStorage.setItem(localKey, JSON.stringify(list));
-    try { await apiRequest(`/api/${apiName}`, { method:'POST', body:JSON.stringify(record) }); }
-    catch (error) { console.warn(`Could not sync ${apiName}:`, error); }
+    // Do not silently treat a local-only save as a successful shared CRM save.
+    return await apiRequest(`/api/${apiName}`, { method:'POST', body:JSON.stringify(record) });
 }
 
 async function deleteRecord(apiName, localKey, id) {
@@ -1469,27 +1469,41 @@ async function saveFollowupsToStorage() {
 
 async function handleSaveFollowup(e) {
     e.preventDefault();
+    const form = e.currentTarget;
     const editingId = document.getElementById('editingFollowupId').value;
-    const client = clients.find(c => c._id === document.getElementById('followupClientSelect').value);
-    if (!client) return;
+    const selectedClientId = document.getElementById('followupClientSelect').value;
+    const client = clients.find(c => String(c._id ?? c.id ?? '') === String(selectedClientId));
+    if (!client) {
+        showNotification('اختار العميل من القائمة قبل الحفظ.', 'warning');
+        return;
+    }
+    const dateTime = document.getElementById('followupDateTime').value;
+    if (!dateTime || Number.isNaN(new Date(dateTime).getTime())) {
+        showNotification('حدد تاريخ ووقت صحيح للمتابعة.', 'warning');
+        return;
+    }
 
-    const oldFollowup = editingId !== '' ? followups.find(f => String(f.id) === String(editingId)) : null;
+    const oldFollowup = editingId !== '' ? followups.find(f => String(f.id ?? f._id) === String(editingId)) : null;
     const chatFile = document.getElementById('followupChatFile')?.files?.[0];
     let attachmentData = oldFollowup?.attachmentData || '', attachmentName = oldFollowup?.attachmentName || '';
     if (chatFile) {
-        if (chatFile.size > 1.5 * 1024 * 1024) { showNotification('الملف أكبر من 1.5 ميجابايت. اختار ملف أصغر.', 'warning'); return; }
+        if (chatFile.size > 1.5 * 1024 * 1024) {
+            showNotification('الملف أكبر من 1.5 ميجابايت. اختار ملف أصغر.', 'warning');
+            return;
+        }
         try { attachmentData = await readFileAsDataURL(chatFile); attachmentName = chatFile.name; }
         catch (err) { showNotification('تعذر قراءة المرفق.', 'danger'); return; }
     }
+
     const followupObj = {
         ...(oldFollowup || {}),
-        id: editingId !== "" ? (oldFollowup?.id ?? editingId) : Date.now(),
-        clientId: client._id,
+        id: editingId !== '' ? (oldFollowup?.id ?? oldFollowup?._id ?? editingId) : Date.now(),
+        clientId: client._id ?? client.id,
         clientName: client.name,
         clientPhone: client.phone || 'N/A',
         type: document.getElementById('followupType').value,
         status: document.getElementById('followupStatusSelect').value,
-        dateTime: document.getElementById('followupDateTime').value,
+        dateTime,
         assignedTo: document.getElementById('followupAssignedTo').value,
         priority: document.getElementById('followupPriority').value,
         notes: document.getElementById('followupNotes').value.trim(),
@@ -1498,18 +1512,25 @@ async function handleSaveFollowup(e) {
         lastActionAt: (document.getElementById('followupStatusSelect').value === 'Completed' || document.getElementById('followupStatusSelect').value === 'In Progress' || document.getElementById('followupNotes').value.trim()) ? new Date().toISOString() : (oldFollowup?.lastActionAt || '')
     };
 
-    if (editingId !== "") {
-        const idx = followups.findIndex(f => f.id == editingId);
-        if (idx !== -1) followups[idx] = followupObj;
-        showNotification('Follow-up updated successfully!', 'success');
-    } else {
-        followups.unshift(followupObj);
-        showNotification('Follow-up added successfully!', 'success');
+    const saveButton = form.querySelector('button[type="submit"], button:not([type])');
+    if (saveButton) { saveButton.disabled = true; saveButton.textContent = 'Saving...'; }
+    try {
+        await saveRecord('followups', 'roving_followups', followupObj);
+        if (editingId !== '') {
+            const idx = followups.findIndex(f => String(f.id ?? f._id) === String(editingId));
+            if (idx !== -1) followups[idx] = followupObj; else followups.unshift(followupObj);
+        } else {
+            followups.unshift(followupObj);
+        }
+        showNotification('تم حفظ المتابعة بنجاح.', 'success');
+        bootstrap.Modal.getInstance(document.getElementById('addFollowupModal'))?.hide();
+        renderFollowups();
+    } catch (error) {
+        console.error('Failed to save follow-up:', error);
+        showNotification(`فشل حفظ المتابعة على السيرفر: ${error.message || 'خطأ غير معروف'}`, 'danger');
+    } finally {
+        if (saveButton) { saveButton.disabled = false; saveButton.textContent = 'Save Follow-up'; }
     }
-
-    await saveRecord('followups','roving_followups',followupObj);
-    bootstrap.Modal.getInstance(document.getElementById('addFollowupModal')).hide();
-    renderFollowups();
 }
 
 function renderFollowups() {
