@@ -49,6 +49,44 @@ function publicRecord(doc) {
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
+app.get('/health/mail', async (_req, res) => {
+  const result = await verifyMailSetup();
+  const recipients = await getAdminEmailRecipients();
+  res.status(result.verified ? 200 : 503).json({
+    ok: result.verified,
+    smtpConfigured: result.configured,
+    smtpVerified: result.verified,
+    adminRecipientsFound: recipients.length,
+    reason: result.reason || null
+  });
+});
+
+// Send an explicit end-to-end test email to all admin recipients.
+// Set EMAIL_TEST_TOKEN in Render and send it in x-email-test-token header.
+app.post('/api/email/test', async (req, res) => {
+  const expected = String(process.env.EMAIL_TEST_TOKEN || '');
+  const provided = String(req.get('x-email-test-token') || '');
+  if (!expected || provided !== expected) return res.status(401).json({ error: 'Unauthorized email test request' });
+  const setup = await verifyMailSetup();
+  if (!setup.verified) return res.status(503).json({ error: 'SMTP is not ready', details: setup.reason || 'SMTP verification failed' });
+  const recipients = await getAdminEmailRecipients();
+  if (!recipients.length) return res.status(400).json({ error: 'No admin email recipients found. Add ADMIN_EMAILS or admin user emails.' });
+  try {
+    await getMailTransport().sendMail({
+      from: process.env.MAIL_FROM || process.env.SMTP_USER,
+      to: recipients.join(', '),
+      subject: 'Roving CRM — Email delivery test',
+      text: `This is a test email from Roving CRM. SMTP is configured and the backend can send email. Sent at ${new Date().toISOString()}.`,
+      html: `<p>This is a test email from <b>Roving CRM</b>.</p><p>SMTP is configured and the backend can send email.</p><p>Sent at ${htmlEscape(new Date().toISOString())}.</p>`
+    });
+    console.log(`SMTP test email sent to ${recipients.length} admin recipient(s).`);
+    res.json({ ok: true, sent: true, adminRecipientsFound: recipients.length });
+  } catch (err) {
+    console.error('SMTP test email failed:', err.message);
+    res.status(502).json({ error: 'Could not send test email', details: err.message });
+  }
+});
+
 app.get('/api/:collection', async (req, res) => {
   try {
     const collection = collectionFor(req.params.collection);
@@ -71,9 +109,18 @@ app.post('/api/:collection', async (req, res) => {
     delete data.password;
     data.recordKey = recordKey;
     if (!data.createdAt) data.createdAt = new Date();
+    const previous = await collection.findOne({ recordKey });
     await collection.updateOne({ recordKey }, { $set: data }, { upsert: true });
     const saved = await collection.findOne({ recordKey });
     res.status(200).json(publicRecord(saved));
+    if (['clients', 'followups', 'bookings', 'suppliers', 'users', 'approvals', 'notifications'].includes(req.params.collection)) {
+      void sendAdminActivityEmail({
+        collectionName: req.params.collection,
+        action: req.params.collection === 'notifications' ? 'notification' : (previous ? 'update' : 'create'),
+        record: saved,
+        previous
+      });
+    }
   } catch (err) {
     res.status(400).json({ error: 'Could not save record', details: err.message });
   }
@@ -86,8 +133,19 @@ app.put('/api/:collection/:id', async (req, res) => {
     delete data._id;
     delete data.pass;
     delete data.password;
-    await collection.updateOne({ recordKey: String(req.params.id) }, { $set: data }, { upsert: true });
-    res.json(publicRecord(await collection.findOne({ recordKey: String(req.params.id) })));
+    const key = String(req.params.id);
+    const previous = await collection.findOne({ recordKey: key });
+    await collection.updateOne({ recordKey: key }, { $set: data }, { upsert: true });
+    const saved = await collection.findOne({ recordKey: key });
+    res.json(publicRecord(saved));
+    if (['clients', 'followups', 'bookings', 'suppliers', 'users', 'approvals', 'notifications'].includes(req.params.collection)) {
+      void sendAdminActivityEmail({
+        collectionName: req.params.collection,
+        action: req.params.collection === 'notifications' ? 'notification' : (previous ? 'update' : 'create'),
+        record: saved,
+        previous
+      });
+    }
   } catch (err) {
     res.status(400).json({ error: 'Could not update record', details: err.message });
   }
@@ -103,6 +161,14 @@ app.delete('/api/:collection/:id', async (req, res) => {
       await collection.deleteOne({ id: /^\d+$/.test(key) ? Number(key) : key });
     }
     res.json({ ok: true });
+    if (['clients', 'followups', 'bookings', 'suppliers', 'users', 'approvals', 'notifications'].includes(req.params.collection)) {
+      void sendAdminActivityEmail({
+        collectionName: req.params.collection,
+        action: 'delete',
+        record: { id: key, name: req.params.collection },
+        previous: null
+      });
+    }
   } catch (err) {
     res.status(400).json({ error: 'Could not delete record', details: err.message });
   }
@@ -129,6 +195,95 @@ function dateText(value) {
 }
 function htmlEscape(value) {
   return String(value ?? '—').replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
+}
+
+async function getAdminEmailRecipients() {
+  const recipients = new Set(
+    String(process.env.ADMIN_EMAILS || '')
+      .split(/[;,]/).map(value => value.trim()).filter(Boolean).map(normalize)
+  );
+  if (mongoose.connection.readyState === 1) {
+    try {
+      const users = await collectionFor('users').find({}).toArray();
+      for (const user of users) {
+        if (normalize(user.role) === 'admin' && user.email) recipients.add(normalize(user.email));
+      }
+    } catch (err) {
+      console.warn('Could not load admin email recipients:', err.message);
+    }
+  }
+  return [...recipients].filter(email => /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email));
+}
+
+function safeSummary(value) {
+  if (value === undefined || value === null || value === '') return '—';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+}
+
+async function sendAdminActivityEmail({ collectionName, action, record, previous }) {
+  // Email notifications cover changes and CRM notifications, not read requests.
+  const transport = getMailTransport();
+  if (!transport) {
+    console.warn(`Admin activity email skipped (${collectionName}/${action}): SMTP is not configured.`);
+    return { sent: false, reason: 'smtp_not_configured' };
+  }
+  const recipients = await getAdminEmailRecipients();
+  if (!recipients.length) {
+    console.warn(`Admin activity email skipped (${collectionName}/${action}): no admin email recipients.`);
+    return { sent: false, reason: 'no_admin_recipients' };
+  }
+
+  const safeRecord = { ...(record || {}) };
+  delete safeRecord.password; delete safeRecord.pass; delete safeRecord._id; delete safeRecord.recordKey;
+  const safePrevious = previous ? { ...previous } : null;
+  if (safePrevious) {
+    delete safePrevious.password; delete safePrevious.pass; delete safePrevious._id; delete safePrevious.recordKey;
+  }
+
+  const label = safeRecord.clientName || safeRecord.name || safeRecord.title ||
+    safeRecord.email || safeRecord.id || 'CRM record';
+  const fields = new Set([...Object.keys(safePrevious || {}), ...Object.keys(safeRecord)]);
+  const changes = [];
+  for (const field of fields) {
+    if (['createdAt', 'updatedAt', 'notifiedAt'].includes(field)) continue;
+    const before = safePrevious ? safeSummary(safePrevious[field]) : '(new)';
+    const after = safeSummary(safeRecord[field]);
+    if (!safePrevious || before !== after) changes.push({ field, before, after });
+  }
+  const details = changes.slice(0, 30);
+  const detailsText = details.map(item => `${item.field}: ${item.before} → ${item.after}`).join('\\n') || 'A CRM activity/notification was recorded.';
+  const detailsHtml = details.map(item =>
+    `<tr><th style="text-align:left;padding:8px;border:1px solid #ddd;background:#f5f5f5">${htmlEscape(item.field)}</th><td style="padding:8px;border:1px solid #ddd">${htmlEscape(item.before)}</td><td style="padding:8px;border:1px solid #ddd">${htmlEscape(item.after)}</td></tr>`
+  ).join('');
+  const actionText = ({ create: 'Created', update: 'Updated', delete: 'Deleted', notification: 'Notification' })[action] || action;
+  const subject = `[Roving CRM] ${actionText}: ${collectionName} — ${label}`;
+  try {
+    await transport.sendMail({
+      from: process.env.MAIL_FROM || process.env.SMTP_USER,
+      to: recipients.join(', '),
+      subject,
+      text: `A CRM activity occurred.\\nCollection: ${collectionName}\\nAction: ${actionText}\\nRecord: ${label}\\n\\n${detailsText}`,
+      html: `<div style="font-family:Arial,sans-serif"><h2>Roving CRM — Admin Activity Alert</h2><p>A change or notification was recorded in the CRM.</p><p><b>Section:</b> ${htmlEscape(collectionName)}<br><b>Action:</b> ${htmlEscape(actionText)}<br><b>Record:</b> ${htmlEscape(label)}</p><table style="border-collapse:collapse;width:100%;max-width:900px"><thead><tr><th style="padding:8px;border:1px solid #ddd">Field</th><th style="padding:8px;border:1px solid #ddd">Before</th><th style="padding:8px;border:1px solid #ddd">After</th></tr></thead><tbody>${detailsHtml || '<tr><td colspan="3">A CRM activity/notification was recorded.</td></tr>'}</tbody></table></div>`
+    });
+    console.log(`Admin activity email sent: ${collectionName}/${action} to ${recipients.length} admin recipient(s).`);
+    return { sent: true };
+  } catch (err) {
+    console.error(`Admin activity email failed (${collectionName}/${action}):`, err.message);
+    return { sent: false, reason: err.message };
+  }
+}
+
+async function verifyMailSetup() {
+  const transport = getMailTransport();
+  if (!transport) return { configured: false, verified: false, reason: 'Configure SMTP_HOST, SMTP_USER, SMTP_PASS.' };
+  try {
+    await transport.verify();
+    return { configured: true, verified: true };
+  } catch (err) {
+    console.error('SMTP verification failed:', err.message);
+    return { configured: true, verified: false, reason: err.message };
+  }
 }
 
 async function checkDueFollowups() {
