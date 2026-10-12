@@ -38,8 +38,9 @@ function recordKeyOf(record) {
 
 function publicRecord(doc) {
   if (!doc) return doc;
-  const result = { ...doc, id: doc.recordKey ?? String(doc._id), _id: String(doc._id) };
+  const result = { ...doc, id: doc.recordKey ?? String(doc._id) };
   delete result.recordKey;
+  delete result._id;
   // Passwords are never returned from the API.
   delete result.pass;
   delete result.password;
@@ -81,22 +82,12 @@ app.post('/api/:collection', async (req, res) => {
 app.put('/api/:collection/:id', async (req, res) => {
   try {
     const collection = collectionFor(req.params.collection);
-    const key = String(req.params.id);
-    const data = { ...(req.body || {}) };
+    const data = { ...(req.body || {}), recordKey: String(req.params.id) };
     delete data._id;
     delete data.pass;
     delete data.password;
-    let query;
-    if (mongoose.Types.ObjectId.isValid(key)) {
-      query = { $or: [{ recordKey: key }, { _id: new mongoose.Types.ObjectId(key) }] };
-    } else {
-      query = { $or: [{ recordKey: key }, { id: /^\d+$/.test(key) ? Number(key) : key }] };
-    }
-    const existing = await collection.findOne(query);
-    const recordKey = existing?.recordKey ?? key;
-    const target = existing ? { _id: existing._id } : { recordKey };
-    await collection.updateOne(target, { $set: { ...data, recordKey } }, { upsert: true });
-    res.json(publicRecord(await collection.findOne(target)));
+    await collection.updateOne({ recordKey: String(req.params.id) }, { $set: data }, { upsert: true });
+    res.json(publicRecord(await collection.findOne({ recordKey: String(req.params.id) })));
   } catch (err) {
     res.status(400).json({ error: 'Could not update record', details: err.message });
   }
@@ -106,10 +97,8 @@ app.delete('/api/:collection/:id', async (req, res) => {
   try {
     const collection = collectionFor(req.params.collection);
     const key = String(req.params.id);
-    let result = await collection.deleteOne({ recordKey: key });
-    if (!result.deletedCount && mongoose.Types.ObjectId.isValid(key)) {
-      result = await collection.deleteOne({ _id: new mongoose.Types.ObjectId(key) });
-    }
+    const result = await collection.deleteOne({ recordKey: key });
+    // Support older records which were stored without recordKey.
     if (!result.deletedCount) {
       await collection.deleteOne({ id: /^\d+$/.test(key) ? Number(key) : key });
     }
