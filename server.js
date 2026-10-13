@@ -54,6 +54,8 @@ app.get('/health/mail', async (_req, res) => {
   const recipients = await getAdminEmailRecipients();
   res.status(result.verified ? 200 : 503).json({
     ok: result.verified,
+    emailConfigured: result.configured,
+    emailProviderVerified: result.verified,
     smtpConfigured: result.configured,
     smtpVerified: result.verified,
     adminRecipientsFound: recipients.length,
@@ -79,10 +81,10 @@ app.post('/api/email/test', async (req, res) => {
       text: `This is a test email from Roving CRM. SMTP is configured and the backend can send email. Sent at ${new Date().toISOString()}.`,
       html: `<p>This is a test email from <b>Roving CRM</b>.</p><p>SMTP is configured and the backend can send email.</p><p>Sent at ${htmlEscape(new Date().toISOString())}.</p>`
     });
-    console.log(`SMTP test email sent to ${recipients.length} admin recipient(s).`);
+    console.log(`Test email sent to ${recipients.length} admin recipient(s).`);
     res.json({ ok: true, sent: true, adminRecipientsFound: recipients.length });
   } catch (err) {
-    console.error('SMTP test email failed:', err.message);
+    console.error('Email test failed:', err.message);
     res.status(502).json({ error: 'Could not send test email', details: err.message });
   }
 });
@@ -177,6 +179,57 @@ app.delete('/api/:collection/:id', async (req, res) => {
 let mailTransport = null;
 function getMailTransport() {
   if (mailTransport) return mailTransport;
+
+  // Prefer Resend's HTTPS API. This avoids SMTP port restrictions on some hosting plans.
+  const resendApiKey = String(process.env.RESEND_API_KEY || '').trim();
+  if (resendApiKey) {
+    mailTransport = {
+      async verify() {
+        const response = await fetch('https://api.resend.com/domains', {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${resendApiKey}` }
+        });
+        if (!response.ok) {
+          const body = await response.text().catch(() => '');
+          throw new Error(`Resend verification failed (${response.status})${body ? `: ${body.slice(0, 240)}` : ''}`);
+        }
+        return true;
+      },
+      async sendMail(message) {
+        const to = Array.isArray(message.to)
+          ? message.to
+          : String(message.to || '').split(',').map(value => value.trim()).filter(Boolean);
+        const payload = {
+          from: message.from || process.env.MAIL_FROM,
+          to,
+          subject: message.subject || 'Roving CRM notification',
+          text: message.text || undefined,
+          html: message.html || undefined
+        };
+        if (!payload.from) throw new Error('MAIL_FROM is required for Resend.');
+        if (!payload.to.length) throw new Error('At least one recipient is required.');
+        const response = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${resendApiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+        const bodyText = await response.text();
+        let body;
+        try { body = bodyText ? JSON.parse(bodyText) : {}; } catch (_) { body = { message: bodyText }; }
+        if (!response.ok) {
+          const detail = body.message || body.error || body.name || `HTTP ${response.status}`;
+          throw new Error(`Resend API error (${response.status}): ${detail}`);
+        }
+        return { messageId: body.id || null, response: body };
+      }
+    };
+    return mailTransport;
+  }
+
+  // Legacy SMTP fallback for environments that allow outbound SMTP.
   if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) return null;
   mailTransport = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
@@ -225,7 +278,7 @@ async function sendAdminActivityEmail({ collectionName, action, record, previous
   // Email notifications cover changes and CRM notifications, not read requests.
   const transport = getMailTransport();
   if (!transport) {
-    console.warn(`Admin activity email skipped (${collectionName}/${action}): SMTP is not configured.`);
+    console.warn(`Admin activity email skipped (${collectionName}/${action}): email provider is not configured.`);
     return { sent: false, reason: 'smtp_not_configured' };
   }
   const recipients = await getAdminEmailRecipients();
@@ -276,12 +329,12 @@ async function sendAdminActivityEmail({ collectionName, action, record, previous
 
 async function verifyMailSetup() {
   const transport = getMailTransport();
-  if (!transport) return { configured: false, verified: false, reason: 'Configure SMTP_HOST, SMTP_USER, SMTP_PASS.' };
+  if (!transport) return { configured: false, verified: false, reason: 'Configure RESEND_API_KEY (recommended) or SMTP_HOST, SMTP_USER, SMTP_PASS.' };
   try {
     await transport.verify();
     return { configured: true, verified: true };
   } catch (err) {
-    console.error('SMTP verification failed:', err.message);
+    console.error('Email provider verification failed:', err.message);
     return { configured: true, verified: false, reason: err.message };
   }
 }
@@ -352,7 +405,7 @@ async function checkDueFollowups() {
 
 function startFollowupEmailScheduler() {
   if (!getMailTransport()) {
-    console.warn('Email scheduler is idle: configure SMTP_HOST, SMTP_USER and SMTP_PASS.');
+    console.warn('Email scheduler is idle: configure RESEND_API_KEY (recommended) or SMTP_HOST, SMTP_USER and SMTP_PASS.');
     return;
   }
   checkDueFollowups();
