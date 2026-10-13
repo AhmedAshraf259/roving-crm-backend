@@ -212,7 +212,7 @@ async function getAdminEmailRecipients() {
       console.warn('Could not load admin email recipients:', err.message);
     }
   }
-  return [...recipients].filter(email => /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email));
+  return [...recipients].filter(email => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
 }
 
 function safeSummary(value) {
