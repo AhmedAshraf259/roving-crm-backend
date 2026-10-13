@@ -50,8 +50,27 @@ function publicRecord(doc) {
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
 app.get('/health/mail', async (_req, res) => {
-  const result = await verifyMailSetup();
+  const usingResend = Boolean(String(process.env.RESEND_API_KEY || '').trim());
+  const configured = usingResend || Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
   const recipients = await getAdminEmailRecipients();
+
+  // A send-only Resend key is not allowed to GET /domains. Do not treat that
+  // permission denial as proof that sending is broken; the POST test below
+  // is the real end-to-end check.
+  if (usingResend) {
+    return res.status(configured ? 200 : 503).json({
+      ok: false,
+      emailConfigured: true,
+      emailProviderVerified: false,
+      verificationMode: 'send_test_required',
+      smtpConfigured: Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS),
+      smtpVerified: false,
+      adminRecipientsFound: recipients.length,
+      reason: 'Resend send-only keys cannot verify by listing domains. Run the protected email test to verify actual delivery.'
+    });
+  }
+
+  const result = await verifyMailSetup();
   res.status(result.verified ? 200 : 503).json({
     ok: result.verified,
     emailConfigured: result.configured,
@@ -69,8 +88,11 @@ app.post('/api/email/test', async (req, res) => {
   const expected = String(process.env.EMAIL_TEST_TOKEN || '');
   const provided = String(req.get('x-email-test-token') || '');
   if (!expected || provided !== expected) return res.status(401).json({ error: 'Unauthorized email test request' });
-  const setup = await verifyMailSetup();
-  if (!setup.verified) return res.status(503).json({ error: 'SMTP is not ready', details: setup.reason || 'SMTP verification failed' });
+  const usingResend = Boolean(String(process.env.RESEND_API_KEY || '').trim());
+  if (!usingResend) {
+    const setup = await verifyMailSetup();
+    if (!setup.verified) return res.status(503).json({ error: 'SMTP is not ready', details: setup.reason || 'SMTP verification failed' });
+  }
   const recipients = await getAdminEmailRecipients();
   if (!recipients.length) return res.status(400).json({ error: 'No admin email recipients found. Add ADMIN_EMAILS or admin user emails.' });
   try {
@@ -78,8 +100,8 @@ app.post('/api/email/test', async (req, res) => {
       from: process.env.MAIL_FROM || process.env.SMTP_USER,
       to: recipients.join(', '),
       subject: 'Roving CRM — Email delivery test',
-      text: `This is a test email from Roving CRM. SMTP is configured and the backend can send email. Sent at ${new Date().toISOString()}.`,
-      html: `<p>This is a test email from <b>Roving CRM</b>.</p><p>SMTP is configured and the backend can send email.</p><p>Sent at ${htmlEscape(new Date().toISOString())}.</p>`
+      text: `This is a test email from Roving CRM. The backend successfully submitted this message to the configured email provider. Sent at ${new Date().toISOString()}.`,
+      html: `<p>This is a test email from <b>Roving CRM</b>.</p><p>The backend successfully submitted this message to the configured email provider.</p><p>Sent at ${htmlEscape(new Date().toISOString())}.</p>`
     });
     console.log(`Test email sent to ${recipients.length} admin recipient(s).`);
     res.json({ ok: true, sent: true, adminRecipientsFound: recipients.length });
