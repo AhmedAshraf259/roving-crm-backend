@@ -93,8 +93,20 @@ app.post('/api/email/test', async (req, res) => {
     const setup = await verifyMailSetup();
     if (!setup.verified) return res.status(503).json({ error: 'SMTP is not ready', details: setup.reason || 'SMTP verification failed' });
   }
-  const recipients = await getAdminEmailRecipients();
-  if (!recipients.length) return res.status(400).json({ error: 'No admin email recipients found. Add ADMIN_EMAILS or admin user emails.' });
+  const adminRecipients = await getAdminEmailRecipients();
+  // Resend's unverified-domain/testing mode can send only to the account owner's
+  // verified email. Keep this test separate from real admin notifications.
+  const testRecipient = usingResend
+    ? String(process.env.RESEND_TEST_EMAIL || '').trim().toLowerCase()
+    : '';
+  const recipients = usingResend ? (testRecipient ? [testRecipient] : []) : adminRecipients;
+  if (!recipients.length) {
+    return res.status(400).json({
+      error: usingResend
+        ? 'Set RESEND_TEST_EMAIL to the email address verified as the Resend account owner for this test.'
+        : 'No admin email recipients found. Add ADMIN_EMAILS or admin user emails.'
+    });
+  }
   try {
     await getMailTransport().sendMail({
       from: process.env.MAIL_FROM || process.env.SMTP_USER,
@@ -104,7 +116,13 @@ app.post('/api/email/test', async (req, res) => {
       html: `<p>This is a test email from <b>Roving CRM</b>.</p><p>The backend successfully submitted this message to the configured email provider.</p><p>Sent at ${htmlEscape(new Date().toISOString())}.</p>`
     });
     console.log(`Test email sent to ${recipients.length} admin recipient(s).`);
-    res.json({ ok: true, sent: true, adminRecipientsFound: recipients.length });
+    res.json({
+      ok: true,
+      sent: true,
+      testOnly: usingResend,
+      sentToCount: recipients.length,
+      adminRecipientsFound: adminRecipients.length
+    });
   } catch (err) {
     console.error('Email test failed:', err.message);
     res.status(502).json({ error: 'Could not send test email', details: err.message });
