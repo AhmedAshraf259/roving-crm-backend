@@ -93,8 +93,20 @@ app.post('/api/email/test', async (req, res) => {
     const setup = await verifyMailSetup();
     if (!setup.verified) return res.status(503).json({ error: 'SMTP is not ready', details: setup.reason || 'SMTP verification failed' });
   }
-  const recipients = await getAdminEmailRecipients();
-  if (!recipients.length) return res.status(400).json({ error: 'No admin email recipients found. Add ADMIN_EMAILS or admin user emails.' });
+  const adminRecipients = await getAdminEmailRecipients();
+  // Resend's unverified-domain/testing mode can send only to the account owner's
+  // verified email. Keep this test separate from real admin notifications.
+  const testRecipient = usingResend
+    ? String(process.env.RESEND_TEST_EMAIL || '').trim().toLowerCase()
+    : '';
+  const recipients = usingResend ? (testRecipient ? [testRecipient] : []) : adminRecipients;
+  if (!recipients.length) {
+    return res.status(400).json({
+      error: usingResend
+        ? 'Set RESEND_TEST_EMAIL to the email address verified as the Resend account owner for this test.'
+        : 'No admin email recipients found. Add ADMIN_EMAILS or admin user emails.'
+    });
+  }
   try {
     await getMailTransport().sendMail({
       from: process.env.MAIL_FROM || process.env.SMTP_USER,
@@ -104,7 +116,13 @@ app.post('/api/email/test', async (req, res) => {
       html: `<p>This is a test email from <b>Roving CRM</b>.</p><p>The backend successfully submitted this message to the configured email provider.</p><p>Sent at ${htmlEscape(new Date().toISOString())}.</p>`
     });
     console.log(`Test email sent to ${recipients.length} admin recipient(s).`);
-    res.json({ ok: true, sent: true, adminRecipientsFound: recipients.length });
+    res.json({
+      ok: true,
+      sent: true,
+      testOnly: usingResend,
+      sentToCount: recipients.length,
+      adminRecipientsFound: adminRecipients.length
+    });
   } catch (err) {
     console.error('Email test failed:', err.message);
     res.status(502).json({ error: 'Could not send test email', details: err.message });
@@ -134,6 +152,7 @@ app.post('/api/:collection', async (req, res) => {
     data.recordKey = recordKey;
     if (!data.createdAt) data.createdAt = new Date();
     const previous = await collection.findOne({ recordKey });
+    preserveFollowupReminderState(req.params.collection, data, previous);
     await collection.updateOne({ recordKey }, { $set: data }, { upsert: true });
     const saved = await collection.findOne({ recordKey });
     res.status(200).json(publicRecord(saved));
@@ -144,6 +163,10 @@ app.post('/api/:collection', async (req, res) => {
         record: saved,
         previous
       });
+    }
+    if (req.params.collection === 'clients' && normalize(saved.assignedTo) &&
+        (!previous || normalize(previous.assignedTo) !== normalize(saved.assignedTo))) {
+      void sendSalesAssignmentEmail({ client: saved, previous });
     }
   } catch (err) {
     res.status(400).json({ error: 'Could not save record', details: err.message });
@@ -159,6 +182,7 @@ app.put('/api/:collection/:id', async (req, res) => {
     delete data.password;
     const key = String(req.params.id);
     const previous = await collection.findOne({ recordKey: key });
+    preserveFollowupReminderState(req.params.collection, data, previous);
     await collection.updateOne({ recordKey: key }, { $set: data }, { upsert: true });
     const saved = await collection.findOne({ recordKey: key });
     res.json(publicRecord(saved));
@@ -169,6 +193,10 @@ app.put('/api/:collection/:id', async (req, res) => {
         record: saved,
         previous
       });
+    }
+    if (req.params.collection === 'clients' && normalize(saved.assignedTo) &&
+        (!previous || normalize(previous.assignedTo) !== normalize(saved.assignedTo))) {
+      void sendSalesAssignmentEmail({ client: saved, previous });
     }
   } catch (err) {
     res.status(400).json({ error: 'Could not update record', details: err.message });
@@ -296,8 +324,35 @@ function safeSummary(value) {
   return String(value);
 }
 
+function isCompletedFollowupStatus(value) {
+  return ['completed', 'lose', 'lost'].includes(normalize(value));
+}
+
+function preserveFollowupReminderState(collectionName, data, previous) {
+  if (collectionName !== 'followups' || !previous) return;
+  const oldDate = previous.dateTime || previous.scheduledAt || previous.scheduledDateTime || '';
+  const newDate = data.dateTime || data.scheduledAt || data.scheduledDateTime || '';
+  const scheduleChanged = String(oldDate) !== String(newDate);
+  const reopened = isCompletedFollowupStatus(previous.status) && !isCompletedFollowupStatus(data.status);
+
+  // A stale browser copy must not reset a reminder that the server already sent.
+  // A genuinely rescheduled/reopened follow-up becomes eligible for one new reminder.
+  if (previous.notified === true && !scheduleChanged && !reopened) {
+    data.notified = true;
+    data.notifiedAt = previous.notifiedAt || data.notifiedAt || new Date();
+  } else if (scheduleChanged || reopened) {
+    data.notified = false;
+    delete data.notifiedAt;
+    delete data.reminderClaimedAt;
+  }
+}
+
 async function sendAdminActivityEmail({ collectionName, action, record, previous }) {
-  // Email notifications cover changes and CRM notifications, not read requests.
+  // Notification records are synchronized by the frontend and are not user actions.
+  // Emailing every sync creates a feedback loop and floods admin inboxes.
+  if (collectionName === 'notifications') {
+    return { sent: false, reason: 'internal_notification_sync' };
+  }
   const transport = getMailTransport();
   if (!transport) {
     console.warn(`Admin activity email skipped (${collectionName}/${action}): email provider is not configured.`);
@@ -326,6 +381,12 @@ async function sendAdminActivityEmail({ collectionName, action, record, previous
     const after = safeSummary(safeRecord[field]);
     if (!safePrevious || before !== after) changes.push({ field, before, after });
   }
+  // The frontend syncs cached records on startup. Do not email admins for a
+  // POST/PUT that does not change any meaningful field.
+  if (action === 'update' && changes.length === 0) {
+    console.log(`Admin activity email skipped (no-op update): ${collectionName}/${label}`);
+    return { sent: false, reason: 'no_meaningful_change' };
+  }
   const details = changes.slice(0, 30);
   const detailsText = details.map(item => `${item.field}: ${item.before} → ${item.after}`).join('\\n') || 'A CRM activity/notification was recorded.';
   const detailsHtml = details.map(item =>
@@ -349,6 +410,67 @@ async function sendAdminActivityEmail({ collectionName, action, record, previous
   }
 }
 
+
+function crmLink(path = '') {
+  const base = String(process.env.CRM_BASE_URL || '').trim().replace(/\/+$/, '');
+  if (!base) return '';
+  return `${base}${path.startsWith('/') ? path : `/${path}`}`;
+}
+
+async function sendSalesAssignmentEmail({ client, previous }) {
+  const transport = getMailTransport();
+  if (!transport) {
+    console.warn('Sales assignment email skipped: email provider is not configured.');
+    return { sent: false, reason: 'email_not_configured' };
+  }
+  const users = await collectionFor('users').find({}).toArray();
+  const assigned = normalize(client.assignedTo);
+  const salesUser = users.find(u =>
+    normalize(u.name) === assigned || normalize(u.email) === assigned
+  );
+  const recipient = normalize(salesUser?.email || (assigned.includes('@') ? assigned : ''));
+  if (!recipient || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) {
+    console.warn(`Sales assignment email skipped: no email found for assignee "${client.assignedTo || ''}".`);
+    return { sent: false, reason: 'assignee_email_not_found' };
+  }
+
+  const clientName = client.name || client.clientName || 'New client';
+  const wasAssigned = previous?.assignedTo ? `Previously assigned to: ${previous.assignedTo}` : 'This client has been assigned to you.';
+  const action = previous ? 'Client transferred to you' : 'New client assigned to you';
+  const link = crmLink('/');
+  const details = [
+    ['Client', clientName],
+    ['Phone', client.phone || client.mobile],
+    ['Email', client.email],
+    ['Lead source', client.source],
+    ['Assigned to', client.assignedTo],
+    ['Previous assignment', previous?.assignedTo || 'Not previously assigned'],
+    ['Status', client.status],
+    ['Notes', client.notes]
+  ];
+  const rows = details.map(([label, value]) =>
+    `<tr><th style="text-align:left;padding:8px;border:1px solid #ddd;background:#f5f5f5">${htmlEscape(label)}</th><td style="padding:8px;border:1px solid #ddd">${htmlEscape(value || '—')}</td></tr>`
+  ).join('');
+  const openButton = link
+    ? `<p style="margin:24px 0"><a href="${htmlEscape(link)}" style="display:inline-block;background:#e45a36;color:#fff;text-decoration:none;padding:12px 18px;border-radius:6px;font-weight:bold">Open Roving CRM</a></p>`
+    : '<p>Open Roving CRM to view this client.</p>';
+
+  try {
+    await transport.sendMail({
+      from: process.env.MAIL_FROM || process.env.SMTP_USER,
+      to: recipient,
+      subject: `[Roving CRM] ${action}: ${clientName}`,
+      text: `${action}\n${wasAssigned}\n\n${details.map(([label, value]) => `${label}: ${value || '—'}`).join('\n')}${link ? `\n\nOpen Roving CRM: ${link}` : ''}`,
+      html: `<div style="font-family:Arial,sans-serif"><h2>Roving CRM — ${htmlEscape(action)}</h2><p>${htmlEscape(wasAssigned)}</p><table style="border-collapse:collapse;width:100%;max-width:760px">${rows}</table>${openButton}</div>`
+    });
+    console.log(`Sales assignment email sent to ${recipient} for client ${clientName}.`);
+    return { sent: true, recipient };
+  } catch (err) {
+    console.error(`Sales assignment email failed for ${clientName}:`, err.message);
+    return { sent: false, reason: err.message };
+  }
+}
+
 async function verifyMailSetup() {
   const transport = getMailTransport();
   if (!transport) return { configured: false, verified: false, reason: 'Configure RESEND_API_KEY (recommended) or SMTP_HOST, SMTP_USER, SMTP_PASS.' };
@@ -361,20 +483,27 @@ async function verifyMailSetup() {
   }
 }
 
+let followupSchedulerRunning = false;
+
 async function checkDueFollowups() {
   const transport = getMailTransport();
-  if (!transport || mongoose.connection.readyState !== 1) return;
+  if (!transport || mongoose.connection.readyState !== 1 || followupSchedulerRunning) return;
+  followupSchedulerRunning = true;
   try {
     const followupsCollection = collectionFor('followups');
     const usersCollection = collectionFor('users');
     const clientsCollection = collectionFor('clients');
     const now = new Date();
+    const maxOverdueHoursRaw = Number(process.env.FOLLOWUP_REMINDER_MAX_OVERDUE_HOURS || 24);
+    const maxOverdueHours = Number.isFinite(maxOverdueHoursRaw) && maxOverdueHoursRaw >= 0 ? maxOverdueHoursRaw : 24;
+    const cutoff = new Date(now.getTime() - maxOverdueHours * 60 * 60 * 1000);
     const due = await followupsCollection.find({
-      status: { $nin: ['Completed', 'Lose', 'Lost'] },
+      status: { $nin: ['Completed', 'Lose', 'Lost', 'completed', 'lose', 'lost'] },
       notified: { $ne: true },
       dateTime: { $exists: true, $ne: '' }
     }).toArray();
     if (!due.length) return;
+
     const users = await usersCollection.find({}).toArray();
     const adminEmailsFromEnv = String(process.env.ADMIN_EMAILS || '').split(/[;,]/).map(x => x.trim()).filter(Boolean);
     const adminEmails = new Set(adminEmailsFromEnv.map(normalize));
@@ -383,45 +512,80 @@ async function checkDueFollowups() {
     }
 
     for (const followup of due) {
-      const when = new Date(followup.dateTime);
+      const when = new Date(followup.dateTime || followup.scheduledAt || followup.scheduledDateTime || '');
       if (Number.isNaN(when.getTime()) || when > now) continue;
-      const assigned = normalize(followup.assignedTo);
-      const assignedUser = users.find(u => normalize(u.name) === assigned || normalize(u.email) === assigned);
-      const recipients = new Set(adminEmails);
-      if (assignedUser?.email) recipients.add(normalize(assignedUser.email));
-      if (!recipients.size) {
-        console.warn(`No email recipients configured for due follow-up ${followup.recordKey || followup.id || followup._id}`);
+
+      // Prevent a deployment/restart from replaying a large backlog of old emails.
+      // Older due items are marked handled without sending a message.
+      if (when < cutoff) {
+        await followupsCollection.updateOne(
+          { _id: followup._id, notified: { $ne: true } },
+          { $set: { notified: true, notificationSuppressedAt: now, notificationSuppressedReason: 'older_than_max_overdue_window' }, $unset: { reminderClaimedAt: '' } }
+        );
+        console.log(`Suppressed stale follow-up reminder (${followup.recordKey || followup.id || followup._id}); due at ${when.toISOString()}`);
         continue;
       }
 
-      const clientKey = followup.clientId === undefined || followup.clientId === null ? '' : String(followup.clientId);
-      const client = clientKey ? await clientsCollection.findOne({ $or: [{ recordKey: clientKey }, { id: /^\d+$/.test(clientKey) ? Number(clientKey) : clientKey }] }) : null;
-      const clientName = followup.clientName || client?.name || followup.name || 'Not specified';
-      const subject = `Roving CRM Follow-up Due: ${clientName}`;
-      const rows = [
-        ['Client Name', clientName], ['Phone', followup.clientPhone || client?.phone || followup.phone],
-        ['Email', followup.clientEmail || client?.email || followup.email], ['Lead Source', followup.source || client?.source],
-        ['Assigned To', followup.assignedTo], ['Follow-up Type', followup.type],
-        ['Follow-up Date & Time', dateText(followup.dateTime)], ['Priority', followup.priority],
-        ['Status', followup.status], ['Last Contact', dateText(followup.lastContactAt)],
-        ['Latest Result', followup.result], ['Note', followup.notes]
-      ];
-      const tableRows = rows.map(([label, value]) => `<tr><th style="text-align:left;padding:8px;border:1px solid #ddd;background:#f5f5f5">${htmlEscape(label)}</th><td style="padding:8px;border:1px solid #ddd">${htmlEscape(value || '—')}</td></tr>`).join('');
-      await transport.sendMail({
-        from: process.env.MAIL_FROM || process.env.SMTP_USER,
-        to: [...recipients].join(', '),
-        subject,
-        text: rows.map(([label, value]) => `${label}: ${value || '—'}`).join('\n'),
-        html: `<div style="font-family:Arial,sans-serif"><h2>Roving CRM — Follow-up Reminder</h2><p>A scheduled follow-up is due.</p><table style="border-collapse:collapse;width:100%;max-width:760px">${tableRows}</table></div>`
-      });
-      await followupsCollection.updateOne(
-        { _id: followup._id },
-        { $set: { notified: true, notifiedAt: new Date() } }
-      );
-      console.log(`Follow-up reminder email sent for ${clientName}`);
+      // Claim atomically so overlapping instances cannot send the same reminder.
+      // A claim older than 10 minutes is considered stale and can be retried.
+      const claimExpiredBefore = new Date(now.getTime() - 10 * 60 * 1000);
+      const claim = await followupsCollection.updateOne({
+        _id: followup._id,
+        notified: { $ne: true },
+        $or: [
+          { reminderClaimedAt: { $exists: false } },
+          { reminderClaimedAt: null },
+          { reminderClaimedAt: { $lt: claimExpiredBefore } }
+        ]
+      }, { $set: { reminderClaimedAt: now } });
+      if (!claim.modifiedCount) continue;
+
+      try {
+        const assigned = normalize(followup.assignedTo);
+        const assignedUser = users.find(u => normalize(u.name) === assigned || normalize(u.email) === assigned);
+        const recipients = new Set(adminEmails);
+        if (assignedUser?.email) recipients.add(normalize(assignedUser.email));
+        const validRecipients = [...recipients].filter(email => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
+        if (!validRecipients.length) {
+          await followupsCollection.updateOne({ _id: followup._id }, { $unset: { reminderClaimedAt: '' } });
+          console.warn(`No email recipients configured for due follow-up ${followup.recordKey || followup.id || followup._id}`);
+          continue;
+        }
+
+        const clientKey = followup.clientId === undefined || followup.clientId === null ? '' : String(followup.clientId);
+        const client = clientKey ? await clientsCollection.findOne({ $or: [{ recordKey: clientKey }, { id: /^\d+$/.test(clientKey) ? Number(clientKey) : clientKey }] }) : null;
+        const clientName = followup.clientName || client?.name || followup.name || 'Not specified';
+        const subject = `Roving CRM Follow-up Due: ${clientName}`;
+        const rows = [
+          ['Client Name', clientName], ['Phone', followup.clientPhone || client?.phone || followup.phone],
+          ['Email', followup.clientEmail || client?.email || followup.email], ['Lead Source', followup.source || client?.source],
+          ['Assigned To', followup.assignedTo], ['Follow-up Type', followup.type],
+          ['Follow-up Date & Time', dateText(followup.dateTime || followup.scheduledAt || followup.scheduledDateTime)], ['Priority', followup.priority],
+          ['Status', followup.status], ['Last Contact', dateText(followup.lastContactAt)],
+          ['Latest Result', followup.result], ['Note', followup.notes]
+        ];
+        const tableRows = rows.map(([label, value]) => `<tr><th style="text-align:left;padding:8px;border:1px solid #ddd;background:#f5f5f5">${htmlEscape(label)}</th><td style="padding:8px;border:1px solid #ddd">${htmlEscape(value || '—')}</td></tr>`).join('');
+        await transport.sendMail({
+          from: process.env.MAIL_FROM || process.env.SMTP_USER,
+          to: validRecipients.join(', '),
+          subject,
+          text: rows.map(([label, value]) => `${label}: ${value || '—'}`).join('\n') + (crmLink('/') ? `\n\nOpen Roving CRM: ${crmLink('/')}` : ''),
+          html: `<div style="font-family:Arial,sans-serif"><h2>Roving CRM — Follow-up Reminder</h2><p>A scheduled follow-up is due.</p><table style="border-collapse:collapse;width:100%;max-width:760px">${tableRows}</table>${crmLink('/') ? `<p style="margin:24px 0"><a href="${htmlEscape(crmLink('/'))}" style="display:inline-block;background:#e45a36;color:#fff;text-decoration:none;padding:12px 18px;border-radius:6px;font-weight:bold">Open Roving CRM</a></p>` : ''}</div>`
+        });
+        await followupsCollection.updateOne(
+          { _id: followup._id },
+          { $set: { notified: true, notifiedAt: new Date() }, $unset: { reminderClaimedAt: '', notificationSuppressedAt: '', notificationSuppressedReason: '' } }
+        );
+        console.log(`Follow-up reminder email sent for ${clientName} to ${validRecipients.length} recipient(s)`);
+      } catch (sendErr) {
+        await followupsCollection.updateOne({ _id: followup._id }, { $unset: { reminderClaimedAt: '' } });
+        throw sendErr;
+      }
     }
   } catch (err) {
     console.error('Follow-up email scheduler error:', err.message);
+  } finally {
+    followupSchedulerRunning = false;
   }
 }
 
@@ -432,7 +596,7 @@ function startFollowupEmailScheduler() {
   }
   checkDueFollowups();
   setInterval(checkDueFollowups, 60 * 1000);
-  console.log('Follow-up email scheduler started (checks every minute).');
+  console.log(`Follow-up email scheduler started (checks every minute; stale reminders older than ${process.env.FOLLOWUP_REMINDER_MAX_OVERDUE_HOURS || 24} hours are suppressed).`);
 }
 
 app.listen(PORT, () => console.log(`Roving CRM backend listening on port ${PORT}`));
