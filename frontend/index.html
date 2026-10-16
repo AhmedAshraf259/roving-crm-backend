@@ -559,6 +559,45 @@
     </div>
 </div>
 
+
+<!-- Modal: Record Follow-up Outcome -->
+<div class="modal fade" id="followupOutcomeModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold text-roving-green">Follow-up Result</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="followupOutcomeId">
+        <p class="mb-3">Choose what happened with this client:</p>
+        <div class="mb-3">
+          <label for="followupOutcomeChoice" class="form-label fw-semibold">Result</label>
+          <select id="followupOutcomeChoice" class="form-select" onchange="toggleRenewFollowupFields()">
+            <option value="Booked">Booked — تم الحجز</option>
+            <option value="Lost">Lost — العميل لم يكمل</option>
+            <option value="Renew Follow-up">Renew Follow-up — تحديد متابعة جديدة</option>
+          </select>
+        </div>
+        <div id="renewFollowupFields" class="d-none">
+          <div class="mb-3">
+            <label for="renewFollowupDateTime" class="form-label fw-semibold">New follow-up date & time</label>
+            <input type="datetime-local" id="renewFollowupDateTime" class="form-control">
+          </div>
+          <div class="mb-3">
+            <label for="renewFollowupNote" class="form-label fw-semibold">Note (optional)</label>
+            <textarea id="renewFollowupNote" class="form-control" rows="2" placeholder="What should be done next?"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="saveFollowupOutcome()">Save Result</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: Transfer / Send Client -->
 <div class="modal fade" id="transferClientModal" tabindex="-1">
     <div class="modal-dialog">
@@ -793,17 +832,12 @@ async function syncCollection(apiName, localKey, currentValue, assign) {
 
 async function saveRecord(apiName, localKey, record) {
     const list = JSON.parse(localStorage.getItem(localKey) || '[]');
-    const id = recordId(record);
-    const idx = list.findIndex(x => recordId(x) === id);
+    const id = String(record.id ?? record._id);
+    const idx = list.findIndex(x => String(x.id ?? x._id) === id);
     if (idx >= 0) list[idx] = record; else list.unshift(record);
     localStorage.setItem(localKey, JSON.stringify(list));
-    const remote = await apiRequest(`/api/${apiName}`, { method:'POST', body:JSON.stringify(record) });
-    const saved = remote && typeof remote === 'object' ? { ...record, ...remote } : record;
-    const savedId = recordId(saved);
-    const savedIdx = list.findIndex(x => recordId(x) === id || (savedId && recordId(x) === savedId));
-    if (savedIdx >= 0) list[savedIdx] = saved; else list.unshift(saved);
-    localStorage.setItem(localKey, JSON.stringify(list));
-    return saved;
+    try { await apiRequest(`/api/${apiName}`, { method:'POST', body:JSON.stringify(record) }); }
+    catch (error) { console.warn(`Could not sync ${apiName}:`, error); }
 }
 
 async function deleteRecord(apiName, localKey, id) {
@@ -1277,8 +1311,6 @@ function handleBookingCategoryChange() {
     } else section.classList.add('d-none');
     calculateBookingFinancials();
 }
-function recordId(record) { return String(record?.id ?? record?._id ?? ''); }
-function inlineId(value) { return escapeHtml(String(value ?? '')).replace(/'/g, '&#39;'); }
 function escapeHtml(value){return String(value??'').replace(/[&<>'"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));}
 function populateSupplierSelects(){const main=document.getElementById('bookingSupplier');if(main){const v=main.value;main.innerHTML='<option value="">-- Select Supplier --</option>'+suppliers.map(s=>`<option value="${s.id}">${escapeHtml(s.name)} · ${escapeHtml(s.type||'Other')}</option>`).join('');main.value=v||'';}document.querySelectorAll('.package-supplier-select').forEach(sel=>{const v=sel.value;sel.innerHTML='<option value="">-- Select Supplier --</option>'+suppliers.map(s=>`<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');sel.value=v||'';});}
 function addPackageCostRow(type='Other'){packageCostRows.push({type,name:'',nights:type==='Hotel'?1:1,rate:0,supplierId:'',currency:document.getElementById('bookingCurrency').value||'USD',fx:1,notes:''});renderPackageCostRows();calculateBookingFinancials();}
@@ -1402,10 +1434,10 @@ async function saveFollowupsToStorage() {
 async function handleSaveFollowup(e) {
     e.preventDefault();
     const editingId = document.getElementById('editingFollowupId').value;
-    const client = clients.find(c => recordId(c) === String(document.getElementById('followupClientSelect').value));
+    const client = clients.find(c => c._id === document.getElementById('followupClientSelect').value);
     if (!client) return;
 
-    const oldFollowup = editingId !== '' ? followups.find(f => recordId(f) === String(editingId)) : null;
+    const oldFollowup = editingId !== '' ? followups.find(f => String(f.id) === String(editingId)) : null;
     const chatFile = document.getElementById('followupChatFile')?.files?.[0];
     let attachmentData = oldFollowup?.attachmentData || '', attachmentName = oldFollowup?.attachmentName || '';
     if (chatFile) {
@@ -1415,8 +1447,8 @@ async function handleSaveFollowup(e) {
     }
     const followupObj = {
         ...(oldFollowup || {}),
-        id: editingId !== "" ? String(editingId) : String(Date.now()),
-        clientId: recordId(client),
+        id: editingId !== "" ? Number(editingId) : Date.now(),
+        clientId: client._id,
         clientName: client.name,
         clientPhone: client.phone || 'N/A',
         type: document.getElementById('followupType').value,
@@ -1431,7 +1463,7 @@ async function handleSaveFollowup(e) {
     };
 
     if (editingId !== "") {
-        const idx = followups.findIndex(f => recordId(f) === String(editingId));
+        const idx = followups.findIndex(f => f.id == editingId);
         if (idx !== -1) followups[idx] = followupObj;
         showNotification('Follow-up updated successfully!', 'success');
     } else {
@@ -1465,15 +1497,15 @@ function renderFollowups() {
                 <td><strong>${f.clientName}</strong></td>
                 <td><small><i class="fa-solid fa-phone me-1"></i>${f.clientPhone}</small></td>
                 <td><span class="badge bg-dark">${f.type}</span></td>
-                <td><small>${String(f.dateTime || '').replace('T', ' ')}</small></td>
+                <td><small>${f.dateTime.replace('T', ' ')}</small></td>
                 <td><span class="badge bg-light text-dark border">${f.assignedTo}</span></td>
                 <td><span class="badge bg-secondary">${f.priority}</span></td>
                 <td><span class="badge bg-primary">${f.status}</span></td>
                 <td><small class="text-muted">${escapeHtml(f.notes || '-')}</small>${f.attachmentData ? `<br><a href="${f.attachmentData}" target="_blank" rel="noopener">📎 ${escapeHtml(f.attachmentName || 'View attachment')}</a>` : ''}${f.status !== 'Completed' && f.dateTime && new Date(f.dateTime) < new Date() ? '<br><span class="badge bg-danger">Overdue · Action needed</span>' : ''}</td>
                 <td>
-                    <button class="btn btn-sm btn-outline-primary me-1" title="Edit / Reschedule / Reassign" onclick="editFollowup('${inlineId(recordId(f))}')"><i class="fa-solid fa-pen-to-square"></i></button>
-                    <button class="btn btn-sm btn-outline-success me-1" title="Mark action completed" onclick="completeFollowup('${inlineId(recordId(f))}')"><i class="fa-solid fa-check"></i></button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteFollowup('${inlineId(recordId(f))}')"><i class="fa-solid fa-trash"></i></button>
+                    <button class="btn btn-sm btn-outline-primary me-1" title="Edit / Reschedule / Reassign" onclick="editFollowup(${f.id})"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button class="btn btn-sm btn-outline-success me-1" title="Mark action completed" onclick="completeFollowup(${f.id})"><i class="fa-solid fa-check"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteFollowup(${f.id})"><i class="fa-solid fa-trash"></i></button>
                 </td>
             </tr>
         `;
@@ -1484,9 +1516,9 @@ function renderFollowups() {
 
 function readFileAsDataURL(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result || '')); reader.onerror = reject; reader.readAsDataURL(file); }); }
 function editFollowup(id) {
-    const f = followups.find(x => recordId(x) === String(id)); if (!f) return;
+    const f = followups.find(x => String(x.id) === String(id)); if (!f) return;
     document.getElementById('followupModalTitle').innerText = 'Edit / Reschedule Follow-up';
-    document.getElementById('editingFollowupId').value = recordId(f);
+    document.getElementById('editingFollowupId').value = f.id;
     populateClientDropdowns(); populateDropdowns();
     document.getElementById('followupClientSelect').value = f.clientId;
     document.getElementById('followupType').value = f.type || 'Phone Call';
@@ -1501,29 +1533,132 @@ function editFollowup(id) {
 }
 function refreshFollowupAlerts() {
     const now = new Date();
-    const overdue = (followups || []).filter(f => f.status !== 'Completed' && f.dateTime && new Date(f.dateTime) < now && (!currentUser || currentUser.role !== 'Sales' || f.assignedTo === currentUser.name));
-    const noAction = (followups || []).filter(f => f.status !== 'Completed' && !f.lastActionAt && (!currentUser || currentUser.role !== 'Sales' || f.assignedTo === currentUser.name));
+    const isSalesView = currentUser && currentUser.role === 'Sales';
+    const normalizeText = value => String(value || '').toLowerCase().replace(/[ًٌٍَُِّْـ]/g, '').trim();
+    const inaccessiblePattern = /(لا يرد|مش بيرد|لم يرد|عدم الرد|غير متاح|مغلق|رقم خطأ|رقم غير صحيح|تعذر الوصول|لا يمكن الوصول|لم استطع الوصول|لم أستطع الوصول|unreachable|not reachable|no answer|no response|could not reach|couldn't reach|invalid number|phone off)/i;
+    const isRelevantForCurrentUser = f => !isSalesView || f.assignedTo === currentUser.name;
+    const needsNoAction = f => {
+        const status = normalizeText(f.status);
+        const notes = normalizeText([f.notes, f.result, f.lastNote, f.outcome].filter(Boolean).join(' '));
+        const when = f.dateTime ? new Date(f.dateTime) : null;
+        const isActive = !['completed', 'cancelled', 'canceled', 'lost', 'closed', 'done'].includes(status);
+        // Only count tasks that have actually become due. Future tasks and old
+        // legacy rows with no due date should not inflate the sidebar badge.
+        const isDue = when && !Number.isNaN(when.getTime()) && when <= now;
+        // A recorded unsuccessful contact attempt is not an actionable alert
+        // by itself; the user can create/reschedule a new follow-up if needed.
+        const markedUnreachable = inaccessiblePattern.test(notes) || ['unreachable', 'no answer', 'not reachable', 'invalid number'].includes(status);
+        return isActive && isDue && !markedUnreachable && isRelevantForCurrentUser(f);
+    };
+    const actionable = (followups || []).filter(needsNoAction);
+    const overdue = actionable.filter(f => f.status !== 'Completed');
+    // The sidebar is a client count, not a task-row count.
+    const clientKey = f => String(f.clientId || f.client_id || f.clientName || f.client || f.id);
+    const uniqueClientCount = new Set(actionable.map(clientKey)).size;
     const box = document.getElementById('urgentFollowupAlertContainer');
     const badge = document.getElementById('sidebarFollowupBadge');
-    if (badge) { badge.textContent = String(overdue.length + noAction.length); badge.classList.toggle('d-none', overdue.length + noAction.length === 0); }
-    if (box) box.innerHTML = overdue.length ? `<div class="alert alert-danger urgent-pulse-banner"><strong>Follow-ups overdue (${overdue.length})</strong><div class="small">${overdue.slice(0,5).map(f=>`${escapeHtml(f.clientName)} — ${escapeHtml(f.assignedTo)} — ${escapeHtml((f.dateTime||'').replace('T',' '))}`).join('<br>')}</div><button class="btn btn-sm btn-outline-danger mt-2" onclick="switchTab('followups')">Review and take action</button></div>` : (noAction.length ? `<div class="alert alert-warning"><strong>${noAction.length} follow-up(s) still need an action.</strong> <button class="btn btn-sm btn-outline-dark" onclick="switchTab('followups')">Open follow-ups</button></div>` : '');
+    if (badge) {
+        badge.textContent = String(uniqueClientCount);
+        badge.classList.toggle('d-none', uniqueClientCount === 0);
+    }
+    if (!box) return;
+    const fingerprint = actionable
+        .map(f => `${clientKey(f)}|${f.id || ''}|${f.dateTime || ''}|${f.status || ''}`)
+        .sort().join('::');
+    const storageKey = 'rovingFollowupAlertDismissedFingerprint';
+    let dismissedFingerprint = '';
+    try { dismissedFingerprint = sessionStorage.getItem(storageKey) || ''; } catch (_) {}
+    if (!actionable.length) {
+        box.innerHTML = '';
+        box.classList.add('d-none');
+        try { sessionStorage.removeItem(storageKey); } catch (_) {}
+        return;
+    }
+    window.currentFollowupAlertFingerprint = fingerprint;
+    if (dismissedFingerprint === fingerprint) {
+        box.innerHTML = '';
+        box.classList.add('d-none');
+        return;
+    }
+    box.classList.remove('d-none');
+    const preview = actionable.slice(0, 3).map(f =>
+        `${escapeHtml(f.clientName || f.client || 'Client')} — ${escapeHtml(f.assignedTo || '')} — ${escapeHtml(String(f.dateTime || '').replace('T', ' '))}`
+    ).join('<br>');
+    box.innerHTML = `<div class="alert alert-danger d-flex align-items-start justify-content-between gap-2 py-2 px-3 mb-2" role="alert" style="border-left:4px solid #dc5b3c;border-radius:8px;background:#fff7f4;color:#65302a;box-shadow:none">
+        <div class="small"><strong>Follow-ups needing action (${uniqueClientCount})</strong><div class="mt-1">${preview}${actionable.length > 3 ? `<br><span class="text-muted">and ${actionable.length - 3} more task(s)</span>` : ''}</div>
+        <button class="btn btn-sm btn-outline-danger mt-2 py-1" onclick="switchTab('followups')">Review follow-ups</button></div>
+        <button type="button" class="btn-close" aria-label="Dismiss follow-up alert" title="Close" onclick="dismissFollowupAlert()" style="flex:0 0 auto" ></button>
+    </div>`;
+}
+function dismissFollowupAlert() {
+    try { sessionStorage.setItem('rovingFollowupAlertDismissedFingerprint', window.currentFollowupAlertFingerprint || ''); } catch (_) {}
+    const box = document.getElementById('urgentFollowupAlertContainer');
+    if (box) { box.innerHTML = ''; box.classList.add('d-none'); }
 }
 
-async function completeFollowup(id) {
-    const f = followups.find(x => recordId(x) === String(id));
-    if (!f) { showNotification('لم يتم العثور على المتابعة. حدّث الصفحة وحاول مرة أخرى.', 'warning'); return; }
-    const previousStatus = f.status;
-    f.status = 'Completed';
-    f.lastActionAt = new Date().toISOString();
-    try {
-        await saveRecord('followups','roving_followups',f);
-        await syncCollection('followups','roving_followups',followups,v => followups = v);
-        renderFollowups(); refreshFollowupAlerts();
-        showNotification('تم تسجيل المتابعة كمكتملة.', 'success');
-    } catch (error) {
-        f.status = previousStatus; renderFollowups();
-        showNotification('تعذر حفظ إتمام المتابعة: ' + error.message, 'danger');
+function completeFollowup(id) {
+    const f = followups.find(x => String(x.id) === String(id));
+    if (!f) return;
+    document.getElementById('followupOutcomeId').value = String(f.id);
+    document.getElementById('followupOutcomeChoice').value = 'Booked';
+    document.getElementById('renewFollowupDateTime').value = '';
+    document.getElementById('renewFollowupNote').value = '';
+    toggleRenewFollowupFields();
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('followupOutcomeModal')).show();
+}
+
+function toggleRenewFollowupFields() {
+    const choice = document.getElementById('followupOutcomeChoice')?.value;
+    const fields = document.getElementById('renewFollowupFields');
+    const dateInput = document.getElementById('renewFollowupDateTime');
+    if (!fields || !dateInput) return;
+    const renewing = choice === 'Renew Follow-up';
+    fields.classList.toggle('d-none', !renewing);
+    dateInput.required = renewing;
+}
+
+async function saveFollowupOutcome() {
+    const id = document.getElementById('followupOutcomeId').value;
+    const f = followups.find(x => String(x.id) === String(id));
+    if (!f) {
+        showNotification('Follow-up not found. Refresh and try again.', 'danger');
+        return;
     }
+    const choice = document.getElementById('followupOutcomeChoice').value;
+    const now = new Date().toISOString();
+
+    if (choice === 'Renew Follow-up') {
+        const newDate = document.getElementById('renewFollowupDateTime').value;
+        if (!newDate || Number.isNaN(new Date(newDate).getTime()) || new Date(newDate) <= new Date()) {
+            showNotification('Choose a future date and time for the next follow-up.', 'warning');
+            return;
+        }
+        const extraNote = document.getElementById('renewFollowupNote').value.trim();
+        f.status = 'Scheduled';
+        f.dateTime = newDate;
+        f.notified = false;
+        f.lastActionAt = now;
+        f.result = 'Renew Follow-up';
+        if (extraNote) f.notes = [f.notes, `Follow-up renewed: ${extraNote}`].filter(Boolean).join(' | ');
+    } else if (choice === 'Booked') {
+        f.status = 'Completed';
+        f.result = 'Booked';
+        f.outcome = 'Booked';
+        f.lastActionAt = now;
+    } else if (choice === 'Lost') {
+        f.status = 'Lost';
+        f.result = 'Lost';
+        f.outcome = 'Lost';
+        f.lastActionAt = now;
+    } else {
+        showNotification('Choose a valid follow-up result.', 'warning');
+        return;
+    }
+
+    await saveRecord('followups','roving_followups',f);
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('followupOutcomeModal')).hide();
+    renderFollowups();
+    showNotification(choice === 'Renew Follow-up' ? 'New follow-up date saved.' : `Follow-up result saved: ${choice}.`, 'success');
 }
 
 async function deleteFollowup(id) {
@@ -2158,24 +2293,22 @@ async function executeSaveClient(clientData) {
             });
         }
     } catch (error) {
+        // Offline fallback: keep the client locally so the user does not lose it.
         console.warn('Client server sync failed; keeping local copy:', error);
-        const fallback = { ...clientData, _syncFailed: true };
-        const oldKey = String(editingId || '');
-        const existingIndex = localClients.findIndex(c => recordId(c) === oldKey);
-        if (existingIndex >= 0) localClients[existingIndex] = fallback; else localClients.unshift(fallback);
-        localStorage.setItem('roving_local_clients', JSON.stringify(localClients));
-        throw error;
     }
 
     const oldKey = String(editingId || '');
-    const savedKey = recordId(savedClient);
-    const nextClients = localClients.filter(c => {
-        const key = recordId(c);
-        return key !== oldKey && (!savedKey || key !== savedKey) &&
-            !(String(key).startsWith('local_') && String(c.name || '') === String(savedClient.name || '') && String(c.phone || '') === String(savedClient.phone || ''));
-    });
-    nextClients.unshift(savedClient);
-    localStorage.setItem('roving_local_clients', JSON.stringify(nextClients));
+    const existingIndex = localClients.findIndex(
+        c => String(c._id || c.id) === oldKey
+    );
+
+    if (existingIndex !== -1) {
+        localClients[existingIndex] = savedClient;
+    } else {
+        localClients.unshift(savedClient);
+    }
+
+    localStorage.setItem('roving_local_clients', JSON.stringify(localClients));
     return savedClient;
 }
 
@@ -2355,9 +2488,7 @@ async function handleSaveClient(event) {
         passport: document.getElementById('clientPassport').value.trim(),
         source: document.getElementById('clientSource').value,
         status: document.getElementById('clientStatusSelect').value,
-        assignedTo: (currentUser && String(currentUser.role || '').trim().toLowerCase() === 'sales')
-            ? currentUser.name
-            : document.getElementById('assignedEmployee').value,
+        assignedTo: document.getElementById('assignedEmployee').value,
         notes: document.getElementById('clientNotes').value.trim()
     };
 
@@ -2397,11 +2528,7 @@ async function handleSaveClient(event) {
     }
 
     // NEW CLIENT or ADMIN EDIT = execute immediately.
-    try { await executeSaveClient(clientData); }
-    catch (saveError) {
-        showNotification('تعذر حفظ العميل على السيرفر: ' + saveError.message + ' — لم يتم تأكيد الحفظ.', 'danger');
-        return;
-    }
+    await executeSaveClient(clientData);
 
     showNotification(
         editingId !== ""
@@ -2423,10 +2550,10 @@ async function handleSaveClient(event) {
 }
 
 function editClient(id) {
-    const client = clients.find(c => recordId(c) === String(id));
+    const client = clients.find(c => c._id === id);
     if (!client) return;
     document.getElementById('clientModalTitle').innerText = "Edit Client";
-    document.getElementById('editingClientId').value = recordId(client);
+    document.getElementById('editingClientId').value = client._id;
     document.getElementById('clientName').value = client.name || '';
     document.getElementById('clientSource').value = client.source || '';
     document.getElementById('clientStatusSelect').value = client.status || 'New';
@@ -2438,13 +2565,11 @@ function editClient(id) {
 }
 
 function openTransferModal(id) {
-    const client = clients.find(c => recordId(c) === String(id));
-    if (!client) { showNotification('لم يتم العثور على العميل. حدّث قائمة العملاء وحاول مرة أخرى.', 'warning'); return; }
-    document.getElementById('transferClientId').value = recordId(client);
-    document.getElementById('transferClientNameDisplay').innerText = client.name || 'Client';
+    const client = clients.find(c => c._id === id);
+    if (!client) return;
+    document.getElementById('transferClientId').value = client._id;
+    document.getElementById('transferClientNameDisplay').innerText = client.name;
     populateDropdowns();
-    const select = document.getElementById('transferToEmployee');
-    if (select) select.value = client.assignedTo || '';
     new bootstrap.Modal(document.getElementById('transferClientModal')).show();
 }
 
@@ -2564,9 +2689,9 @@ function renderClients() {
                 <td><span class="badge bg-primary">${client.status || 'New'}</span></td>
                 <td><small class="text-muted">${client.notes || '-'}</small></td>
                 <td>
-                    <button class="btn btn-sm btn-outline-success me-1" onclick="openTransferModal('${inlineId(clientId)}')" title="Transfer Client"><i class="fa-solid fa-right-left"></i></button>
-                    <button class="btn btn-sm btn-outline-primary me-1" onclick="editClient('${inlineId(clientId)}')"><i class="fa-solid fa-pen-to-square"></i></button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteClient('${inlineId(clientId)}')"><i class="fa-solid fa-trash"></i></button>
+                    <button class="btn btn-sm btn-outline-success me-1" onclick="openTransferModal('${clientId}')" title="Transfer Client"><i class="fa-solid fa-right-left"></i></button>
+                    <button class="btn btn-sm btn-outline-primary me-1" onclick="editClient('${clientId}')"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteClient('${clientId}')"><i class="fa-solid fa-trash"></i></button>
                 </td>
             </tr>
         `;
