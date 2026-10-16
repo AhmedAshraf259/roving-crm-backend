@@ -1484,8 +1484,17 @@ async function saveFollowupsToStorage() {
 async function handleSaveFollowup(e) {
     e.preventDefault();
     const editingId = document.getElementById('editingFollowupId').value;
-    const client = clients.find(c => c._id === document.getElementById('followupClientSelect').value);
-    if (!client) return;
+    const clientSelect = document.getElementById('followupClientSelect');
+    const selectedClientId = String(clientSelect?.value || '').trim();
+    // Client records may use MongoDB _id or the app-level id. Compare both as strings.
+    const client = (Array.isArray(clients) ? clients : []).find(c =>
+        String(c?._id ?? c?.id ?? '') === selectedClientId
+    );
+    if (!selectedClientId || !client) {
+        showNotification('اختار العميل من القائمة أولًا. لو القائمة فاضية، اقفل النموذج وافتحه مرة أخرى بعد تحميل العملاء.', 'warning');
+        clientSelect?.focus();
+        return;
+    }
 
     const oldFollowup = editingId !== '' ? followups.find(f => String(f.id) === String(editingId)) : null;
     const chatFile = document.getElementById('followupChatFile')?.files?.[0];
@@ -1498,7 +1507,7 @@ async function handleSaveFollowup(e) {
     const followupObj = {
         ...(oldFollowup || {}),
         id: editingId !== "" ? Number(editingId) : Date.now(),
-        clientId: client._id,
+        clientId: client._id ?? client.id,
         clientName: client.name,
         clientPhone: client.phone || 'N/A',
         type: document.getElementById('followupType').value,
@@ -1515,15 +1524,21 @@ async function handleSaveFollowup(e) {
     if (editingId !== "") {
         const idx = followups.findIndex(f => f.id == editingId);
         if (idx !== -1) followups[idx] = followupObj;
-        showNotification('Follow-up updated successfully!', 'success');
     } else {
         followups.unshift(followupObj);
-        showNotification('Follow-up added successfully!', 'success');
     }
 
-    await saveRecord('followups','roving_followups',followupObj);
-    bootstrap.Modal.getInstance(document.getElementById('addFollowupModal')).hide();
-    renderFollowups();
+    try {
+        await saveRecord('followups','roving_followups',followupObj);
+        const modalEl = document.getElementById('addFollowupModal');
+        const modalInstance = bootstrap.Modal.getInstance(modalEl) || bootstrap.Modal.getOrCreateInstance(modalEl);
+        modalInstance.hide();
+        renderFollowups();
+        showNotification(editingId !== '' ? 'تم حفظ تعديل المتابعة.' : 'تمت إضافة المتابعة.', 'success');
+    } catch (err) {
+        console.error('Follow-up save failed:', err);
+        showNotification('تعذر حفظ المتابعة. راجع Console وNetwork لمعرفة السبب.', 'danger');
+    }
 }
 
 function renderFollowups() {
