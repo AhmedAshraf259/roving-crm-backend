@@ -301,7 +301,16 @@ function safeSummary(value) {
 }
 
 function isCompletedFollowupStatus(value) {
-  return ['completed', 'lose', 'lost'].includes(normalize(value));
+  // Outcomes that should stop reminders. Compare case-insensitively because the
+  // frontend has historically stored title-case and lower-case values.
+  return ['completed', 'complete', 'booked', 'lose', 'lost', 'cancelled', 'canceled'].includes(normalize(value));
+}
+
+function followupDateValue(followup) {
+  // Different frontend versions have used different names for the same date.
+  return followup?.dateTime || followup?.scheduledAt || followup?.scheduledDateTime ||
+    followup?.dueDateTime || followup?.followupDateTime || followup?.scheduledDate ||
+    followup?.dueDate || '';
 }
 
 function preserveFollowupReminderState(collectionName, data, previous) {
@@ -473,11 +482,17 @@ async function checkDueFollowups() {
     const maxOverdueHoursRaw = Number(process.env.FOLLOWUP_REMINDER_MAX_OVERDUE_HOURS || 24);
     const maxOverdueHours = Number.isFinite(maxOverdueHoursRaw) && maxOverdueHoursRaw >= 0 ? maxOverdueHoursRaw : 24;
     const cutoff = new Date(now.getTime() - maxOverdueHours * 60 * 60 * 1000);
-    const due = await followupsCollection.find({
-      status: { $nin: ['Completed', 'Lose', 'Lost', 'completed', 'lose', 'lost'] },
-      notified: { $ne: true },
-      dateTime: { $exists: true, $ne: '' }
-    }).toArray();
+
+    // Do not filter by dateTime in MongoDB: older frontend versions may save
+    // the schedule as scheduledAt/scheduledDateTime. Filter the candidate set
+    // here using the same helper used to parse the actual date.
+    const candidates = await followupsCollection.find({ notified: { $ne: true } }).toArray();
+    const due = candidates.filter(item => {
+      if (isCompletedFollowupStatus(item.status)) return false;
+      const when = new Date(followupDateValue(item));
+      return !Number.isNaN(when.getTime()) && when <= now;
+    });
+    console.log(`Follow-up scheduler check: ${candidates.length} unnotified record(s), ${due.length} due now.`);
     if (!due.length) return;
 
     const users = await usersCollection.find({}).toArray();
@@ -488,11 +503,10 @@ async function checkDueFollowups() {
     }
 
     for (const followup of due) {
-      const when = new Date(followup.dateTime || followup.scheduledAt || followup.scheduledDateTime || '');
+      const when = new Date(followupDateValue(followup));
       if (Number.isNaN(when.getTime()) || when > now) continue;
 
       // Prevent a deployment/restart from replaying a large backlog of old emails.
-      // Older due items are marked handled without sending a message.
       if (when < cutoff) {
         await followupsCollection.updateOne(
           { _id: followup._id, notified: { $ne: true } },
@@ -502,8 +516,6 @@ async function checkDueFollowups() {
         continue;
       }
 
-      // Claim atomically so overlapping instances cannot send the same reminder.
-      // A claim older than 10 minutes is considered stale and can be retried.
       const claimExpiredBefore = new Date(now.getTime() - 10 * 60 * 1000);
       const claim = await followupsCollection.updateOne({
         _id: followup._id,
@@ -517,26 +529,32 @@ async function checkDueFollowups() {
       if (!claim.modifiedCount) continue;
 
       try {
-        const assigned = normalize(followup.assignedTo);
+        const clientKey = followup.clientId === undefined || followup.clientId === null ? '' : String(followup.clientId);
+        const client = clientKey ? await clientsCollection.findOne({ $or: [
+          { recordKey: clientKey },
+          { id: /^\d+$/.test(clientKey) ? Number(clientKey) : clientKey }
+        ] }) : null;
+        // Some follow-up records omit assignedTo; use the linked client's owner as fallback.
+        const assignedValue = followup.assignedTo || client?.assignedTo || '';
+        const assigned = normalize(assignedValue);
         const assignedUser = users.find(u => normalize(u.name) === assigned || normalize(u.email) === assigned);
         const recipients = new Set(adminEmails);
         if (assignedUser?.email) recipients.add(normalize(assignedUser.email));
+        else if (assigned.includes('@')) recipients.add(assigned);
         const validRecipients = [...recipients].filter(email => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
         if (!validRecipients.length) {
           await followupsCollection.updateOne({ _id: followup._id }, { $unset: { reminderClaimedAt: '' } });
-          console.warn(`No email recipients configured for due follow-up ${followup.recordKey || followup.id || followup._id}`);
+          console.warn(`No email recipients configured for due follow-up ${followup.recordKey || followup.id || followup._id}; assignedTo="${assignedValue}"`);
           continue;
         }
 
-        const clientKey = followup.clientId === undefined || followup.clientId === null ? '' : String(followup.clientId);
-        const client = clientKey ? await clientsCollection.findOne({ $or: [{ recordKey: clientKey }, { id: /^\d+$/.test(clientKey) ? Number(clientKey) : clientKey }] }) : null;
         const clientName = followup.clientName || client?.name || followup.name || 'Not specified';
         const subject = `Roving CRM Follow-up Due: ${clientName}`;
         const rows = [
           ['Client Name', clientName], ['Phone', followup.clientPhone || client?.phone || followup.phone],
           ['Email', followup.clientEmail || client?.email || followup.email], ['Lead Source', followup.source || client?.source],
-          ['Assigned To', followup.assignedTo], ['Follow-up Type', followup.type],
-          ['Follow-up Date & Time', dateText(followup.dateTime || followup.scheduledAt || followup.scheduledDateTime)], ['Priority', followup.priority],
+          ['Assigned To', assignedValue], ['Follow-up Type', followup.type],
+          ['Follow-up Date & Time', dateText(followupDateValue(followup))], ['Priority', followup.priority],
           ['Status', followup.status], ['Last Contact', dateText(followup.lastContactAt)],
           ['Latest Result', followup.result], ['Note', followup.notes]
         ];
@@ -555,7 +573,7 @@ async function checkDueFollowups() {
         console.log(`Follow-up reminder email sent for ${clientName} to ${validRecipients.length} recipient(s)`);
       } catch (sendErr) {
         await followupsCollection.updateOne({ _id: followup._id }, { $unset: { reminderClaimedAt: '' } });
-        throw sendErr;
+        console.error(`Follow-up reminder send failed (${followup.recordKey || followup.id || followup._id}):`, sendErr.message);
       }
     }
   } catch (err) {
