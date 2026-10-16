@@ -642,65 +642,11 @@
     </div>
 </div>
 
-<!-- Modal: Follow-up Action -->
-<div class="modal fade" id="followupActionModal" tabindex="-1">
-  <div class="modal-dialog modal-lg"><div class="modal-content">
-    <div class="modal-header"><h5 class="modal-title fw-bold text-roving-green">Follow-up Action</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-    <div class="modal-body">
-      <input type="hidden" id="actionFollowupId">
-      <div id="followupActionClientInfo" class="alert alert-light border mb-3"></div>
-      <div class="mb-3"><label class="form-label fw-semibold">Result / Action</label>
-        <div class="d-flex gap-2 flex-wrap">
-          <button type="button" class="btn btn-outline-danger" onclick="handleFollowupOutcome('Lose')"><i class="fa-solid fa-xmark me-1"></i> Lose</button>
-          <button type="button" class="btn btn-outline-success" onclick="handleFollowupOutcome('Booking')"><i class="fa-solid fa-bookmark me-1"></i> Booking</button>
-          <button type="button" class="btn btn-outline-primary" onclick="showNewFollowupFields()"><i class="fa-solid fa-phone me-1"></i> New Follow-up</button>
-        </div>
-      </div>
-      <div id="newFollowupFields" class="d-none">
-        <div class="row g-3">
-          <div class="col-md-6"><label class="form-label fw-semibold">Last Contact Date</label><input type="datetime-local" id="followupLastContactAt" class="form-control" readonly></div>
-          <div class="col-md-6"><label class="form-label fw-semibold">Result</label><input type="text" id="followupResult" class="form-control" placeholder="Client result / response"></div>
-          <div class="col-12"><label class="form-label fw-semibold">New Note</label><textarea id="followupNewNote" class="form-control" rows="3" placeholder="Write the new note. This will be saved separately from the previous note."></textarea></div>
-          <div class="col-md-6"><label class="form-label fw-semibold">Next Follow-up Date & Time</label><input type="datetime-local" id="followupNextDateTime" class="form-control" required></div>
-        </div>
-        <button type="button" class="btn btn-primary w-100 mt-3 fw-bold" onclick="saveNewFollowupFromAction()"><i class="fa-solid fa-plus me-1"></i> Add Follow-up</button>
-      </div>
-    </div>
-  </div></div>
-</div>
-
-<!-- Modal: Follow-up Action -->
-<div class="modal fade" id="followupActionModal" tabindex="-1">
-  <div class="modal-dialog modal-lg"><div class="modal-content">
-    <div class="modal-header"><h5 class="modal-title fw-bold text-roving-green">Follow-up Action</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-    <div class="modal-body">
-      <input type="hidden" id="actionFollowupId">
-      <div id="followupActionClientInfo" class="alert alert-light border mb-3"></div>
-      <div class="mb-3"><label class="form-label fw-semibold">Result / Action</label>
-        <div class="d-flex gap-2 flex-wrap">
-          <button type="button" class="btn btn-outline-danger" onclick="handleFollowupOutcome('Lose')"><i class="fa-solid fa-xmark me-1"></i> Lose</button>
-          <button type="button" class="btn btn-outline-success" onclick="handleFollowupOutcome('Booking')"><i class="fa-solid fa-bookmark me-1"></i> Booking</button>
-          <button type="button" class="btn btn-outline-primary" onclick="showNewFollowupFields()"><i class="fa-solid fa-phone me-1"></i> New Follow-up</button>
-        </div>
-      </div>
-      <div id="newFollowupFields" class="d-none">
-        <div class="row g-3">
-          <div class="col-md-6"><label class="form-label fw-semibold">Last Contact Date</label><input type="datetime-local" id="followupLastContactAt" class="form-control" readonly></div>
-          <div class="col-md-6"><label class="form-label fw-semibold">Result</label><input type="text" id="followupResult" class="form-control" placeholder="Client result / response"></div>
-          <div class="col-12"><label class="form-label fw-semibold">New Note</label><textarea id="followupNewNote" class="form-control" rows="3" placeholder="Write the new note. This will be saved separately from the previous note."></textarea></div>
-          <div class="col-md-6"><label class="form-label fw-semibold">Next Follow-up Date & Time</label><input type="datetime-local" id="followupNextDateTime" class="form-control" required></div>
-        </div>
-        <button type="button" class="btn btn-primary w-100 mt-3 fw-bold" onclick="saveNewFollowupFromAction()"><i class="fa-solid fa-plus me-1"></i> Add Follow-up</button>
-      </div>
-    </div>
-  </div></div>
-</div>
-
 <!-- Modal: Add / Edit Booking -->
 <div class="modal fade" id="addBookingModal" tabindex="-1">
  <div class="modal-dialog modal-xl"><div class="modal-content"><div class="modal-header">
   <h5 class="modal-title fw-bold text-roving-green" id="bookingModalTitle">Add Booking & Installments</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button>
- </div><div class="modal-body"><form id="addBookingForm"><input type="hidden" id="editingBookingId" value=""><input type="hidden" id="sourceFollowupId" value=""><input type="hidden" id="sourceFollowupId" value="">
+ </div><div class="modal-body"><form id="addBookingForm"><input type="hidden" id="editingBookingId" value="">
   <div class="row g-3">
    <div class="col-md-6"><label class="form-label fw-semibold">Select Client <span class="text-danger">*</span></label><input type="search" id="bookingClientSearch" class="form-control mb-2" placeholder="Search client by name or phone..." autocomplete="off"><select id="bookingClientSelect" class="form-select" required></select><div class="form-text">Search by customer name or phone number.</div></div>
    <div class="col-md-3"><label class="form-label fw-semibold">Category <span class="text-danger">*</span></label><select id="bookingCategory" class="form-select" required onchange="handleBookingCategoryChange()"><option value="" disabled selected>-- Select Category --</option><option value="Flight">Flight</option><option value="Hotel Accommodation">Hotel Accommodation</option><option value="Full Package">Full Package</option><option value="Visa">Visa</option><option value="Transportation">Transportation</option><option value="Other">Other</option></select></div>
@@ -851,8 +797,8 @@ async function saveRecord(apiName, localKey, record) {
     const idx = list.findIndex(x => String(x.id ?? x._id) === id);
     if (idx >= 0) list[idx] = record; else list.unshift(record);
     localStorage.setItem(localKey, JSON.stringify(list));
-    // Do not silently treat a local-only save as a successful shared CRM save.
-    return await apiRequest(`/api/${apiName}`, { method:'POST', body:JSON.stringify(record) });
+    try { await apiRequest(`/api/${apiName}`, { method:'POST', body:JSON.stringify(record) }); }
+    catch (error) { console.warn(`Could not sync ${apiName}:`, error); }
 }
 
 async function deleteRecord(apiName, localKey, id) {
@@ -1037,21 +983,7 @@ function clearSession(showLoginMessage = false) {
     }
 }
 
-async function syncUsersForEmailNotifications() {
-    try {
-        const safeUsers = (Array.isArray(validUsers) ? validUsers : []).map(u => ({
-            id: String(u.email || '').toLowerCase(), email: u.email || '', name: u.name || '', role: u.role || ''
-        })).filter(u => u.id && u.email);
-        for (const user of safeUsers) {
-            await apiRequest('/api/users', { method: 'POST', body: JSON.stringify(user) });
-        }
-    } catch (error) {
-        console.warn('Could not sync email recipients with backend:', error);
-    }
-}
-
 function startSession(user) {
-    syncUsersForEmailNotifications();
     const startedAt = Date.now();
     sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(user));
     sessionStorage.setItem(SESSION_STARTED_KEY, String(startedAt));
@@ -1406,13 +1338,6 @@ async function handleSaveBooking(e) {
         showNotification('Booking added successfully!', 'success');
     }
     await saveRecord('bookings', 'roving_bookings', bookingObj);
-    const sourceFollowupId = document.getElementById('sourceFollowupId')?.value || '';
-    if (sourceFollowupId) {
-        const source = followups.find(f => String(f.id) === String(sourceFollowupId));
-        if (source) { source.status='Completed'; source.actionOutcome='Booking'; source.lastContactAt=new Date().toISOString(); source.result='Booking'; await saveRecord('followups','roving_followups',source); }
-        document.getElementById('sourceFollowupId').value='';
-        renderFollowups();
-    }
     const modal = bootstrap.Modal.getInstance(document.getElementById('addBookingModal'));
     if (modal) modal.hide();
     renderBookings(); renderCommissions();
@@ -1469,41 +1394,27 @@ async function saveFollowupsToStorage() {
 
 async function handleSaveFollowup(e) {
     e.preventDefault();
-    const form = e.currentTarget;
     const editingId = document.getElementById('editingFollowupId').value;
-    const selectedClientId = document.getElementById('followupClientSelect').value;
-    const client = clients.find(c => String(c._id ?? c.id ?? '') === String(selectedClientId));
-    if (!client) {
-        showNotification('اختار العميل من القائمة قبل الحفظ.', 'warning');
-        return;
-    }
-    const dateTime = document.getElementById('followupDateTime').value;
-    if (!dateTime || Number.isNaN(new Date(dateTime).getTime())) {
-        showNotification('حدد تاريخ ووقت صحيح للمتابعة.', 'warning');
-        return;
-    }
+    const client = clients.find(c => c._id === document.getElementById('followupClientSelect').value);
+    if (!client) return;
 
-    const oldFollowup = editingId !== '' ? followups.find(f => String(f.id ?? f._id) === String(editingId)) : null;
+    const oldFollowup = editingId !== '' ? followups.find(f => String(f.id) === String(editingId)) : null;
     const chatFile = document.getElementById('followupChatFile')?.files?.[0];
     let attachmentData = oldFollowup?.attachmentData || '', attachmentName = oldFollowup?.attachmentName || '';
     if (chatFile) {
-        if (chatFile.size > 1.5 * 1024 * 1024) {
-            showNotification('الملف أكبر من 1.5 ميجابايت. اختار ملف أصغر.', 'warning');
-            return;
-        }
+        if (chatFile.size > 1.5 * 1024 * 1024) { showNotification('الملف أكبر من 1.5 ميجابايت. اختار ملف أصغر.', 'warning'); return; }
         try { attachmentData = await readFileAsDataURL(chatFile); attachmentName = chatFile.name; }
         catch (err) { showNotification('تعذر قراءة المرفق.', 'danger'); return; }
     }
-
     const followupObj = {
         ...(oldFollowup || {}),
-        id: editingId !== '' ? (oldFollowup?.id ?? oldFollowup?._id ?? editingId) : Date.now(),
-        clientId: client._id ?? client.id,
+        id: editingId !== "" ? Number(editingId) : Date.now(),
+        clientId: client._id,
         clientName: client.name,
         clientPhone: client.phone || 'N/A',
         type: document.getElementById('followupType').value,
         status: document.getElementById('followupStatusSelect').value,
-        dateTime,
+        dateTime: document.getElementById('followupDateTime').value,
         assignedTo: document.getElementById('followupAssignedTo').value,
         priority: document.getElementById('followupPriority').value,
         notes: document.getElementById('followupNotes').value.trim(),
@@ -1512,25 +1423,18 @@ async function handleSaveFollowup(e) {
         lastActionAt: (document.getElementById('followupStatusSelect').value === 'Completed' || document.getElementById('followupStatusSelect').value === 'In Progress' || document.getElementById('followupNotes').value.trim()) ? new Date().toISOString() : (oldFollowup?.lastActionAt || '')
     };
 
-    const saveButton = form.querySelector('button[type="submit"], button:not([type])');
-    if (saveButton) { saveButton.disabled = true; saveButton.textContent = 'Saving...'; }
-    try {
-        await saveRecord('followups', 'roving_followups', followupObj);
-        if (editingId !== '') {
-            const idx = followups.findIndex(f => String(f.id ?? f._id) === String(editingId));
-            if (idx !== -1) followups[idx] = followupObj; else followups.unshift(followupObj);
-        } else {
-            followups.unshift(followupObj);
-        }
-        showNotification('تم حفظ المتابعة بنجاح.', 'success');
-        bootstrap.Modal.getInstance(document.getElementById('addFollowupModal'))?.hide();
-        renderFollowups();
-    } catch (error) {
-        console.error('Failed to save follow-up:', error);
-        showNotification(`فشل حفظ المتابعة على السيرفر: ${error.message || 'خطأ غير معروف'}`, 'danger');
-    } finally {
-        if (saveButton) { saveButton.disabled = false; saveButton.textContent = 'Save Follow-up'; }
+    if (editingId !== "") {
+        const idx = followups.findIndex(f => f.id == editingId);
+        if (idx !== -1) followups[idx] = followupObj;
+        showNotification('Follow-up updated successfully!', 'success');
+    } else {
+        followups.unshift(followupObj);
+        showNotification('Follow-up added successfully!', 'success');
     }
+
+    await saveRecord('followups','roving_followups',followupObj);
+    bootstrap.Modal.getInstance(document.getElementById('addFollowupModal')).hide();
+    renderFollowups();
 }
 
 function renderFollowups() {
@@ -1538,7 +1442,7 @@ function renderFollowups() {
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    let list = (Array.isArray(followups) ? followups : []).filter(f => f && typeof f === 'object');
+    let list = followups;
     if (currentUser && currentUser.role === 'Sales') {
         list = list.filter(f => f.assignedTo === currentUser.name);
     }
@@ -1551,17 +1455,17 @@ function renderFollowups() {
     list.forEach(f => {
         tbody.innerHTML += `
             <tr>
-                <td><strong>${escapeHtml(f.clientName || '-')}</strong></td>
-                <td><small><i class="fa-solid fa-phone me-1"></i>${escapeHtml(f.clientPhone || '-')}</small></td>
-                <td><span class="badge bg-dark">${escapeHtml(f.type || '-')}</span></td>
-                <td><small>${String(f.dateTime || f.scheduledAt || f.scheduledDateTime || '').replace('T', ' ') || '-'}</small></td>
-                <td><span class="badge bg-light text-dark border">${escapeHtml(f.assignedTo || '-')}</span></td>
-                <td><span class="badge bg-secondary">${escapeHtml(f.priority || 'Normal')}</span></td>
-                <td><span class="badge bg-primary">${escapeHtml(f.status || 'Scheduled')}</span></td>
-                <td><small class="text-muted">${escapeHtml(f.notes || '-')}</small>${f.attachmentData ? `<br><a href="${f.attachmentData}" target="_blank" rel="noopener">📎 ${escapeHtml(f.attachmentName || 'View attachment')}</a>` : ''}${f.status !== 'Completed' && (f.dateTime || f.scheduledAt || f.scheduledDateTime) && new Date(f.dateTime || f.scheduledAt || f.scheduledDateTime || 0) < new Date() ? '<br><span class="badge bg-danger">Overdue · Action needed</span>' : ''}</td>
+                <td><strong>${f.clientName}</strong></td>
+                <td><small><i class="fa-solid fa-phone me-1"></i>${f.clientPhone}</small></td>
+                <td><span class="badge bg-dark">${f.type}</span></td>
+                <td><small>${f.dateTime.replace('T', ' ')}</small></td>
+                <td><span class="badge bg-light text-dark border">${f.assignedTo}</span></td>
+                <td><span class="badge bg-secondary">${f.priority}</span></td>
+                <td><span class="badge bg-primary">${f.status}</span></td>
+                <td><small class="text-muted">${escapeHtml(f.notes || '-')}</small>${f.attachmentData ? `<br><a href="${f.attachmentData}" target="_blank" rel="noopener">📎 ${escapeHtml(f.attachmentName || 'View attachment')}</a>` : ''}${f.status !== 'Completed' && f.dateTime && new Date(f.dateTime) < new Date() ? '<br><span class="badge bg-danger">Overdue · Action needed</span>' : ''}</td>
                 <td>
                     <button class="btn btn-sm btn-outline-primary me-1" title="Edit / Reschedule / Reassign" onclick="editFollowup(${f.id})"><i class="fa-solid fa-pen-to-square"></i></button>
-                    <button class="btn btn-sm btn-outline-success me-1" title="Choose follow-up result" onclick="openFollowupAction(${f.id})"><i class="fa-solid fa-check"></i></button>
+                    <button class="btn btn-sm btn-outline-success me-1" title="Mark action completed" onclick="completeFollowup(${f.id})"><i class="fa-solid fa-check"></i></button>
                     <button class="btn btn-sm btn-outline-danger" onclick="deleteFollowup(${f.id})"><i class="fa-solid fa-trash"></i></button>
                 </td>
             </tr>
@@ -1577,7 +1481,7 @@ function editFollowup(id) {
     document.getElementById('followupModalTitle').innerText = 'Edit / Reschedule Follow-up';
     document.getElementById('editingFollowupId').value = f.id;
     populateClientDropdowns(); populateDropdowns();
-    document.getElementById('followupClientSelect').value = String(f.clientId || f.client_id || '');
+    document.getElementById('followupClientSelect').value = f.clientId;
     document.getElementById('followupType').value = f.type || 'Phone Call';
     document.getElementById('followupStatusSelect').value = f.status || 'Scheduled';
     document.getElementById('followupDateTime').value = f.dateTime || '';
@@ -1590,47 +1494,67 @@ function editFollowup(id) {
 }
 function refreshFollowupAlerts() {
     const now = new Date();
-    const overdue = (followups || []).filter(f => f.status !== 'Completed' && (f.dateTime || f.scheduledAt || f.scheduledDateTime) && new Date(f.dateTime || f.scheduledAt || f.scheduledDateTime || 0) < now && (!currentUser || currentUser.role !== 'Sales' || f.assignedTo === currentUser.name));
-    const noAction = (followups || []).filter(f => f.status !== 'Completed' && !f.lastActionAt && (!currentUser || currentUser.role !== 'Sales' || f.assignedTo === currentUser.name));
+    const isSalesView = currentUser && currentUser.role === 'Sales';
+    const normalizeText = value => String(value || '').toLowerCase().replace(/[ًٌٍَُِّْـ]/g, '').trim();
+    const inaccessiblePattern = /(لا يرد|مش بيرد|لم يرد|عدم الرد|غير متاح|مغلق|رقم خطأ|رقم غير صحيح|تعذر الوصول|لا يمكن الوصول|لم استطع الوصول|لم أستطع الوصول|unreachable|not reachable|no answer|no response|could not reach|couldn't reach|invalid number|phone off)/i;
+    const isRelevantForCurrentUser = f => !isSalesView || f.assignedTo === currentUser.name;
+    const needsNoAction = f => {
+        const status = normalizeText(f.status);
+        const notes = normalizeText([f.notes, f.result, f.lastNote, f.outcome].filter(Boolean).join(' '));
+        const when = f.dateTime ? new Date(f.dateTime) : null;
+        const isActive = !['completed', 'cancelled', 'canceled', 'lost', 'closed', 'done'].includes(status);
+        // Only count tasks that have actually become due. Future tasks and old
+        // legacy rows with no due date should not inflate the sidebar badge.
+        const isDue = when && !Number.isNaN(when.getTime()) && when <= now;
+        // A recorded unsuccessful contact attempt is not an actionable alert
+        // by itself; the user can create/reschedule a new follow-up if needed.
+        const markedUnreachable = inaccessiblePattern.test(notes) || ['unreachable', 'no answer', 'not reachable', 'invalid number'].includes(status);
+        return isActive && isDue && !markedUnreachable && isRelevantForCurrentUser(f);
+    };
+    const actionable = (followups || []).filter(needsNoAction);
+    const overdue = actionable.filter(f => f.status !== 'Completed');
+    // The sidebar is a client count, not a task-row count.
+    const clientKey = f => String(f.clientId || f.client_id || f.clientName || f.client || f.id);
+    const uniqueClientCount = new Set(actionable.map(clientKey)).size;
     const box = document.getElementById('urgentFollowupAlertContainer');
     const badge = document.getElementById('sidebarFollowupBadge');
-    if (badge) { badge.textContent = String(overdue.length + noAction.length); badge.classList.toggle('d-none', overdue.length + noAction.length === 0); }
-    if (box) box.innerHTML = overdue.length ? `<div class="alert alert-danger urgent-pulse-banner"><strong>Follow-ups overdue (${overdue.length})</strong><div class="small">${overdue.slice(0,5).map(f=>`${escapeHtml(f.clientName)} — ${escapeHtml(f.assignedTo)} — ${escapeHtml((f.dateTime||'').replace('T',' '))}`).join('<br>')}</div><button class="btn btn-sm btn-outline-danger mt-2" onclick="switchTab('followups')">Review and take action</button></div>` : (noAction.length ? `<div class="alert alert-warning"><strong>${noAction.length} follow-up(s) still need an action.</strong> <button class="btn btn-sm btn-outline-dark" onclick="switchTab('followups')">Open follow-ups</button></div>` : '');
-}
-
-function openFollowupAction(id) {
-    const f=followups.find(x=>String(x.id)===String(id)); if(!f)return;
-    document.getElementById('actionFollowupId').value=f.id;
-    document.getElementById('followupActionClientInfo').innerHTML=`<strong>${escapeHtml(f.clientName||'')}</strong><br><small>${escapeHtml(f.clientPhone||'')}</small><br><span class="text-muted">Previous note: ${escapeHtml(f.notes||'-')}</span>`;
-    const now=new Date(); now.setMinutes(now.getMinutes()-now.getTimezoneOffset());
-    document.getElementById('followupLastContactAt').value=now.toISOString().slice(0,16);
-    document.getElementById('followupResult').value=''; document.getElementById('followupNewNote').value=''; document.getElementById('followupNextDateTime').value='';
-    document.getElementById('newFollowupFields').classList.add('d-none');
-    new bootstrap.Modal(document.getElementById('followupActionModal')).show();
-}
-function showNewFollowupFields(){
-    document.getElementById('newFollowupFields').classList.remove('d-none');
-    const n=document.getElementById('followupNextDateTime'); if(n&&!n.value){const d=new Date(Date.now()+86400000);d.setMinutes(d.getMinutes()-d.getTimezoneOffset());n.value=d.toISOString().slice(0,16);}
-}
-async function handleFollowupOutcome(outcome){
-    const id=document.getElementById('actionFollowupId').value, f=followups.find(x=>String(x.id)===String(id)); if(!f)return;
-    if(outcome==='Lose'){await deleteFollowup(f.id);const m=bootstrap.Modal.getInstance(document.getElementById('followupActionModal'));if(m)m.hide();showNotification('Follow-up marked as Lose and removed automatically.','success');return;}
-    if(outcome==='Booking'){
-        const m=bootstrap.Modal.getInstance(document.getElementById('followupActionModal'));if(m)m.hide();
-        openAddBookingModal(); document.getElementById('sourceFollowupId').value=f.id; populateClientDropdowns();
-        const cs=document.getElementById('bookingClientSelect'); if(cs){cs.value=String(f.clientId);cs.dispatchEvent(new Event('change',{bubbles:true}));}
-        document.getElementById('bookingDetails').value=`Converted from follow-up. Client: ${f.clientName}. Previous note: ${f.notes||''}`.trim();
-        showNotification('Booking form opened for this client. Complete the booking data to move it to Bookings.','info');
+    if (badge) {
+        badge.textContent = String(uniqueClientCount);
+        badge.classList.toggle('d-none', uniqueClientCount === 0);
     }
+    if (!box) return;
+    const fingerprint = actionable
+        .map(f => `${clientKey(f)}|${f.id || ''}|${f.dateTime || ''}|${f.status || ''}`)
+        .sort().join('::');
+    const storageKey = 'rovingFollowupAlertDismissedFingerprint';
+    let dismissedFingerprint = '';
+    try { dismissedFingerprint = sessionStorage.getItem(storageKey) || ''; } catch (_) {}
+    if (!actionable.length) {
+        box.innerHTML = '';
+        box.classList.add('d-none');
+        try { sessionStorage.removeItem(storageKey); } catch (_) {}
+        return;
+    }
+    window.currentFollowupAlertFingerprint = fingerprint;
+    if (dismissedFingerprint === fingerprint) {
+        box.innerHTML = '';
+        box.classList.add('d-none');
+        return;
+    }
+    box.classList.remove('d-none');
+    const preview = actionable.slice(0, 3).map(f =>
+        `${escapeHtml(f.clientName || f.client || 'Client')} — ${escapeHtml(f.assignedTo || '')} — ${escapeHtml(String(f.dateTime || '').replace('T', ' '))}`
+    ).join('<br>');
+    box.innerHTML = `<div class="alert alert-danger d-flex align-items-start justify-content-between gap-2 py-2 px-3 mb-2" role="alert" style="border-left:4px solid #dc5b3c;border-radius:8px;background:#fff7f4;color:#65302a;box-shadow:none">
+        <div class="small"><strong>Follow-ups needing action (${uniqueClientCount})</strong><div class="mt-1">${preview}${actionable.length > 3 ? `<br><span class="text-muted">and ${actionable.length - 3} more task(s)</span>` : ''}</div>
+        <button class="btn btn-sm btn-outline-danger mt-2 py-1" onclick="switchTab('followups')">Review follow-ups</button></div>
+        <button type="button" class="btn-close" aria-label="Dismiss follow-up alert" title="Close" onclick="dismissFollowupAlert()" style="flex:0 0 auto" ></button>
+    </div>`;
 }
-async function saveNewFollowupFromAction(){
-    const id=document.getElementById('actionFollowupId').value, old=followups.find(x=>String(x.id)===String(id)); if(!old)return;
-    const newNote=document.getElementById('followupNewNote').value.trim(), result=document.getElementById('followupResult').value.trim(), next=document.getElementById('followupNextDateTime').value;
-    if(!newNote||!result||!next){showNotification('Please enter the new note, result, and next follow-up date.','warning');return;}
-    const last=document.getElementById('followupLastContactAt').value||new Date().toISOString();
-    old.status='Completed'; old.actionOutcome='Follow-up'; old.lastContactAt=last; old.result=result; old.lastActionAt=new Date().toISOString(); await saveRecord('followups','roving_followups',old);
-    const nf={id:Date.now(),clientId:old.clientId,clientName:old.clientName,clientPhone:old.clientPhone||'N/A',type:old.type||'Phone Call',status:'Scheduled',dateTime:next,assignedTo:old.assignedTo,priority:old.priority||'Normal',notes:newNote,attachmentData:'',attachmentName:'',notified:false,lastActionAt:'',lastContactAt:last,result,previousFollowupId:old.id,history:[...(Array.isArray(old.history)?old.history:[]),{contactAt:last,result,note:newNote,previousFollowupId:old.id}]};
-    followups.unshift(nf); await saveRecord('followups','roving_followups',nf); const m=bootstrap.Modal.getInstance(document.getElementById('followupActionModal'));if(m)m.hide();renderFollowups();showNotification('New follow-up added successfully. The previous note was kept separately.','success');
+function dismissFollowupAlert() {
+    try { sessionStorage.setItem('rovingFollowupAlertDismissedFingerprint', window.currentFollowupAlertFingerprint || ''); } catch (_) {}
+    const box = document.getElementById('urgentFollowupAlertContainer');
+    if (box) { box.innerHTML = ''; box.classList.add('d-none'); }
 }
 
 async function completeFollowup(id) {
@@ -1824,7 +1748,6 @@ function updateUserInfo(index) {
     validUsers[index].commission = newRate;
 
     localStorage.setItem('roving_users', JSON.stringify(validUsers));
-    syncUsersForEmailNotifications();
     showNotification('User updated successfully!', 'success');
     populateDropdowns();
 }
@@ -1843,7 +1766,6 @@ function handleAddNewUser(e) {
 
     validUsers.push({ name, email, pass, role, commission });
     localStorage.setItem('roving_users', JSON.stringify(validUsers));
-    syncUsersForEmailNotifications();
     bootstrap.Modal.getInstance(document.getElementById('addUserModal')).hide();
     showNotification('New user created successfully!', 'success');
     renderAdminUsers();
@@ -2533,14 +2455,10 @@ async function handleSaveClient(event) {
 }
 
 function editClient(id) {
-    const client = clients.find(c => String(c._id || c.id) === String(id));
-    if (!client) {
-        showNotification('لم يتم العثور على العميل للتعديل. حدّث الصفحة وجرب مرة أخرى.', 'danger');
-        return;
-    }
-    const clientId = String(client._id || client.id);
+    const client = clients.find(c => c._id === id);
+    if (!client) return;
     document.getElementById('clientModalTitle').innerText = "Edit Client";
-    document.getElementById('editingClientId').value = clientId;
+    document.getElementById('editingClientId').value = client._id;
     document.getElementById('clientName').value = client.name || '';
     document.getElementById('clientSource').value = client.source || '';
     document.getElementById('clientStatusSelect').value = client.status || 'New';
@@ -2552,12 +2470,9 @@ function editClient(id) {
 }
 
 function openTransferModal(id) {
-    const client = clients.find(c => String(c._id || c.id) === String(id));
-    if (!client) {
-        showNotification('لم يتم العثور على العميل للتحويل. حدّث الصفحة وجرب مرة أخرى.', 'danger');
-        return;
-    }
-    document.getElementById('transferClientId').value = String(client._id || client.id);
+    const client = clients.find(c => c._id === id);
+    if (!client) return;
+    document.getElementById('transferClientId').value = client._id;
     document.getElementById('transferClientNameDisplay').innerText = client.name;
     populateDropdowns();
     new bootstrap.Modal(document.getElementById('transferClientModal')).show();
