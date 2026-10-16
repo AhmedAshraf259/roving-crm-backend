@@ -32,8 +32,8 @@ function collectionFor(name) {
 
 function recordKeyOf(record) {
   const value = record?.id ?? record?._id ?? record?.email;
-  if (value === undefined || value === null || String(value).trim() === '') return null;
-  return String(value);
+  if (value !== undefined && value !== null && String(value).trim() !== '') return String(value);
+  return `auto_${new mongoose.Types.ObjectId().toString()}`;
 }
 
 function publicRecord(doc) {
@@ -156,14 +156,6 @@ app.post('/api/:collection', async (req, res) => {
     await collection.updateOne({ recordKey }, { $set: data }, { upsert: true });
     const saved = await collection.findOne({ recordKey });
     res.status(200).json(publicRecord(saved));
-    if (['clients', 'followups', 'bookings', 'suppliers', 'users', 'approvals', 'notifications'].includes(req.params.collection)) {
-      void sendAdminActivityEmail({
-        collectionName: req.params.collection,
-        action: req.params.collection === 'notifications' ? 'notification' : (previous ? 'update' : 'create'),
-        record: saved,
-        previous
-      });
-    }
     if (req.params.collection === 'clients' && normalize(saved.assignedTo) &&
         (!previous || normalize(previous.assignedTo) !== normalize(saved.assignedTo))) {
       void sendSalesAssignmentEmail({ client: saved, previous });
@@ -186,14 +178,6 @@ app.put('/api/:collection/:id', async (req, res) => {
     await collection.updateOne({ recordKey: key }, { $set: data }, { upsert: true });
     const saved = await collection.findOne({ recordKey: key });
     res.json(publicRecord(saved));
-    if (['clients', 'followups', 'bookings', 'suppliers', 'users', 'approvals', 'notifications'].includes(req.params.collection)) {
-      void sendAdminActivityEmail({
-        collectionName: req.params.collection,
-        action: req.params.collection === 'notifications' ? 'notification' : (previous ? 'update' : 'create'),
-        record: saved,
-        previous
-      });
-    }
     if (req.params.collection === 'clients' && normalize(saved.assignedTo) &&
         (!previous || normalize(previous.assignedTo) !== normalize(saved.assignedTo))) {
       void sendSalesAssignmentEmail({ client: saved, previous });
@@ -213,14 +197,6 @@ app.delete('/api/:collection/:id', async (req, res) => {
       await collection.deleteOne({ id: /^\d+$/.test(key) ? Number(key) : key });
     }
     res.json({ ok: true });
-    if (['clients', 'followups', 'bookings', 'suppliers', 'users', 'approvals', 'notifications'].includes(req.params.collection)) {
-      void sendAdminActivityEmail({
-        collectionName: req.params.collection,
-        action: 'delete',
-        record: { id: key, name: req.params.collection },
-        previous: null
-      });
-    }
   } catch (err) {
     res.status(400).json({ error: 'Could not delete record', details: err.message });
   }
