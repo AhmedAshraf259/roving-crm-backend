@@ -313,6 +313,43 @@ function followupDateValue(followup) {
     followup?.dueDate || '';
 }
 
+
+function parseFollowupDate(value) {
+  if (value === undefined || value === null || value === '') return new Date(NaN);
+  if (value instanceof Date) return new Date(value.getTime());
+  if (typeof value === 'number') return new Date(value);
+
+  const text = String(value).trim();
+  // datetime-local inputs send "YYYY-MM-DDTHH:mm" without a timezone.
+  // Render commonly runs in UTC, while the CRM user enters Egypt local time.
+  // Interpret timezone-less date-times in FOLLOWUP_TIME_ZONE (default Africa/Cairo)
+  // so the scheduler does not delay reminders by the Egypt/UTC offset.
+  const localMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?(?:\.(\d{1,3}))?$/);
+  if (localMatch) {
+    const [, y, mo, d, h, mi, sec = '0', ms = '0'] = localMatch;
+    const desiredUtcWall = Date.UTC(+y, +mo - 1, +d, +h, +mi, +sec, +(ms.padEnd(3, '0')));
+    const timeZone = process.env.FOLLOWUP_TIME_ZONE || 'Africa/Cairo';
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
+    });
+    // Iteratively solve UTC instant whose wall-clock rendering equals the input.
+    let candidate = desiredUtcWall;
+    for (let i = 0; i < 3; i++) {
+      const parts = Object.fromEntries(formatter.formatToParts(new Date(candidate))
+        .filter(p => p.type !== 'literal').map(p => [p.type, p.value]));
+      const renderedWall = Date.UTC(+parts.year, +parts.month - 1, +parts.day,
+        +parts.hour, +parts.minute, +parts.second, +(ms.padEnd(3, '0')));
+      const delta = desiredUtcWall - renderedWall;
+      candidate += delta;
+      if (delta === 0) break;
+    }
+    return new Date(candidate);
+  }
+  // Preserve explicit timezone/offsets and legacy date formats.
+  return new Date(text);
+}
+
 function preserveFollowupReminderState(collectionName, data, previous) {
   if (collectionName !== 'followups' || !previous) return;
   const oldDate = previous.dateTime || previous.scheduledAt || previous.scheduledDateTime || '';
@@ -489,10 +526,10 @@ async function checkDueFollowups() {
     const candidates = await followupsCollection.find({ notified: { $ne: true } }).toArray();
     const due = candidates.filter(item => {
       if (isCompletedFollowupStatus(item.status)) return false;
-      const when = new Date(followupDateValue(item));
+      const when = parseFollowupDate(followupDateValue(item));
       return !Number.isNaN(when.getTime()) && when <= now;
     });
-    console.log(`Follow-up scheduler check: ${candidates.length} unnotified record(s), ${due.length} due now.`);
+    console.log(`Follow-up scheduler check: ${candidates.length} unnotified record(s), ${due.length} due now; timezone=${process.env.FOLLOWUP_TIME_ZONE || 'Africa/Cairo'}; serverNow=${now.toISOString()}.`);
     if (!due.length) return;
 
     const users = await usersCollection.find({}).toArray();
@@ -503,7 +540,7 @@ async function checkDueFollowups() {
     }
 
     for (const followup of due) {
-      const when = new Date(followupDateValue(followup));
+      const when = parseFollowupDate(followupDateValue(followup));
       if (Number.isNaN(when.getTime()) || when > now) continue;
 
       // Prevent a deployment/restart from replaying a large backlog of old emails.
