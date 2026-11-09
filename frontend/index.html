@@ -1254,16 +1254,25 @@ function switchTab(tabName) {
 
 function populateDropdowns() {
     const selects = ['assignedEmployee', 'transferToEmployee', 'followupAssignedTo', 'bookingAssignedTo'];
+    const users = (Array.isArray(validUsers) ? validUsers : [])
+        .filter(emp => emp && emp.name)
+        .filter((emp, index, arr) => arr.findIndex(x => String(x.name).toLowerCase() === String(emp.name).toLowerCase()) === index);
+
     selects.forEach(id => {
         const el = document.getElementById(id);
-        if(el) {
-            el.innerHTML = '';
-            validUsers.forEach(emp => {
-                el.innerHTML += `<option value="${emp.name}">${emp.name} (${emp.role})</option>`;
-            });
-            if(id === 'bookingAssignedTo' && currentUser) {
-                el.value = currentUser.name;
-            }
+        if (!el) return;
+        const previousValue = el.value;
+        el.innerHTML = '';
+        if (id === 'transferToEmployee') {
+            el.add(new Option('-- Select recipient --', ''));
+        }
+        users.forEach(emp => {
+            el.add(new Option(`${emp.name} (${emp.role || 'User'})`, emp.name));
+        });
+        if (id === 'bookingAssignedTo' && currentUser) {
+            el.value = currentUser.name;
+        } else if (previousValue && Array.from(el.options).some(o => o.value === previousValue)) {
+            el.value = previousValue;
         }
     });
 }
@@ -1398,7 +1407,7 @@ async function handleSaveBooking(e) {
     e.preventDefault();
     const editingId = document.getElementById('editingBookingId').value;
     const clientId = document.getElementById('bookingClientSelect').value;
-    const client = clients.find(c => String(c._id || c.id) === String(clientId));
+    const client = getClientByAnyId(clientId);
     if (!client) { showNotification('Please select a valid client.', 'warning'); return; }
     calculateBookingFinancials();
     const oldBooking = editingId !== '' ? bookings.find(b => String(b.id) === String(editingId)) : null;
@@ -2652,7 +2661,7 @@ setInterval(() => {
 async function handleSaveClient(event) {
     if (event) event.preventDefault();
 
-    const editingId = document.getElementById('editingClientId').value;
+    const editingId = String(document.getElementById('editingClientId').value || '').trim();
 
     const priorClient = editingId !== "" ? clients.find(c => String(c._id || c.id) === String(editingId)) : null;
     const clientData = {
@@ -2725,34 +2734,73 @@ async function handleSaveClient(event) {
     await fetchClients();
 }
 
+function getClientByAnyId(id) {
+    const wanted = String(id ?? '').trim();
+    return (Array.isArray(clients) ? clients : []).find(c =>
+        [c?._id, c?.id, c?.clientId, c?.client_id]
+            .some(value => value !== undefined && value !== null && String(value).trim() === wanted)
+    ) || null;
+}
+
 function editClient(id) {
-    const client = clients.find(c => c._id === id);
-    if (!client) return;
-    document.getElementById('clientModalTitle').innerText = "Edit Client";
-    document.getElementById('editingClientId').value = client._id;
+    const client = getClientByAnyId(id);
+    if (!client) {
+        showNotification('لم يتم العثور على العميل لفتحه للتعديل. حدّث قائمة العملاء وحاول مرة أخرى.', 'danger');
+        return;
+    }
+
+    const clientId = String(client._id ?? client.id ?? client.clientId ?? client.client_id ?? '');
+    document.getElementById('clientModalTitle').innerText = 'Edit Client';
+    document.getElementById('editingClientId').value = clientId;
     document.getElementById('clientName').value = client.name || '';
     document.getElementById('clientSource').value = client.source || '';
     document.getElementById('clientStatusSelect').value = client.status || 'New';
-    document.getElementById('assignedEmployee').value = client.assignedTo || '';
+    populateDropdowns();
+
+    const assignedSelect = document.getElementById('assignedEmployee');
+    if (assignedSelect) {
+        const owner = String(client.assignedTo || '');
+        if (owner && !Array.from(assignedSelect.options).some(o => o.value === owner)) {
+            assignedSelect.add(new Option(owner, owner));
+        }
+        assignedSelect.value = owner;
+    }
+
     document.getElementById('clientPhone').value = client.phone || '';
     document.getElementById('clientPassport').value = client.passport || '';
     document.getElementById('clientNotes').value = client.notes || '';
-    new bootstrap.Modal(document.getElementById('addClientModal')).show();
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('addClientModal')).show();
 }
 
 function openTransferModal(id) {
-    const client = clients.find(c => c._id === id);
-    if (!client) return;
-    document.getElementById('transferClientId').value = client._id;
-    document.getElementById('transferClientNameDisplay').innerText = client.name;
+    const client = getClientByAnyId(id);
+    if (!client) {
+        showNotification('لم يتم العثور على العميل المطلوب تحويله. حدّث قائمة العملاء وحاول مرة أخرى.', 'danger');
+        return;
+    }
+
+    const clientId = String(client._id ?? client.id ?? client.clientId ?? client.client_id ?? '');
+    document.getElementById('transferClientId').value = clientId;
+    document.getElementById('transferClientNameDisplay').innerText = client.name || 'Unnamed client';
+
     populateDropdowns();
-    new bootstrap.Modal(document.getElementById('transferClientModal')).show();
+    const transferSelect = document.getElementById('transferToEmployee');
+    if (transferSelect) {
+        const currentOwner = String(client.assignedTo || '');
+        // Prevent accidentally assigning the client back to the current owner.
+        Array.from(transferSelect.options).forEach(option => {
+            option.disabled = option.value === currentOwner;
+        });
+        if (transferSelect.value === currentOwner) transferSelect.value = '';
+    }
+
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('transferClientModal')).show();
 }
 
 // تنفيذ تحويل العميل لأي مستخدم أو أدمن بدون قيود ومع إرسال الإشعارات فوراً
 async function executeTransfer() {
     const clientId = document.getElementById('transferClientId').value;
-    const newOwner = document.getElementById('transferToEmployee').value;
+    const newOwner = String(document.getElementById('transferToEmployee').value || '').trim();
     const client = clients.find(c => String(c._id || c.id) === String(clientId));
 
     if (!client) {
@@ -2865,9 +2913,9 @@ function renderClients() {
                 <td><span class="badge bg-primary">${client.status || 'New'}</span></td>
                 <td><small class="text-muted">${client.notes || '-'}</small></td>
                 <td>
-                    <button class="btn btn-sm btn-outline-success me-1" onclick="openTransferModal('${clientId}')" title="Transfer Client"><i class="fa-solid fa-right-left"></i></button>
-                    <button class="btn btn-sm btn-outline-primary me-1" onclick="editClient('${clientId}')"><i class="fa-solid fa-pen-to-square"></i></button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteClient('${clientId}')"><i class="fa-solid fa-trash"></i></button>
+                    <button class="btn btn-sm btn-outline-success me-1" onclick='openTransferModal(${JSON.stringify(String(clientId))})'  title="Transfer Client"><i class="fa-solid fa-right-left"></i></button>
+                    <button class="btn btn-sm btn-outline-primary me-1" onclick='editClient(${JSON.stringify(String(clientId))})' ><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" onclick='deleteClient(${JSON.stringify(String(clientId))})' ><i class="fa-solid fa-trash"></i></button>
                 </td>
             </tr>
         `;
