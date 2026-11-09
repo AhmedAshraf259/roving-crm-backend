@@ -316,10 +316,29 @@
                 </div>
 
                 <div class="card card-custom p-3">
-                    <div class="table-responsive">
+                    <div class="card card-custom p-3 mb-3" id="followupBulkToolbar">
+    <div class="d-flex flex-wrap align-items-center gap-2">
+        <label class="form-check mb-0 me-2"><input class="form-check-input" type="checkbox" id="selectAllFollowups" onchange="toggleAllFollowups(this.checked)"> <span class="form-check-label fw-semibold">Select all</span></label>
+        <span class="small text-muted" id="selectedFollowupsCount">0 selected</span>
+        <select id="bulkFollowupAction" class="form-select form-select-sm" style="max-width:220px">
+            <option value="">Choose action for selected</option>
+            <option value="complete">Complete current follow-up</option>
+            <option value="reschedule">Set same follow-up date/time</option>
+            <option value="priority-high">Set priority: High</option>
+            <option value="priority-medium">Set priority: Medium</option>
+            <option value="priority-normal">Set priority: Normal</option>
+        </select>
+        <input type="datetime-local" id="bulkFollowupDateTime" class="form-control form-control-sm" style="max-width:220px" aria-label="New follow-up date and time">
+        <button type="button" class="btn btn-sm btn-primary" onclick="applyBulkFollowupAction()">Apply to selected</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearFollowupSelection()">Clear selection</button>
+    </div>
+    <div class="form-text mt-2">Completing a follow-up removes it from this active list only. The client and follow-up history remain saved.</div>
+</div>
+<div class="table-responsive">
                         <table class="table table-hover align-middle">
                             <thead class="table-light">
                                 <tr>
+                                    <th><input type="checkbox" id="selectAllFollowupsHeader" aria-label="Select all follow-ups" onchange="toggleAllFollowups(this.checked)"></th>
                                     <th>Client Name</th>
                                     <th>Phone</th>
                                     <th>Task Type</th>
@@ -332,7 +351,7 @@
                                 </tr>
                             </thead>
                             <tbody id="followupsTableBody">
-                                <tr><td colspan="9" class="text-center text-muted py-4">No follow-ups recorded</td></tr>
+                                <tr><td colspan="10" class="text-center text-muted py-4">No follow-ups recorded</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1486,7 +1505,6 @@ async function handleSaveFollowup(e) {
     const editingId = document.getElementById('editingFollowupId').value;
     const clientSelect = document.getElementById('followupClientSelect');
     const selectedClientId = String(clientSelect?.value || '').trim();
-    // Client records may use MongoDB _id or the app-level id. Compare both as strings.
     const client = (Array.isArray(clients) ? clients : []).find(c =>
         String(c?._id ?? c?.id ?? '') === selectedClientId
     );
@@ -1497,6 +1515,17 @@ async function handleSaveFollowup(e) {
     }
 
     const oldFollowup = editingId !== '' ? followups.find(f => String(f.id) === String(editingId)) : null;
+    const isOpenFollowup = f => !['completed','lost','cancelled','canceled','closed'].includes(String(f.status || '').trim().toLowerCase());
+    const duplicate = (Array.isArray(followups) ? followups : []).find(f =>
+        String(f.id) !== String(editingId) &&
+        String(f.clientId ?? f.client_id ?? '') === selectedClientId &&
+        isOpenFollowup(f)
+    );
+    if (!oldFollowup && duplicate) {
+        showNotification(`العميل ${client.name} لديه متابعة نشطة بالفعل. افتح المتابعة الحالية وعدّل موعدها بدل إنشاء متابعة مكررة.`, 'warning');
+        return;
+    }
+
     const chatFile = document.getElementById('followupChatFile')?.files?.[0];
     let attachmentData = oldFollowup?.attachmentData || '', attachmentName = oldFollowup?.attachmentName || '';
     if (chatFile) {
@@ -1504,6 +1533,7 @@ async function handleSaveFollowup(e) {
         try { attachmentData = await readFileAsDataURL(chatFile); attachmentName = chatFile.name; }
         catch (err) { showNotification('تعذر قراءة المرفق.', 'danger'); return; }
     }
+    const selectedStatus = document.getElementById('followupStatusSelect').value;
     const followupObj = {
         ...(oldFollowup || {}),
         id: editingId !== "" ? Number(editingId) : Date.now(),
@@ -1511,18 +1541,18 @@ async function handleSaveFollowup(e) {
         clientName: client.name,
         clientPhone: client.phone || 'N/A',
         type: document.getElementById('followupType').value,
-        status: document.getElementById('followupStatusSelect').value,
+        status: selectedStatus,
         dateTime: document.getElementById('followupDateTime').value,
         assignedTo: document.getElementById('followupAssignedTo').value,
         priority: document.getElementById('followupPriority').value,
         notes: document.getElementById('followupNotes').value.trim(),
         attachmentData, attachmentName,
         notified: false,
-        lastActionAt: (document.getElementById('followupStatusSelect').value === 'Completed' || document.getElementById('followupStatusSelect').value === 'In Progress' || document.getElementById('followupNotes').value.trim()) ? new Date().toISOString() : (oldFollowup?.lastActionAt || '')
+        lastActionAt: (selectedStatus === 'Completed' || selectedStatus === 'In Progress' || document.getElementById('followupNotes').value.trim()) ? new Date().toISOString() : (oldFollowup?.lastActionAt || '')
     };
 
     if (editingId !== "") {
-        const idx = followups.findIndex(f => f.id == editingId);
+        const idx = followups.findIndex(f => String(f.id) === String(editingId));
         if (idx !== -1) followups[idx] = followupObj;
     } else {
         followups.unshift(followupObj);
@@ -1546,36 +1576,114 @@ function renderFollowups() {
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    let list = followups;
+    const isActive = f => !['completed','lost','cancelled','canceled','closed'].includes(String(f.status || '').trim().toLowerCase());
+    let list = (Array.isArray(followups) ? followups : []).filter(isActive);
+
     if (currentUser && currentUser.role === 'Sales') {
         list = list.filter(f => f.assignedTo === currentUser.name);
     }
 
+    // Show only one active row per client (the newest active task).
+    const seenClients = new Set();
+    list = list.filter(f => {
+        const key = String(f.clientId ?? f.client_id ?? f.clientName ?? f.client ?? f.id);
+        if (seenClients.has(key)) return false;
+        seenClients.add(key);
+        return true;
+    });
+
     if (list.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">No follow-ups recorded</td></tr>`;
-        refreshFollowupAlerts(); return;
+        tbody.innerHTML = `<tr><td colspan="10" class="text-center text-muted py-4">No active follow-ups. Clients remain saved in the Clients section.</td></tr>`;
+        refreshFollowupAlerts();
+        updateFollowupSelectionCount();
+        return;
     }
 
     list.forEach(f => {
         tbody.innerHTML += `
             <tr>
-                <td><strong>${f.clientName}</strong></td>
-                <td><small><i class="fa-solid fa-phone me-1"></i>${f.clientPhone}</small></td>
-                <td><span class="badge bg-dark">${f.type}</span></td>
+                <td><input type="checkbox" class="followup-row-select" value="${escapeHtml(String(f.id))}" onchange="updateFollowupSelectionCount()" aria-label="Select ${escapeHtml(f.clientName || 'client')}"></td>
+                <td><strong>${escapeHtml(f.clientName || '')}</strong></td>
+                <td><small><i class="fa-solid fa-phone me-1"></i>${escapeHtml(f.clientPhone || '')}</small></td>
+                <td><span class="badge bg-dark">${escapeHtml(f.type || '')}</span></td>
                 <td><small>${escapeHtml(String(f.dateTime || f.scheduledAt || f.scheduledDateTime || 'Date not set').replace('T', ' '))}</small></td>
-                <td><span class="badge bg-light text-dark border">${f.assignedTo}</span></td>
-                <td><span class="badge bg-secondary">${f.priority}</span></td>
-                <td><span class="badge bg-primary">${f.status}</span></td>
-                <td><small class="text-muted">${escapeHtml(f.notes || '-')}</small>${f.attachmentData ? `<br><a href="${f.attachmentData}" target="_blank" rel="noopener">📎 ${escapeHtml(f.attachmentName || 'View attachment')}</a>` : ''}${f.status !== 'Completed' && f.dateTime && new Date(f.dateTime) < new Date() ? '<br><span class="badge bg-danger">Overdue · Action needed</span>' : ''}</td>
+                <td><span class="badge bg-light text-dark border">${escapeHtml(f.assignedTo || '')}</span></td>
+                <td><span class="badge bg-secondary">${escapeHtml(f.priority || '')}</span></td>
+                <td><span class="badge bg-primary">${escapeHtml(f.status || '')}</span></td>
+                <td><small class="text-muted">${escapeHtml(f.notes || '-')}</small>${f.attachmentData ? `<br><a href="${f.attachmentData}" target="_blank" rel="noopener">📎 ${escapeHtml(f.attachmentName || 'View attachment')}</a>` : ''}${f.dateTime && new Date(f.dateTime) < new Date() ? '<br><span class="badge bg-danger">Overdue · Action needed</span>' : ''}</td>
                 <td>
-                    <button class="btn btn-sm btn-outline-primary me-1" title="Edit / Reschedule / Reassign" onclick="editFollowup(${f.id})"><i class="fa-solid fa-pen-to-square"></i></button>
-                    <button class="btn btn-sm btn-outline-success me-1" title="Choose follow-up result" onclick="openFollowupAction(${f.id})"><i class="fa-solid fa-check"></i></button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteFollowup(${f.id})"><i class="fa-solid fa-trash"></i></button>
+                    <button class="btn btn-sm btn-outline-primary me-1" title="Edit / Reschedule / Reassign" onclick="editFollowup(${Number(f.id)})"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button class="btn btn-sm btn-outline-success me-1" title="Choose follow-up result" onclick="openFollowupAction(${Number(f.id)})"><i class="fa-solid fa-check"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" title="Archive follow-up (does not delete client)" onclick="archiveFollowup(${Number(f.id)})"><i class="fa-solid fa-box-archive"></i></button>
                 </td>
             </tr>
         `;
     });
+    updateFollowupSelectionCount();
     refreshFollowupAlerts();
+}
+
+function getSelectedFollowupIds() {
+    return Array.from(document.querySelectorAll('.followup-row-select:checked')).map(el => String(el.value));
+}
+function updateFollowupSelectionCount() {
+    const count = getSelectedFollowupIds().length;
+    const label = document.getElementById('selectedFollowupsCount');
+    if (label) label.textContent = `${count} selected`;
+    const all = document.getElementById('selectAllFollowups');
+    const header = document.getElementById('selectAllFollowupsHeader');
+    const total = document.querySelectorAll('.followup-row-select').length;
+    if (all) all.checked = total > 0 && count === total;
+    if (header) header.checked = total > 0 && count === total;
+}
+function toggleAllFollowups(checked) {
+    document.querySelectorAll('.followup-row-select').forEach(el => { el.checked = !!checked; });
+    const all = document.getElementById('selectAllFollowups');
+    const header = document.getElementById('selectAllFollowupsHeader');
+    if (all) all.checked = !!checked;
+    if (header) header.checked = !!checked;
+    updateFollowupSelectionCount();
+}
+function clearFollowupSelection() { toggleAllFollowups(false); }
+async function applyBulkFollowupAction() {
+    const ids = getSelectedFollowupIds();
+    const action = document.getElementById('bulkFollowupAction')?.value || '';
+    if (!ids.length) { showNotification('حدد عميلًا واحدًا على الأقل أولًا.', 'warning'); return; }
+    if (!action) { showNotification('اختر الإجراء المطلوب تطبيقه.', 'warning'); return; }
+
+    if (action === 'reschedule') {
+        const dateTime = document.getElementById('bulkFollowupDateTime')?.value || '';
+        if (!dateTime) { showNotification('حدد تاريخ ووقت المتابعة الجديدة.', 'warning'); return; }
+        for (const id of ids) {
+            const f = followups.find(x => String(x.id) === id);
+            if (!f) continue;
+            f.dateTime = dateTime; f.status = 'Scheduled'; f.notified = false;
+            await saveRecord('followups','roving_followups',f);
+        }
+    } else {
+        for (const id of ids) {
+            const f = followups.find(x => String(x.id) === id);
+            if (!f) continue;
+            if (action === 'complete') {
+                f.status = 'Completed'; f.completedAt = new Date().toISOString(); f.lastActionAt = f.completedAt;
+            } else if (action === 'priority-high') f.priority = 'High';
+            else if (action === 'priority-medium') f.priority = 'Medium';
+            else if (action === 'priority-normal') f.priority = 'Normal';
+            await saveRecord('followups','roving_followups',f);
+        }
+    }
+    clearFollowupSelection();
+    renderFollowups();
+    showNotification(`تم تطبيق الإجراء على ${ids.length} عميل. بيانات العملاء لم تُحذف.`, 'success');
+}
+async function archiveFollowup(id) {
+    const f = followups.find(x => String(x.id) === String(id));
+    if (!f) return;
+    if (!confirm('إغلاق المتابعة الحالية؟ سيختفي سجلها من القائمة النشطة، وسيظل العميل وسجل المتابعة محفوظين.')) return;
+    f.status = 'Completed'; f.completedAt = new Date().toISOString(); f.lastActionAt = f.completedAt;
+    await saveRecord('followups','roving_followups',f);
+    renderFollowups();
+    showNotification('تم إغلاق المتابعة. العميل ما زال محفوظًا في قائمة العملاء.', 'success');
 }
 
 
@@ -1694,7 +1802,7 @@ function showNewFollowupFields(){
 }
 async function handleFollowupOutcome(outcome){
     const id=document.getElementById('actionFollowupId').value, f=followups.find(x=>String(x.id)===String(id)); if(!f)return;
-    if(outcome==='Lose'){await deleteFollowup(f.id);const m=bootstrap.Modal.getInstance(document.getElementById('followupActionModal'));if(m)m.hide();showNotification('Follow-up marked as Lose and removed automatically.','success');return;}
+    if(outcome==='Lose'){f.status='Lost';f.lostAt=new Date().toISOString();f.lastActionAt=f.lostAt;await saveRecord('followups','roving_followups',f);const m=bootstrap.Modal.getInstance(document.getElementById('followupActionModal'));if(m)m.hide();renderFollowups();showNotification('تم تسجيل العميل Lost وإغلاق المتابعة. بيانات العميل وسجل المتابعة محفوظان.','success');return;}
     if(outcome==='Booking'){
         const m=bootstrap.Modal.getInstance(document.getElementById('followupActionModal'));if(m)m.hide();
         openAddBookingModal(); document.getElementById('sourceFollowupId').value=f.id; populateClientDropdowns();
@@ -1706,6 +1814,8 @@ async function handleFollowupOutcome(outcome){
 async function saveNewFollowupFromAction(){
     const id=document.getElementById('actionFollowupId').value, old=followups.find(x=>String(x.id)===String(id)); if(!old)return;
     const newNote=document.getElementById('followupNewNote').value.trim(), result=document.getElementById('followupResult').value.trim(), next=document.getElementById('followupNextDateTime').value;
+    const duplicateActive = followups.find(x => String(x.id) !== String(old.id) && String(x.clientId ?? x.client_id ?? '') === String(old.clientId) && !['completed','lost','cancelled','canceled','closed'].includes(String(x.status || '').toLowerCase()));
+    if (duplicateActive) { showNotification('هذا العميل لديه متابعة نشطة بالفعل؛ لن يتم إنشاء متابعة مكررة.', 'warning'); return; }
     if(!newNote||!result||!next){showNotification('Please enter the new note, result, and next follow-up date.','warning');return;}
     const last=document.getElementById('followupLastContactAt').value||new Date().toISOString();
     old.status='Completed'; old.actionOutcome='Follow-up'; old.lastContactAt=last; old.result=result; old.lastActionAt=new Date().toISOString(); await saveRecord('followups','roving_followups',old);
@@ -1714,12 +1824,14 @@ async function saveNewFollowupFromAction(){
 }
 
 async function completeFollowup(id) {
-    const f = followups.find(x => x.id === id);
+    const f = followups.find(x => String(x.id) === String(id));
     if (!f) return;
     f.status = 'Completed';
+    f.completedAt = new Date().toISOString();
+    f.lastActionAt = f.completedAt;
     await saveRecord('followups','roving_followups',f);
     renderFollowups();
-    showNotification('Follow-up marked as completed!', 'success');
+    showNotification('تم إغلاق المتابعة. العميل وسجل المتابعة ما زالا محفوظين.', 'success');
 }
 
 async function deleteFollowup(id) {
