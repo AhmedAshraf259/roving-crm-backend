@@ -180,6 +180,10 @@
         .followup-select-cell{width:42px;text-align:center!important}
         @media(max-width:575px){#followupBulkActionBar{bottom:10px;gap:7px;padding:9px}#followupBulkActionBar .btn{font-size:12px;padding:6px 9px}}
 
+
+        #followupFilterSummary{font-size:.82rem}
+        #followupViewFilter,#followupAssigneeFilter,#followupExactDateFilter,#followupFromDateFilter,#followupToDateFilter,#followupSearchFilter{min-height:40px}
+
     </style>
 </head>
 <body>
@@ -292,6 +296,49 @@
                             <input type="text" id="clientPhoneSearch" class="form-control" placeholder="Type phone number..." oninput="renderClients()">
                         </div>
                     </div>
+                </div>
+
+                <div class="card card-custom p-3 mb-3">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-xl-3 col-md-6">
+                            <label class="form-label small fw-semibold">Show</label>
+                            <select id="followupViewFilter" class="form-select" onchange="renderFollowups()">
+                                <option value="all">All active follow-ups</option>
+                                <option value="mine">Assigned to me</option>
+                                <option value="not_contacted">Not contacted yet</option>
+                                <option value="overdue">Overdue</option>
+                                <option value="today">Due today</option>
+                                <option value="upcoming">Upcoming</option>
+                            </select>
+                        </div>
+                        <div class="col-xl-2 col-md-6">
+                            <label class="form-label small fw-semibold">Assigned to</label>
+                            <select id="followupAssigneeFilter" class="form-select" onchange="renderFollowups()">
+                                <option value="">All users</option>
+                            </select>
+                        </div>
+                        <div class="col-xl-2 col-md-6">
+                            <label class="form-label small fw-semibold">Exact date</label>
+                            <input type="date" id="followupExactDateFilter" class="form-control" onchange="renderFollowups()">
+                        </div>
+                        <div class="col-xl-2 col-md-6">
+                            <label class="form-label small fw-semibold">From date</label>
+                            <input type="date" id="followupFromDateFilter" class="form-control" onchange="renderFollowups()">
+                        </div>
+                        <div class="col-xl-2 col-md-6">
+                            <label class="form-label small fw-semibold">To date</label>
+                            <input type="date" id="followupToDateFilter" class="form-control" onchange="renderFollowups()">
+                        </div>
+                        <div class="col-xl-1 col-md-6 d-grid">
+                            <button type="button" class="btn btn-outline-secondary" onclick="resetFollowupFilters()" title="Reset filters">
+                                <i class="fa-solid fa-rotate-left"></i>
+                            </button>
+                        </div>
+                        <div class="col-12">
+                            <input type="search" id="followupSearchFilter" class="form-control" placeholder="Search client name, phone, task or notes..." oninput="renderFollowups()">
+                        </div>
+                    </div>
+                    <div class="small text-muted mt-2" id="followupFilterSummary">Showing all active follow-ups</div>
                 </div>
 
                 <div class="card card-custom p-3">
@@ -1589,9 +1636,71 @@ function getFollowupClientKey(f) {
 function isActiveFollowup(f) {
     return ['scheduled', 'postponed', 'in progress'].includes(String(f.status || '').trim().toLowerCase());
 }
+function populateFollowupAssigneeFilter() {
+    const select = document.getElementById('followupAssigneeFilter');
+    if (!select) return;
+    const previous = select.value;
+    const names = new Set();
+    (Array.isArray(validUsers) ? validUsers : []).forEach(u => { if (u && u.name) names.add(String(u.name)); });
+    (Array.isArray(followups) ? followups : []).forEach(f => { if (f && f.assignedTo) names.add(String(f.assignedTo)); });
+    select.innerHTML = '<option value="">All users</option>' +
+        [...names].sort((a,b) => a.localeCompare(b)).map(name =>
+            `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`
+        ).join('');
+    if ([...select.options].some(o => o.value === previous)) select.value = previous;
+}
+function hasFollowupContactRecord(f) {
+    const values = [f.lastContactAt, f.result, f.actionOutcome, f.contactOutcome, f.callResult];
+    const hasExplicitValue = values.some(v => String(v || '').trim() !== '');
+    const hasHistory = Array.isArray(f.history) && f.history.length > 0;
+    const completedState = ['completed', 'lost', 'booked', 'booking', 'closed'].includes(String(f.status || '').trim().toLowerCase());
+    return hasExplicitValue || hasHistory || completedState;
+}
 function getVisibleActiveFollowups() {
     let list = Array.isArray(followups) ? followups.filter(isActiveFollowup) : [];
-    if (currentUser && currentUser.role === 'Sales') list = list.filter(f => f.assignedTo === currentUser.name);
+    // Preserve the existing Sales visibility rule: Sales users only see their own tasks.
+    if (currentUser && currentUser.role === 'Sales') {
+        list = list.filter(f => String(f.assignedTo || '') === String(currentUser.name || ''));
+    }
+
+    const view = document.getElementById('followupViewFilter')?.value || 'all';
+    const assignee = document.getElementById('followupAssigneeFilter')?.value || '';
+    const exactDate = document.getElementById('followupExactDateFilter')?.value || '';
+    const fromDate = document.getElementById('followupFromDateFilter')?.value || '';
+    const toDate = document.getElementById('followupToDateFilter')?.value || '';
+    const search = (document.getElementById('followupSearchFilter')?.value || '').trim().toLowerCase();
+    const todayKey = new Date().toLocaleDateString('en-CA');
+    const now = new Date();
+
+    if (view === 'mine' && currentUser) {
+        list = list.filter(f => String(f.assignedTo || '') === String(currentUser.name || ''));
+    } else if (view === 'not_contacted') {
+        list = list.filter(f => !hasFollowupContactRecord(f));
+    } else if (view === 'overdue') {
+        list = list.filter(f => {
+            const d = new Date(f.dateTime || f.scheduledAt || f.scheduledDateTime || '');
+            return !Number.isNaN(d.getTime()) && d < now;
+        });
+    } else if (view === 'today') {
+        list = list.filter(f => String(f.dateTime || f.scheduledAt || f.scheduledDateTime || '').slice(0,10) === todayKey);
+    } else if (view === 'upcoming') {
+        list = list.filter(f => {
+            const d = new Date(f.dateTime || f.scheduledAt || f.scheduledDateTime || '');
+            return !Number.isNaN(d.getTime()) && d >= now;
+        });
+    }
+
+    if (assignee) list = list.filter(f => String(f.assignedTo || '') === assignee);
+    if (exactDate) list = list.filter(f => String(f.dateTime || f.scheduledAt || f.scheduledDateTime || '').slice(0,10) === exactDate);
+    if (fromDate) list = list.filter(f => String(f.dateTime || f.scheduledAt || f.scheduledDateTime || '').slice(0,10) >= fromDate);
+    if (toDate) list = list.filter(f => String(f.dateTime || f.scheduledAt || f.scheduledDateTime || '').slice(0,10) <= toDate);
+    if (search) {
+        list = list.filter(f => [
+            f.clientName, f.clientPhone, f.type, f.notes, f.assignedTo, f.priority, f.status
+        ].join(' ').toLowerCase().includes(search));
+    }
+
+    // Keep one visible active follow-up per client: latest scheduled task wins.
     const byClient = new Map();
     for (const f of list) {
         const key = getFollowupClientKey(f);
@@ -1604,11 +1713,20 @@ function getVisibleActiveFollowups() {
         new Date(a.dateTime || a.scheduledAt || 0) - new Date(b.dateTime || b.scheduledAt || 0)
     );
 }
+function resetFollowupFilters() {
+    ['followupViewFilter','followupAssigneeFilter','followupExactDateFilter','followupFromDateFilter','followupToDateFilter','followupSearchFilter']
+        .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    renderFollowups();
+}
+
 function renderFollowups() {
     const tbody = document.getElementById('followupsTableBody');
     if (!tbody) return;
+    populateFollowupAssigneeFilter();
     tbody.innerHTML = '';
     const list = getVisibleActiveFollowups();
+    const summary = document.getElementById('followupFilterSummary');
+    if (summary) summary.textContent = `Showing ${list.length} matching active follow-up(s)`;
     const visibleIds = new Set(list.map(f => String(f.id ?? f._id)));
     selectedFollowupIds = new Set([...selectedFollowupIds].filter(id => visibleIds.has(id)));
     if (list.length === 0) {
