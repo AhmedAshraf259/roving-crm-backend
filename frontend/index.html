@@ -486,6 +486,28 @@
                         </div>
                         <button class="btn btn-outline-secondary btn-sm" onclick="renderReportsCharts()"><i class="fa-solid fa-rotate me-1"></i>Refresh</button>
                     </div>
+                    <div class="card border shadow-sm p-3 mb-3">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-lg-3 col-md-6">
+                                <label class="form-label small fw-semibold">Sales person</label>
+                                <select id="reportEmployeeFilter" class="form-select" onchange="renderReportsCharts()">
+                                    <option value="">All employees</option>
+                                </select>
+                            </div>
+                            <div class="col-lg-3 col-md-6">
+                                <label class="form-label small fw-semibold">From booking date</label>
+                                <input type="date" id="reportFromDate" class="form-control" onchange="renderReportsCharts()">
+                            </div>
+                            <div class="col-lg-3 col-md-6">
+                                <label class="form-label small fw-semibold">To booking date</label>
+                                <input type="date" id="reportToDate" class="form-control" onchange="renderReportsCharts()">
+                            </div>
+                            <div class="col-lg-3 col-md-6 d-grid">
+                                <button type="button" class="btn btn-outline-secondary" onclick="resetReportFilters()"><i class="fa-solid fa-rotate-left me-1"></i>Reset filters</button>
+                            </div>
+                        </div>
+                        <div class="small text-muted mt-2" id="reportFilterSummary">Showing all bookings</div>
+                    </div>
                     <div id="adminReportKpis" class="row g-3 mb-4"></div>
                     <div class="row g-4 mb-4">
                         <div class="col-lg-7">
@@ -1441,7 +1463,7 @@ function formatMoney(n){return Number(n||0).toLocaleString(undefined,{minimumFra
 function currencyLabel(currency){const code=String(currency||'EGP').toUpperCase();return code==='EGP'?'ج.م':code;}
 function renderPackageCostRows(){const wrap=document.getElementById('packageCostRows');if(!wrap)return;if(!packageCostRows.length){wrap.innerHTML='<div class="text-muted small p-2">No package costs added yet.</div>';return;}const bc=document.getElementById('bookingCurrency')?.value||'EGP';wrap.innerHTML=packageCostRows.map((r,i)=>`<div class="border rounded p-2 mb-2 bg-white"><div class="row g-2 align-items-end"><div class="col-md-2"><label class="form-label small fw-semibold">Cost Type</label><select class="form-select form-select-sm" onchange="updatePackageRow(${i},'type',this.value)">${['Hotel','Flight','Visa','Transportation','Tour / Activities','Other'].map(t=>`<option ${r.type===t?'selected':''}>${t}</option>`).join('')}</select></div><div class="col-md-2"><label class="form-label small fw-semibold">Name / Details</label><input class="form-control form-control-sm" value="${escapeHtml(r.name)}" placeholder="Hotel / Airline / Visa..." oninput="updatePackageRow(${i},'name',this.value)"></div><div class="col-md-1"><label class="form-label small fw-semibold">Nights</label><input type="number" min="1" class="form-control form-control-sm" value="${r.type==='Hotel'?(r.nights||1):1}" ${r.type==='Hotel'?'':'disabled'} oninput="updatePackageRow(${i},'nights',this.value)"></div><div class="col-md-2"><label class="form-label small fw-semibold">Rate / Total</label><input type="number" min="0" step="0.01" class="form-control form-control-sm" value="${r.rate||0}" oninput="updatePackageRow(${i},'rate',this.value)"></div><div class="col-md-2"><label class="form-label small fw-semibold">Supplier</label><select class="form-select form-select-sm package-supplier-select" onchange="updatePackageRow(${i},'supplierId',this.value)"><option value="">-- Select Supplier --</option>${suppliers.map(s=>`<option value="${s.id}" ${String(r.supplierId)===String(s.id)?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}</select></div><div class="col-md-1"><label class="form-label small fw-semibold">Currency</label><select class="form-select form-select-sm" onchange="updatePackageRow(${i},'currency',this.value);updatePackageRow(${i},'fx',1)">${['EGP','USD','EUR','GBP','AED','SAR','TRY','GEL','AZN','OMR','QAR','BHD','ALL','IDR','MYR'].map(c=>`<option ${r.currency===c?'selected':''}>${c}</option>`).join('')}</select></div><div class="col-md-1"><label class="form-label small fw-semibold">FX → ${bc}</label><input type="number" min="0" step="0.000001" class="form-control form-control-sm" value="${r.fx??1}" oninput="updatePackageRow(${i},'fx',this.value)"></div><div class="col-md-1"><button type="button" class="btn btn-sm btn-outline-danger" onclick="removePackageCostRow(${i})"><i class="fa-solid fa-trash"></i></button></div><div class="col-12 small text-muted">${r.type==='Hotel'?'Hotel total = nights × rate':'Cost = entered rate/total'} · Converted: <strong>${formatMoney(packageRowConvertedTotal(r))} ${bc}</strong></div></div></div>`).join('');}
 function calculateBookingFinancials(){const net=parseFloat(document.getElementById('bookingNetPrice').value)||0;let cost=parseFloat(document.getElementById('bookingCostPrice').value)||0;const paid=parseFloat(document.getElementById('bookingPaidAmount').value)||0;const cat=document.getElementById('bookingCategory').value;const cur=document.getElementById('bookingCurrency').value||'EGP';if(cat==='Full Package'){cost=packageCostRows.reduce((sum,r)=>sum+packageRowConvertedTotal(r),0);document.getElementById('bookingCostPrice').value=cost.toFixed(2);document.getElementById('packageCostTotalDisplay').value=`${formatMoney(cost)} ${cur}`;}const profit=net-cost,remaining=net-paid;document.getElementById('bookingProfitDisplay').value=`${formatMoney(profit)} ${cur}`;document.getElementById('bookingRemainingDisplay').value=`${formatMoney(remaining)} ${cur}`;document.getElementById('bookingStatus').value=remaining>0?'Installments Due':'Paid in Full';}
-async function loadBookings(){await syncCollection('bookings','roving_bookings',bookings,v=>bookings=v);renderBookings();renderCommissions();}
+async function loadBookings(){await syncCollection('bookings','roving_bookings',bookings,v=>bookings=v);await ensureBookingNumbers();renderBookings();renderCommissions();}
 async function saveBookingsToStorage(){localStorage.setItem('roving_bookings',JSON.stringify(bookings)); for(const b of bookings){try{await apiRequest('/api/bookings',{method:'POST',body:JSON.stringify(b)});}catch(e){break;}}}
 async function loadSuppliers(){await syncCollection('suppliers','roving_suppliers',suppliers,v=>suppliers=v);renderSuppliers();populateSupplierSelects();}
 async function saveSuppliersToStorage(){localStorage.setItem('roving_suppliers',JSON.stringify(suppliers));}
@@ -1450,6 +1472,57 @@ async function handleSaveSupplier(e){e.preventDefault();const id=document.getEle
 function renderSuppliers(){const tbody=document.getElementById('suppliersTableBody');if(!tbody)return;if(!suppliers.length){tbody.innerHTML='<tr><td colspan="6" class="text-center text-muted py-4">No suppliers recorded</td></tr>';return;}tbody.innerHTML=suppliers.map(s=>`<tr><td><strong>${escapeHtml(s.name)}</strong></td><td><span class="badge bg-secondary">${escapeHtml(s.type||'-')}</span></td><td>${escapeHtml(s.contact||'-')}</td><td><strong>${escapeHtml(s.currency||'-')}</strong></td><td><small>${escapeHtml(s.notes||'-')}</small></td><td><button class="btn btn-sm btn-outline-primary me-1" onclick="editSupplier(${s.id})"><i class="fa-solid fa-pen-to-square"></i></button><button class="btn btn-sm btn-outline-danger" onclick="deleteSupplier(${s.id})"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');}
 function editSupplier(id){const s=suppliers.find(x=>x.id===id);if(!s)return;document.getElementById('editingSupplierId').value=s.id;document.getElementById('supplierName').value=s.name;document.getElementById('supplierType').value=s.type||'Other';document.getElementById('supplierCurrency').value=s.currency||'USD';document.getElementById('supplierContact').value=s.contact||'';document.getElementById('supplierNotes').value=s.notes||'';document.getElementById('supplierModalTitle').innerText='Edit Supplier';new bootstrap.Modal(document.getElementById('supplierModal')).show();}
 async function deleteSupplier(id){suppliers=suppliers.filter(x=>x.id!==id);await deleteRecord('suppliers','roving_suppliers',id);renderSuppliers();populateSupplierSelects();}
+function bookingDateValue(b) {
+    if (b?.createdAt || b?.created_at || b?.bookingDate || b?.createdDate) {
+        const d = new Date(b.createdAt || b.created_at || b.bookingDate || b.createdDate);
+        if (!Number.isNaN(d.getTime())) return d;
+    }
+    // Older records were created with Date.now() as their ID; recover that timestamp.
+    const rawId = String(b?.id ?? b?._id ?? '');
+    if (/^\d{13}$/.test(rawId)) {
+        const d = new Date(Number(rawId));
+        if (!Number.isNaN(d.getTime())) return d;
+    }
+    return null;
+}
+function getNextBookingNumber() {
+    const maxExisting = (Array.isArray(bookings) ? bookings : []).reduce((max, b) => {
+        const raw = b.bookingNumber ?? b.bookingNo ?? b.bookingCode ?? b.number ?? '';
+        const match = String(raw).match(/(\d+)\s*$/);
+        return match ? Math.max(max, Number(match[1])) : max;
+    }, 999);
+    return maxExisting + 1;
+}
+async function ensureBookingNumbers() {
+    if (!Array.isArray(bookings) || !bookings.length) return;
+    const existingNums = bookings.map(b => {
+        const raw = b.bookingNumber ?? b.bookingNo ?? b.bookingCode ?? b.number ?? '';
+        const match = String(raw).match(/(\d+)\s*$/);
+        return match ? Number(match[1]) : null;
+    }).filter(n => Number.isFinite(n));
+    let next = Math.max(999, ...existingNums) + 1;
+    const missing = bookings.filter(b => !(b.bookingNumber ?? b.bookingNo ?? b.bookingCode ?? b.number));
+    // Assign old records in chronological order; if timestamps are unavailable,
+    // reverse the current newest-first array so older records receive lower numbers.
+    missing.sort((a,b) => {
+        const da = bookingDateValue(a)?.getTime();
+        const db = bookingDateValue(b)?.getTime();
+        if (da != null && db != null) return da - db;
+        if (da != null) return -1;
+        if (db != null) return 1;
+        return bookings.indexOf(b) - bookings.indexOf(a);
+    });
+    for (const b of missing) {
+        b.bookingNumber = next++;
+        if (!b.createdAt) {
+            const d = bookingDateValue(b);
+            if (d) b.createdAt = d.toISOString();
+        }
+        try { await saveRecord('bookings', 'roving_bookings', b); } catch (e) { console.warn('Could not persist booking number migration', e); }
+    }
+    if (missing.length) localStorage.setItem('roving_bookings', JSON.stringify(bookings));
+}
+
 async function handleSaveBooking(e) {
     e.preventDefault();
     const editingId = document.getElementById('editingBookingId').value;
@@ -1466,6 +1539,8 @@ async function handleSaveBooking(e) {
     const bookingObj = {
         ...(oldBooking || {}),
         id: editingId !== '' ? (oldBooking?.id ?? Number(editingId)) : Date.now(),
+        bookingNumber: editingId !== '' ? (oldBooking?.bookingNumber ?? oldBooking?.bookingNo ?? null) : getNextBookingNumber(),
+        createdAt: oldBooking?.createdAt || oldBooking?.created_at || (editingId === '' ? new Date().toISOString() : ''),
         clientId: client._id || client.id, clientName: client.name, clientPhone: client.phone || 'N/A',
         category: document.getElementById('bookingCategory').value,
         peopleCount: Math.max(1, parseInt(document.getElementById('bookingPeopleCount').value) || 1),
@@ -1515,37 +1590,42 @@ function renderBookings() {
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    let list = bookings;
+    let list = Array.isArray(bookings) ? bookings.slice() : [];
     if (currentUser && currentUser.role === 'Sales') {
         list = list.filter(b => b.assignedTo === currentUser.name);
     }
+    list.sort((a,b) => {
+        const da = bookingDateValue(a)?.getTime() || 0;
+        const db = bookingDateValue(b)?.getTime() || 0;
+        return db - da;
+    });
 
     if (list.length === 0) {
         tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">No bookings recorded</td></tr>`;
         return;
     }
 
-    list.forEach((b, index) => {
+    list.forEach(b => {
+        const number = b.bookingNumber ?? b.bookingNo ?? b.bookingCode ?? b.number ?? '—';
         tbody.innerHTML += `
             <tr>
-                <td><span class="badge bg-dark">BK-${1000 + index}</span></td>
-                <td><strong>${b.clientName}</strong><br><small class="text-muted"><i class="fa-solid fa-phone me-1"></i>${b.clientPhone}</small></td>
-                <td><span class="badge bg-secondary">${b.category}</span></td>
+                <td><span class="badge bg-dark">BK-${escapeHtml(String(number))}</span></td>
+                <td><strong>${escapeHtml(b.clientName || '')}</strong><br><small class="text-muted"><i class="fa-solid fa-phone me-1"></i>${escapeHtml(b.clientPhone || '')}</small></td>
+                <td><span class="badge bg-secondary">${escapeHtml(b.category || '')}</span></td>
                 <td><span class="fw-semibold text-primary">${formatMoney(b.netPrice)} ${escapeHtml(b.currency || 'EGP')}</span></td>
                 <td>
                     <small class="text-success">Paid: <strong>${formatMoney(b.paidAmount || 0)} ${escapeHtml(b.currency || 'EGP')}</strong></small><br>
                     <small class="${b.remaining > 0 ? 'text-danger fw-bold' : 'text-muted'}">Rem: <strong>${formatMoney(b.remaining || 0)} ${escapeHtml(b.currency || 'EGP')}</strong></small>
                 </td>
                 <td><strong class="text-success">${b.profit >= 0 ? '+' : ''}${formatMoney(b.profit)} ${escapeHtml(b.currency || 'EGP')}</strong></td>
-                <td><span class="badge bg-success">${b.status}</span></td>
+                <td><span class="badge bg-success">${escapeHtml(b.status || '')}</span></td>
                 <td><small>${escapeHtml(b.details || '-')}</small><br><small class="text-muted">${escapeHtml(b.supplierName || '')}${b.serviceStart ? ' · From ' + escapeHtml(b.serviceStart.replace('T',' ')) : ''}${b.serviceEnd ? ' · To ' + escapeHtml(b.serviceEnd.replace('T',' ')) : ''}</small>${(b.paymentHistory||[]).some(p=>p.receiptData) ? '<br><span class="badge bg-info text-dark">Payment receipt attached</span>' : ''}</td>
                 <td>
-                    <button type="button" class="btn btn-sm btn-outline-primary me-1" title="Edit Booking" aria-label="Edit Booking" data-booking-action="edit" data-booking-id="${escapeHtml(String(b.id))}"><i class="fa-solid fa-pen-to-square"></i></button>
-                    <button type="button" class="btn btn-sm btn-success me-1" title="Add Payment / Installment" aria-label="Add Payment / Installment" data-booking-action="payment" data-booking-id="${escapeHtml(String(b.id))}"><i class="fa-solid fa-money-bill-wave"></i></button>
-                    <button type="button" class="btn btn-sm btn-outline-danger" title="Delete Booking" aria-label="Delete Booking" data-booking-action="delete" data-booking-id="${escapeHtml(String(b.id))}"><i class="fa-solid fa-trash"></i></button>
+                    <button type="button" class="btn btn-sm btn-outline-primary me-1" title="Edit Booking" aria-label="Edit Booking" data-booking-action="edit" data-booking-id="${escapeHtml(String(b.id ?? b._id))}"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button type="button" class="btn btn-sm btn-success me-1" title="Add Payment / Installment" aria-label="Add Payment / Installment" data-booking-action="payment" data-booking-id="${escapeHtml(String(b.id ?? b._id))}"><i class="fa-solid fa-money-bill-wave"></i></button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" title="Delete Booking" aria-label="Delete Booking" data-booking-action="delete" data-booking-id="${escapeHtml(String(b.id ?? b._id))}"><i class="fa-solid fa-trash"></i></button>
                 </td>
-            </tr>
-        `;
+            </tr>`;
     });
 }
 
@@ -3041,16 +3121,55 @@ function renderClients() {
 }
 
 // Reports & Charts: Admin sees all data, Sales sees their own analytics
+function resetReportFilters() {
+    ['reportEmployeeFilter','reportFromDate','reportToDate'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    renderReportsCharts();
+}
 function renderReportsCharts() {
     const reportTitle = document.getElementById('reportTitle');
     const isAdmin = currentUser && String(currentUser.role || '').trim().toLowerCase() === 'admin';
-    reportTitle.innerText = isAdmin ? 'System Analytics Overview (All Users)' : `Analytics Overview for ${currentUser.name}`;
+    if (reportTitle) reportTitle.innerText = isAdmin ? 'System Analytics Overview (All Users)' : `Analytics Overview for ${currentUser.name}`;
+
+    const employeeSelect = document.getElementById('reportEmployeeFilter');
+    if (employeeSelect) {
+        const previous = employeeSelect.value;
+        const names = [...new Set((Array.isArray(bookings) ? bookings : []).map(b => b.assignedTo || 'Unassigned'))].sort((a,b)=>a.localeCompare(b));
+        employeeSelect.innerHTML = (isAdmin ? '<option value="">All employees</option>' : '') +
+            names.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
+        if (isAdmin && names.includes(previous)) employeeSelect.value = previous;
+        if (!isAdmin) {
+            employeeSelect.value = currentUser?.name || '';
+            employeeSelect.disabled = true;
+        } else employeeSelect.disabled = false;
+    }
+
+    const selectedEmployee = isAdmin ? (employeeSelect?.value || '') : (currentUser?.name || '');
+    const fromDate = document.getElementById('reportFromDate')?.value || '';
+    const toDate = document.getElementById('reportToDate')?.value || '';
 
     let filteredBookings = Array.isArray(bookings) ? bookings.slice() : [];
     let filteredClients = Array.isArray(clients) ? clients.slice() : [];
     if (!isAdmin) {
         filteredBookings = filteredBookings.filter(b => b.assignedTo === currentUser.name);
         filteredClients = filteredClients.filter(c => c.assignedTo === currentUser.name);
+    }
+    if (selectedEmployee) filteredBookings = filteredBookings.filter(b => String(b.assignedTo || 'Unassigned') === selectedEmployee);
+    if (fromDate || toDate) {
+        filteredBookings = filteredBookings.filter(b => {
+            const d = bookingDateValue(b);
+            if (!d) return false;
+            const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+            return (!fromDate || key >= fromDate) && (!toDate || key <= toDate);
+        });
+    }
+    const summary = document.getElementById('reportFilterSummary');
+    if (summary) {
+        const who = selectedEmployee || 'All employees';
+        const period = fromDate || toDate ? `${fromDate || 'Beginning'} → ${toDate || 'Today'}` : 'All dates';
+        summary.textContent = `Showing ${filteredBookings.length} booking(s) · ${who} · ${period}`;
     }
 
     const fmt = n => Number(n || 0).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
@@ -3066,27 +3185,22 @@ function renderReportsCharts() {
         currencySet.add(currency);
         if (!group[key]) group[key] = {category, currency, bookings:0, people:0, sales:0, cost:0, profit:0, collected:0, remaining:0};
         const g = group[key];
-        g.bookings += 1;
-        g.people += peopleOf(b);
-        g.sales += Number(b.netPrice)||0;
-        g.cost += Number(b.costPrice)||0;
-        g.profit += Number(b.profit)||0;
-        g.collected += Number(b.paidAmount)||0;
+        g.bookings += 1; g.people += peopleOf(b);
+        g.sales += Number(b.netPrice)||0; g.cost += Number(b.costPrice)||0;
+        g.profit += Number(b.profit)||0; g.collected += Number(b.paidAmount)||0;
         g.remaining += Number(b.remaining)||0;
 
         const emp = b.assignedTo || 'Unassigned';
         const ek = `${emp}||${category}||${currency}`;
-        if (!employeeGroup[ek]) employeeGroup[ek] = {employee:emp, category, currency, bookings:0, people:0, sales:0, profit:0};
+        if (!employeeGroup[ek]) employeeGroup[ek] = {employee:emp, category, currency, bookings:0, people:0, sales:0, profit:0, collected:0, remaining:0};
         const e = employeeGroup[ek];
-        e.bookings += 1;
-        e.people += peopleOf(b);
-        e.sales += Number(b.netPrice)||0;
-        e.profit += Number(b.profit)||0;
+        e.bookings += 1; e.people += peopleOf(b);
+        e.sales += Number(b.netPrice)||0; e.profit += Number(b.profit)||0;
+        e.collected += Number(b.paidAmount)||0; e.remaining += Number(b.remaining)||0;
     });
 
     const categoryRows = Object.values(group).sort((a,b)=>a.category.localeCompare(b.category)||a.currency.localeCompare(b.currency));
     const employeeRows = Object.values(employeeGroup).sort((a,b)=>a.employee.localeCompare(b.employee)||a.category.localeCompare(b.category));
-
     const categoryBody = document.getElementById('reportCategoryTableBody');
     if (categoryBody) {
         categoryBody.innerHTML = categoryRows.length ? categoryRows.map(r => `<tr><td><strong>${escapeHtml(r.category)}</strong></td><td><span class="badge bg-light text-dark border">${escapeHtml(r.currency)}</span></td><td>${r.bookings}</td><td>${r.people}</td><td>${fmt(r.sales)}</td><td>${fmt(r.cost)}</td><td class="text-success fw-bold">${fmt(r.profit)}</td><td>${fmt(r.collected)}</td><td class="text-danger">${fmt(r.remaining)}</td></tr>`).join('') : '<tr><td colspan="9" class="text-center text-muted py-4">No booking data</td></tr>';
@@ -3100,18 +3214,24 @@ function renderReportsCharts() {
     if (kpi) {
         const bookingCount = filteredBookings.length;
         const peopleCount = filteredBookings.reduce((s,b)=>s+peopleOf(b),0);
-        const collected = filteredBookings.reduce((s,b)=>s+(Number(b.paidAmount)||0),0);
-        const remaining = filteredBookings.reduce((s,b)=>s+(Number(b.remaining)||0),0);
-        const currencyText = Array.from(currencySet).sort().join(' / ') || 'EGP';
+        const sumByCurrency = field => {
+            const totals = {};
+            filteredBookings.forEach(b => {
+                const currency = b.currency || 'EGP';
+                totals[currency] = (totals[currency] || 0) + (Number(b[field]) || 0);
+            });
+            return Object.keys(totals).sort().map(currency => `${fmt(totals[currency])} ${currency}`).join('<br>') || '0.00';
+        };
         kpi.innerHTML = [
             ['Bookings', bookingCount, 'fa-receipt'],
             ['People', peopleCount, 'fa-users'],
-            ['Collected', `${fmt(collected)} ${currencyText}`, 'fa-money-bill-wave'],
-            ['Remaining', `${fmt(remaining)} ${currencyText}`, 'fa-hourglass-half']
-        ].map(x=>`<div class="col-md-3"><div class="card border shadow-sm p-3 h-100"><div class="d-flex justify-content-between align-items-center"><div><div class="small text-muted">${x[0]}</div><div class="fs-5 fw-bold text-roving-green">${x[1]}</div></div><i class="fa-solid ${x[2]} fa-lg text-roving-orange"></i></div></div></div>`).join('');
+            ['Total Sales', sumByCurrency('netPrice'), 'fa-chart-line'],
+            ['Total Profit', sumByCurrency('profit'), 'fa-sack-dollar'],
+            ['Collected', sumByCurrency('paidAmount'), 'fa-money-bill-wave'],
+            ['Remaining', sumByCurrency('remaining'), 'fa-hourglass-half']
+        ].map(x=>`<div class="col-md-4 col-lg-2"><div class="card border shadow-sm p-3 h-100"><div class="d-flex justify-content-between align-items-center"><div><div class="small text-muted">${x[0]}</div><div class="fs-6 fw-bold text-roving-green">${x[1]}</div></div><i class="fa-solid ${x[2]} text-roving-orange"></i></div></div></div>`).join('');
     }
 
-    // Chart uses separate category/currency labels so currencies are never mixed silently.
     const chartGroups = {};
     filteredBookings.forEach(b => {
         const label = `${b.category || 'Other'} (${b.currency || 'EGP'})`;
@@ -3122,20 +3242,25 @@ function renderReportsCharts() {
     const labels = Object.keys(chartGroups);
     const salesData = labels.map(l=>chartGroups[l].sales);
     const profitData = labels.map(l=>chartGroups[l].profit);
-
-    const ctx1 = document.getElementById('bookingsChart').getContext('2d');
-    if (bookingsChartInstance) bookingsChartInstance.destroy();
-    bookingsChartInstance = new Chart(ctx1, { type:'bar', data:{labels:labels.length?labels:['No Data'], datasets:[
-        {label:'Sales',data:salesData.length?salesData:[0],backgroundColor:'#D45B38',borderRadius:6},
-        {label:'Profit',data:profitData.length?profitData:[0],backgroundColor:'#293E35',borderRadius:6}
-    ]}, options:{responsive:true,plugins:{legend:{display:true}}} });
+    const chartEl = document.getElementById('bookingsChart');
+    if (chartEl) {
+        const ctx1 = chartEl.getContext('2d');
+        if (bookingsChartInstance) bookingsChartInstance.destroy();
+        bookingsChartInstance = new Chart(ctx1, {type:'bar',data:{labels:labels.length?labels:['No Data'],datasets:[
+            {label:'Sales',data:salesData.length?salesData:[0],backgroundColor:'#D45B38',borderRadius:6},
+            {label:'Profit',data:profitData.length?profitData:[0],backgroundColor:'#293E35',borderRadius:6}
+        ]},options:{responsive:true,plugins:{legend:{display:true}}}});
+    }
 
     const statuses = {};
     filteredClients.forEach(c => { const st=c.status||'New'; statuses[st]=(statuses[st]||0)+1; });
     const clientLabels = Object.keys(statuses), clientDataValues = Object.values(statuses);
-    const ctx2 = document.getElementById('clientsChart').getContext('2d');
-    if (clientsChartInstance) clientsChartInstance.destroy();
-    clientsChartInstance = new Chart(ctx2, {type:'doughnut',data:{labels:clientLabels.length?clientLabels:['No Data'],datasets:[{data:clientDataValues.length?clientDataValues:[1],backgroundColor:['#293E35','#D45B38','#E67E55','#1A2822','#6c757d']}]},options:{responsive:true}});
+    const clientChartEl = document.getElementById('clientsChart');
+    if (clientChartEl) {
+        const ctx2 = clientChartEl.getContext('2d');
+        if (clientsChartInstance) clientsChartInstance.destroy();
+        clientsChartInstance = new Chart(ctx2, {type:'doughnut',data:{labels:clientLabels.length?clientLabels:['No Data'],datasets:[{data:clientDataValues.length?clientDataValues:[1],backgroundColor:['#293E35','#D45B38','#E67E55','#1A2822','#6c757d']}]},options:{responsive:true}});
+    }
 }
 function showNotification(message, type = "success") {
     const area = document.getElementById('notificationArea');
