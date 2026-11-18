@@ -495,8 +495,9 @@
                                 </select>
                             </div>
                             <div class="col-lg-3 col-md-6">
-                                <label class="form-label small fw-semibold">Customer</label>
-                                <select id="reportClientFilter" class="form-select" onchange="renderReportsCharts()"><option value="">All customers</option></select>
+                                <label class="form-label small fw-semibold">Customer (search by RT code or name)</label>
+                                <input type="search" id="reportClientSearch" class="form-control" list="reportClientOptions" placeholder="Type customer code or name..." oninput="renderReportsCharts()">
+                                <datalist id="reportClientOptions"></datalist>
                             </div>
                             <div class="col-lg-3 col-md-6">
                                 <label class="form-label small fw-semibold">Booking / Service type</label>
@@ -3190,6 +3191,16 @@ function renderClients() {
         return;
     }
 
+    // Newest customer code first: RT-00353, RT-00352, RT-00351...
+    // Numeric comparison avoids incorrect lexical ordering when code lengths differ.
+    list.sort((a, b) => {
+        const getNumber = client => {
+            const match = clientCodeOf(client).match(/^RT-(\\d+)$/i);
+            return match ? Number(match[1]) : -1;
+        };
+        return getNumber(b) - getNumber(a);
+    });
+
     list.forEach((client) => {
         const clientId = client._id || client.id;
         tbody.innerHTML += `
@@ -3214,7 +3225,7 @@ function renderClients() {
 
 // Reports & Charts: Admin sees all data, Sales sees their own analytics
 function resetReportFilters() {
-    ['reportEmployeeFilter','reportClientFilter','reportTypeFilter','reportFromDate','reportToDate'].forEach(id => {
+    ['reportEmployeeFilter','reportClientSearch','reportClientFilter','reportTypeFilter','reportFromDate','reportToDate'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
@@ -3239,15 +3250,16 @@ function renderReportsCharts() {
     }
 
     const selectedEmployee = isAdmin ? (employeeSelect?.value || '') : (currentUser?.name || '');
-    const clientSelect = document.getElementById('reportClientFilter');
-    if (clientSelect) {
-        const previousClient = clientSelect.value;
-        const visibleClients = (Array.isArray(clients)?clients:[]).filter(c => isAdmin || c.assignedTo === currentUser?.name);
-        clientSelect.innerHTML = '<option value="">All customers</option>' + visibleClients
+    const clientSearch = document.getElementById('reportClientSearch');
+    const clientOptions = document.getElementById('reportClientOptions');
+    const visibleClients = (Array.isArray(clients)?clients:[]).filter(c => isAdmin || c.assignedTo === currentUser?.name);
+    if (clientOptions) {
+        clientOptions.innerHTML = visibleClients
             .slice().sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')))
-            .map(c=>`<option value="${escapeHtml(String(c._id??c.id??''))}">${escapeHtml(clientCodeOf(c))} · ${escapeHtml(c.name||'Unnamed')}</option>`).join('');
-        if ([...clientSelect.options].some(o=>o.value===previousClient)) clientSelect.value=previousClient;
+            .map(c=>`<option value="${escapeHtml(clientCodeOf(c))}">${escapeHtml(c.name||'Unnamed')} · ${escapeHtml(String(c._id??c.id??''))}</option>`).join('');
     }
+    const customerQuery = String(clientSearch?.value || '').trim().toLowerCase();
+    const customerQueryDigits = customerQuery.replace(/[^a-z0-9]/gi,'');
     const typeSelect = document.getElementById('reportTypeFilter');
     if (typeSelect) {
         const previousType=typeSelect.value;
@@ -3255,7 +3267,7 @@ function renderReportsCharts() {
         typeSelect.innerHTML='<option value="">All types</option>'+types.map(t=>`<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
         if (types.includes(previousType)) typeSelect.value=previousType;
     }
-    const selectedClientId = clientSelect?.value || '';
+    const selectedClientId = '';
     const selectedType = typeSelect?.value || '';
     const fromDate = document.getElementById('reportFromDate')?.value || '';
     const toDate = document.getElementById('reportToDate')?.value || '';
@@ -3267,14 +3279,20 @@ function renderReportsCharts() {
         filteredClients = filteredClients.filter(c => c.assignedTo === currentUser.name);
     }
     if (selectedEmployee) filteredBookings = filteredBookings.filter(b => String(b.assignedTo || 'Unassigned') === selectedEmployee);
-    if (selectedClientId) {
-        const selectedClient = getClientByAnyId(selectedClientId);
-        const clientCode = clientCodeOf(selectedClient);
-        filteredBookings = filteredBookings.filter(b =>
-            String(b.clientId ?? b.client_id ?? '') === String(selectedClientId) ||
-            (clientCode && bookingRTCode(b) === clientCode) ||
-            String(b.clientName||'').trim().toLowerCase() === String(selectedClient?.name||'').trim().toLowerCase()
-        );
+    if (customerQuery) {
+        filteredBookings = filteredBookings.filter(b => {
+            const client = resolveBookingClient(b);
+            const code = String(bookingRTCode(b) || '').toLowerCase();
+            const name = String(b.clientName || client?.name || '').toLowerCase();
+            const id = String(b.clientId ?? b.client_id ?? client?._id ?? client?.id ?? '').toLowerCase();
+            const phone = String(b.clientPhone || client?.phone || '').toLowerCase();
+            const normalizedCode = code.replace(/[^a-z0-9]/gi,'');
+            return code.includes(customerQuery) ||
+                name.includes(customerQuery) ||
+                id.includes(customerQuery) ||
+                phone.includes(customerQuery) ||
+                (customerQueryDigits && normalizedCode.includes(customerQueryDigits));
+        });
     }
     if (selectedType) filteredBookings = filteredBookings.filter(b => String(b.category||'Other') === selectedType);
     if (fromDate || toDate) {
@@ -3288,8 +3306,7 @@ function renderReportsCharts() {
     const summary = document.getElementById('reportFilterSummary');
     if (summary) {
         const who = selectedEmployee || 'All employees';
-        const selectedClient = selectedClientId ? getClientByAnyId(selectedClientId) : null;
-        const customerLabel = selectedClient ? `${clientCodeOf(selectedClient)} ${selectedClient.name}` : 'All customers';
+        const customerLabel = customerQuery ? `Customer search: "${clientSearch?.value || ''}"` : 'All customers';
         const typeLabel = selectedType || 'All service types';
         const period = fromDate || toDate ? `${fromDate || 'Beginning'} → ${toDate || 'Today'}` : 'All dates';
         summary.textContent = `Showing ${filteredBookings.length} booking(s) · ${who} · ${customerLabel} · ${typeLabel} · ${period}`;
