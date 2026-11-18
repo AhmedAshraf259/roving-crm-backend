@@ -172,13 +172,18 @@
         #urgentFollowupAlertContainer:empty { display: none; }
 
         /* Follow-up bulk selection bar */
+        #clientBulkActionBar{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:1080;display:none;align-items:center;gap:10px;padding:10px 14px;border:1px solid #e5e7eb;border-radius:16px;background:#fff;box-shadow:0 8px 28px rgba(0,0,0,.16);direction:ltr;max-width:calc(100vw - 24px);flex-wrap:wrap}
+        #clientBulkActionBar.show{display:flex}
+        #clientBulkActionBar .selected-count{font-weight:600;white-space:nowrap}
+        #clientBulkActionBar .bulk-divider{width:1px;height:28px;background:#ddd}
+        .client-row-check,#selectAllClients{width:17px;height:17px;cursor:pointer;accent-color:var(--roving-green)}
         #followupBulkActionBar{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:1080;display:none;align-items:center;gap:10px;padding:10px 14px;border:1px solid #e5e7eb;border-radius:16px;background:#fff;box-shadow:0 8px 28px rgba(0,0,0,.16);direction:ltr;max-width:calc(100vw - 24px);flex-wrap:wrap}
         #followupBulkActionBar.show{display:flex}
         #followupBulkActionBar .selected-count{font-weight:600;white-space:nowrap}
         #followupBulkActionBar .bulk-divider{width:1px;height:28px;background:#ddd}
         .followup-row-check,#selectAllFollowups{width:17px;height:17px;cursor:pointer;accent-color:var(--roving-green)}
         .followup-select-cell{width:42px;text-align:center!important}
-        @media(max-width:575px){#followupBulkActionBar{bottom:10px;gap:7px;padding:9px}#followupBulkActionBar .btn{font-size:12px;padding:6px 9px}}
+        @media(max-width:575px){#clientBulkActionBar{bottom:10px;gap:7px;padding:9px}#clientBulkActionBar .btn{font-size:12px;padding:6px 9px}#followupBulkActionBar{bottom:10px;gap:7px;padding:9px}#followupBulkActionBar .btn{font-size:12px;padding:6px 9px}}
 
 
         #followupFilterSummary{font-size:.82rem}
@@ -346,6 +351,7 @@
                         <table class="table table-hover align-middle">
                             <thead class="table-light">
                                 <tr>
+                                    <th class="followup-select-cell"><input type="checkbox" id="selectAllClients" title="Select all visible clients" onchange="toggleAllClients(this.checked)"></th>
                                     <th>File #</th>
                                     <th>Name *</th>
                                     <th>Source *</th>
@@ -395,6 +401,13 @@
                         </table>
                     </div>
                 </div>
+            </div>
+
+            <div id="clientBulkActionBar" role="toolbar" aria-label="Bulk client actions">
+                <span class="selected-count"><span id="selectedClientCount">0</span> selected</span>
+                <button type="button" class="btn btn-sm btn-link text-muted text-decoration-none" onclick="clearClientSelection()" title="Clear selection">×</button>
+                <span class="bulk-divider"></span>
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="applyBulkClientDelete()"><i class="fa-solid fa-trash me-1"></i> Delete selected</button>
             </div>
 
             <div id="followupBulkActionBar" role="toolbar" aria-label="Bulk follow-up actions">
@@ -992,7 +1005,8 @@ let validUsers = JSON.parse(localStorage.getItem('roving_users')) || [
 let currentUser = null;
 let clients = []; 
 let followups = [];
-let selectedFollowupIds = new Set(); 
+let selectedFollowupIds = new Set();
+let selectedClientIds = new Set(); 
 let bookings = [];
 let suppliers = JSON.parse(localStorage.getItem('roving_suppliers') || '[]');
 let packageCostRows = [];
@@ -1014,6 +1028,62 @@ function toggleSidebar() {
         mainContent.classList.add('col-md-10');
         if (showSidebarBtn) showSidebarBtn.classList.add('d-none');
     }
+}
+
+function hasUsefulValue(value) {
+    if (value === null || value === undefined) return false;
+    const text = String(value).trim();
+    return text !== '' && !['undefined', 'null', '-', 'n/a', 'na'].includes(text.toLowerCase());
+}
+function isEmptyClientRecord(c) {
+    if (!c) return true;
+    const hasName = hasUsefulValue(c.name);
+    const hasOtherData = [
+        c.phone, c.email, c.source, c.passport, c.passportNumber,
+        c.assignedTo && String(c.assignedTo).toLowerCase() !== 'unassigned' ? c.assignedTo : '',
+        c.notes, c.destination, c.travelDate
+    ].some(hasUsefulValue);
+    return !hasName && !hasOtherData;
+}
+function isEmptyBookingRecord(b) {
+    if (!b) return true;
+    const hasBookingInfo = [
+        b.category, b.details, b.supplierName, b.serviceStart, b.serviceEnd,
+        b.clientName, b.clientPhone, b.bookingReference, b.description
+    ].some(hasUsefulValue);
+    const hasMoney = ['netPrice','costPrice','profit','paidAmount','remaining','sellingPrice','totalPrice']
+        .some(k => Number(b[k] || 0) !== 0);
+    const hasPayments = Array.isArray(b.paymentHistory) && b.paymentHistory.some(p =>
+        Number(p.amount || 0) !== 0 || hasUsefulValue(p.receiptData) || hasUsefulValue(p.note)
+    );
+    const hasReceipt = Array.isArray(b.paymentHistory) && b.paymentHistory.some(p => hasUsefulValue(p.receiptData));
+    return !hasBookingInfo && !hasMoney && !hasPayments && !hasReceipt;
+}
+async function cleanupEmptyClients() {
+    if (String(currentUser?.role || '').trim().toLowerCase() !== 'admin') return 0;
+    const junk = (Array.isArray(clients) ? clients : []).filter(isEmptyClientRecord);
+    if (!junk.length) return 0;
+    for (const c of junk) {
+        const id = c._id ?? c.id;
+        if (id !== undefined && id !== null) await executeDeleteClient(id);
+    }
+    const junkIds = new Set(junk.map(c => String(c._id ?? c.id)));
+    clients = clients.filter(c => !junkIds.has(String(c._id ?? c.id)));
+    localStorage.setItem('roving_local_clients', JSON.stringify(clients));
+    return junk.length;
+}
+async function cleanupEmptyBookings() {
+    if (String(currentUser?.role || '').trim().toLowerCase() !== 'admin') return 0;
+    const junk = (Array.isArray(bookings) ? bookings : []).filter(isEmptyBookingRecord);
+    if (!junk.length) return 0;
+    const ids = new Set(junk.map(b => String(b.id ?? b._id)));
+    bookings = bookings.filter(b => !ids.has(String(b.id ?? b._id)));
+    localStorage.setItem('roving_bookings', JSON.stringify(bookings));
+    for (const b of junk) {
+        const id = b.id ?? b._id;
+        if (id !== undefined && id !== null) await deleteRecord('bookings', 'roving_bookings', id);
+    }
+    return junk.length;
 }
 
 async function fetchClients() {
@@ -1079,6 +1149,7 @@ async function fetchClients() {
         clients = localClients;
     }
 
+    await cleanupEmptyClients();
     await ensureClientCodes();
     renderClients();
     if (typeof populateClientDropdowns === 'function') {
@@ -1480,7 +1551,7 @@ function formatMoney(n){return Number(n||0).toLocaleString(undefined,{minimumFra
 function currencyLabel(currency){const code=String(currency||'EGP').toUpperCase();return code==='EGP'?'ج.م':code;}
 function renderPackageCostRows(){const wrap=document.getElementById('packageCostRows');if(!wrap)return;if(!packageCostRows.length){wrap.innerHTML='<div class="text-muted small p-2">No package costs added yet.</div>';return;}const bc=document.getElementById('bookingCurrency')?.value||'EGP';wrap.innerHTML=packageCostRows.map((r,i)=>`<div class="border rounded p-2 mb-2 bg-white"><div class="row g-2 align-items-end"><div class="col-md-2"><label class="form-label small fw-semibold">Cost Type</label><select class="form-select form-select-sm" onchange="updatePackageRow(${i},'type',this.value)">${['Hotel','Flight','Visa','Transportation','Tour / Activities','Other'].map(t=>`<option ${r.type===t?'selected':''}>${t}</option>`).join('')}</select></div><div class="col-md-2"><label class="form-label small fw-semibold">Name / Details</label><input class="form-control form-control-sm" value="${escapeHtml(r.name)}" placeholder="Hotel / Airline / Visa..." oninput="updatePackageRow(${i},'name',this.value)"></div><div class="col-md-1"><label class="form-label small fw-semibold">Nights</label><input type="number" min="1" class="form-control form-control-sm" value="${r.type==='Hotel'?(r.nights||1):1}" ${r.type==='Hotel'?'':'disabled'} oninput="updatePackageRow(${i},'nights',this.value)"></div><div class="col-md-2"><label class="form-label small fw-semibold">Rate / Total</label><input type="number" min="0" step="0.01" class="form-control form-control-sm" value="${r.rate||0}" oninput="updatePackageRow(${i},'rate',this.value)"></div><div class="col-md-2"><label class="form-label small fw-semibold">Supplier</label><select class="form-select form-select-sm package-supplier-select" onchange="updatePackageRow(${i},'supplierId',this.value)"><option value="">-- Select Supplier --</option>${suppliers.map(s=>`<option value="${s.id}" ${String(r.supplierId)===String(s.id)?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}</select></div><div class="col-md-1"><label class="form-label small fw-semibold">Currency</label><select class="form-select form-select-sm" onchange="updatePackageRow(${i},'currency',this.value);updatePackageRow(${i},'fx',1)">${['EGP','USD','EUR','GBP','AED','SAR','TRY','GEL','AZN','OMR','QAR','BHD','ALL','IDR','MYR'].map(c=>`<option ${r.currency===c?'selected':''}>${c}</option>`).join('')}</select></div><div class="col-md-1"><label class="form-label small fw-semibold">FX → ${bc}</label><input type="number" min="0" step="0.000001" class="form-control form-control-sm" value="${r.fx??1}" oninput="updatePackageRow(${i},'fx',this.value)"></div><div class="col-md-1"><button type="button" class="btn btn-sm btn-outline-danger" onclick="removePackageCostRow(${i})"><i class="fa-solid fa-trash"></i></button></div><div class="col-12 small text-muted">${r.type==='Hotel'?'Hotel total = nights × rate':'Cost = entered rate/total'} · Converted: <strong>${formatMoney(packageRowConvertedTotal(r))} ${bc}</strong></div></div></div>`).join('');}
 function calculateBookingFinancials(){const net=parseFloat(document.getElementById('bookingNetPrice').value)||0;let cost=parseFloat(document.getElementById('bookingCostPrice').value)||0;const paid=parseFloat(document.getElementById('bookingPaidAmount').value)||0;const cat=document.getElementById('bookingCategory').value;const cur=document.getElementById('bookingCurrency').value||'EGP';if(cat==='Full Package'){cost=packageCostRows.reduce((sum,r)=>sum+packageRowConvertedTotal(r),0);document.getElementById('bookingCostPrice').value=cost.toFixed(2);document.getElementById('packageCostTotalDisplay').value=`${formatMoney(cost)} ${cur}`;}const profit=net-cost,remaining=net-paid;document.getElementById('bookingProfitDisplay').value=`${formatMoney(profit)} ${cur}`;document.getElementById('bookingRemainingDisplay').value=`${formatMoney(remaining)} ${cur}`;document.getElementById('bookingStatus').value=remaining>0?'Installments Due':'Paid in Full';}
-async function loadBookings(){await syncCollection('bookings','roving_bookings',bookings,v=>bookings=v);await ensureInvoiceNumbers();renderBookings();renderCommissions();}
+async function loadBookings(){await syncCollection('bookings','roving_bookings',bookings,v=>bookings=v);await cleanupEmptyBookings();await ensureInvoiceNumbers();renderBookings();renderCommissions();}
 async function saveBookingsToStorage(){localStorage.setItem('roving_bookings',JSON.stringify(bookings)); for(const b of bookings){try{await apiRequest('/api/bookings',{method:'POST',body:JSON.stringify(b)});}catch(e){break;}}}
 async function loadSuppliers(){await syncCollection('suppliers','roving_suppliers',suppliers,v=>suppliers=v);renderSuppliers();populateSupplierSelects();}
 async function saveSuppliersToStorage(){localStorage.setItem('roving_suppliers',JSON.stringify(suppliers));}
@@ -1498,38 +1569,95 @@ function normalizeRTCode(value) {
 function clientCodeOf(client) {
     return normalizeRTCode(client?.clientCode || client?.client_code || client?.code || '');
 }
+function clientCreatedTime(client) {
+    const dateValue = client?.createdAt || client?.created_at || client?.createdDate ||
+        client?.created_date || client?.timestamp || client?.dateAdded;
+    if (dateValue) {
+        const parsed = new Date(dateValue).getTime();
+        if (Number.isFinite(parsed)) return parsed;
+    }
+
+    // MongoDB ObjectId starts with the record creation time (Unix seconds).
+    const rawId = String(client?._id ?? client?.id ?? '');
+    if (/^[a-f\d]{24}$/i.test(rawId)) {
+        return parseInt(rawId.slice(0, 8), 16) * 1000;
+    }
+
+    // Offline-created IDs use local_<milliseconds>.
+    const localMatch = rawId.match(/^local_(\d{10,})$/);
+    if (localMatch) return Number(localMatch[1]);
+
+    // Older timestamp-based IDs can also preserve creation order.
+    if (/^\d{13}$/.test(rawId)) return Number(rawId);
+
+    return null;
+}
+function clientCodeNumber(client) {
+    const match = clientCodeOf(client).match(/^RT-(\d+)$/i);
+    return match ? Number(match[1]) : null;
+}
 function nextClientCode() {
-    const max=(Array.isArray(clients)?clients:[]).reduce((m,c)=>{
-        const match=clientCodeOf(c).match(/^RT-(\d+)$/);
-        return match?Math.max(m,Number(match[1])):m;
-    },349);
-    return `RT-${String(max+1).padStart(5,'0')}`;
+    // Include the local cache as well as the currently rendered list so a
+    // newly added client never receives a number below an already saved one.
+    let all = [...(Array.isArray(clients) ? clients : [])];
+    try {
+        const cached = JSON.parse(localStorage.getItem('roving_local_clients') || '[]');
+        if (Array.isArray(cached)) all = all.concat(cached);
+    } catch (_) {}
+    const max = all.reduce((m, c) => Math.max(m, clientCodeNumber(c) || 0), 349);
+    return `RT-${String(max + 1).padStart(5, '0')}`;
 }
 async function ensureClientCodes() {
-    if (!Array.isArray(clients)) return;
-    const used=new Set(clients.map(clientCodeOf).filter(Boolean));
-    let next=350;
-    const pending=[];
-    // Keep old visible order for first-time migration; then code is stored on each record.
-    for (const c of clients) {
-        let code=clientCodeOf(c);
-        if (!code) {
-            while (used.has(`RT-${String(next).padStart(5,'0')}`)) next++;
-            code=`RT-${String(next++).padStart(5,'0')}`;
-            c.clientCode=code; used.add(code); pending.push(c);
-        } else c.clientCode=code;
-    }
-    for (const c of pending) {
-        const id=c._id??c.id;
+    if (!Array.isArray(clients) || !clients.length) return;
+
+    // Assign codes by actual creation time, never by API response order.
+    // ObjectId timestamps are used for older records that predate createdAt.
+    const ordered = clients.slice().sort((a, b) => {
+        const ta = clientCreatedTime(a);
+        const tb = clientCreatedTime(b);
+        if (ta !== null && tb !== null && ta !== tb) return ta - tb;
+        if (ta !== null && tb === null) return -1;
+        if (ta === null && tb !== null) return 1;
+
+        const ca = clientCodeNumber(a);
+        const cb = clientCodeNumber(b);
+        if (ca !== null && cb !== null && ca !== cb) return ca - cb;
+        return String(a?._id ?? a?.id ?? '').localeCompare(String(b?._id ?? b?.id ?? ''));
+    });
+
+    const existingNumbers = clients.map(clientCodeNumber).filter(n => n !== null);
+    const firstNumber = existingNumbers.length ? Math.min(...existingNumbers) : 350;
+    const changed = [];
+
+    ordered.forEach((client, index) => {
+        const newCode = `RT-${String(firstNumber + index).padStart(5, '0')}`;
+        if (clientCodeOf(client) !== newCode) {
+            client.clientCode = newCode;
+            changed.push(client);
+        } else {
+            client.clientCode = newCode;
+        }
+    });
+
+    // Persist every corrected code to MongoDB so it remains consistent
+    // across browsers, users, bookings and future sessions.
+    for (const client of changed) {
+        const id = client?._id ?? client?.id;
         if (!id || String(id).startsWith('local_')) continue;
         try {
-            const saved=await apiRequest(`/api/clients/${encodeURIComponent(String(id))}`,{
-                method:'PUT',body:JSON.stringify({clientCode:c.clientCode})
+            const saved = await apiRequest(`/api/clients/${encodeURIComponent(String(id))}`, {
+                method: 'PUT',
+                body: JSON.stringify({ clientCode: client.clientCode })
             });
-            if (saved && typeof saved==='object') Object.assign(c,saved,{clientCode:c.clientCode});
-        } catch(err) { console.warn('Could not save RT customer code',err); }
+            if (saved && typeof saved === 'object') {
+                Object.assign(client, saved, { clientCode: client.clientCode });
+            }
+        } catch (err) {
+            console.warn('Could not persist corrected RT customer code', err);
+        }
     }
-    localStorage.setItem('roving_local_clients',JSON.stringify(clients));
+
+    localStorage.setItem('roving_local_clients', JSON.stringify(clients));
 }
 function resolveBookingClient(b) {
     const id=String(b?.clientId??b?.client_id??'');
@@ -2787,6 +2915,74 @@ async function executeSaveClient(clientData) {
     return savedClient;
 }
 
+function getVisibleClientRows() {
+    return Array.from(document.querySelectorAll('#clientsTableBody .client-row-check'))
+        .map(el => String(el.dataset.clientId));
+}
+function toggleClientSelection(id, checked) {
+    const key = String(id);
+    if (checked) selectedClientIds.add(key); else selectedClientIds.delete(key);
+    updateClientBulkBar();
+}
+function toggleAllClients(checked) {
+    getVisibleClientRows().forEach(id => {
+        if (checked) selectedClientIds.add(id); else selectedClientIds.delete(id);
+    });
+    renderClients();
+}
+function clearClientSelection() {
+    selectedClientIds.clear();
+    renderClients();
+}
+function updateClientBulkBar() {
+    const bar = document.getElementById('clientBulkActionBar');
+    const count = document.getElementById('selectedClientCount');
+    if (count) count.textContent = String(selectedClientIds.size);
+    if (bar) bar.classList.toggle('show', selectedClientIds.size > 0);
+    const selectAll = document.getElementById('selectAllClients');
+    const visible = getVisibleClientRows();
+    if (selectAll) {
+        selectAll.checked = visible.length > 0 && visible.every(id => selectedClientIds.has(id));
+        selectAll.indeterminate = visible.some(id => selectedClientIds.has(id)) && !selectAll.checked;
+    }
+}
+async function applyBulkClientDelete() {
+    const ids = [...selectedClientIds];
+    if (!ids.length) return;
+    const isSales = String(currentUser?.role || '').trim().toLowerCase() === 'sales';
+    const label = isSales ? 'request deletion of' : 'permanently delete';
+    if (!confirm(`Are you sure you want to ${label} ${ids.length} selected client(s)?`)) return;
+
+    let completed = 0;
+    if (isSales) {
+        for (const id of ids) {
+            const client = clients.find(c => String(c._id ?? c.id) === id);
+            if (!client) continue;
+            const alreadyPending = getApprovalNotifications().some(n =>
+                n.type === 'approval_request' && n.requestType === 'DELETE_CLIENT' &&
+                n.status === 'pending' && String(n.payload?.clientId) === id
+            );
+            if (!alreadyPending) {
+                createApprovalRequest('DELETE_CLIENT', { clientId: id }, 'طلب حذف عميل جديد',
+                    `الموظف (${currentUser.name}) يطلب حذف العميل: (${client.name || clientCodeOf(client)})`);
+                completed++;
+            }
+        }
+        selectedClientIds.clear();
+        updateClientBulkBar();
+        showNotification(`تم إرسال ${completed} طلب حذف إلى الأدمن للموافقة.`, 'warning');
+        return;
+    }
+
+    for (const id of ids) {
+        await executeDeleteClient(id);
+        completed++;
+    }
+    selectedClientIds.clear();
+    await fetchClients();
+    showNotification(`تم حذف ${completed} عميل بنجاح.`, 'success');
+}
+
 async function deleteClient(clientId) {
     const client = clients.find(c => String(c._id || c.id) === String(clientId));
     if (!client) return;
@@ -2823,6 +3019,7 @@ async function deleteClient(clientId) {
     }
 
     await executeDeleteClient(clientId);
+    selectedClientIds.delete(String(clientId));
 
     showNotification('تم حذف العميل بنجاح.', 'success');
     await fetchClients();
@@ -2957,6 +3154,7 @@ async function handleSaveClient(event) {
     const clientData = {
         _id: editingId !== "" ? editingId : 'local_' + Date.now(),
         clientCode: priorClient ? (clientCodeOf(priorClient) || nextClientCode()) : nextClientCode(),
+        createdAt: priorClient ? (priorClient.createdAt || priorClient.created_at || new Date().toISOString()) : new Date().toISOString(),
         createdBy: priorClient ? (priorClient.createdBy || priorClient.createdByName || '') : (currentUser?.name || ''),
         createdById: priorClient ? (priorClient.createdById || '') : (currentUser?.id || currentUser?._id || currentUser?.email || ''),
         name: document.getElementById('clientName').value.trim(),
@@ -3187,7 +3385,8 @@ function renderClients() {
     }
 
     if (list.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">No clients recorded</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10" class="text-center text-muted py-4">No clients recorded</td></tr>`;
+        updateClientBulkBar();
         return;
     }
 
@@ -3205,6 +3404,7 @@ function renderClients() {
         const clientId = client._id || client.id;
         tbody.innerHTML += `
             <tr>
+                <td class="followup-select-cell"><input type="checkbox" class="client-row-check" data-client-id="${escapeHtml(String(clientId))}" ${selectedClientIds.has(String(clientId)) ? 'checked' : ''} onchange="toggleClientSelection(${JSON.stringify(String(clientId))}, this.checked)"></td>
                 <td><span class="badge bg-dark">${escapeHtml(clientCodeOf(client) || 'RT-PENDING')}</span></td>
                 <td><strong>${client.name}</strong></td>
                 <td><span class="badge bg-secondary">${client.source || '-'}</span></td>
@@ -3221,6 +3421,7 @@ function renderClients() {
             </tr>
         `;
     });
+    updateClientBulkBar();
 }
 
 // Reports & Charts: Admin sees all data, Sales sees their own analytics
