@@ -2921,12 +2921,14 @@ function getVisibleClientRows() {
 }
 function toggleClientSelection(id, checked) {
     const key = String(id);
-    if (checked) selectedClientIds.add(key); else selectedClientIds.delete(key);
+    if (checked) selectedClientIds.add(key);
+    else selectedClientIds.delete(key);
     updateClientBulkBar();
 }
 function toggleAllClients(checked) {
     getVisibleClientRows().forEach(id => {
-        if (checked) selectedClientIds.add(id); else selectedClientIds.delete(id);
+        if (checked) selectedClientIds.add(id);
+        else selectedClientIds.delete(id);
     });
     renderClients();
 }
@@ -2937,10 +2939,26 @@ function clearClientSelection() {
 function updateClientBulkBar() {
     const bar = document.getElementById('clientBulkActionBar');
     const count = document.getElementById('selectedClientCount');
-    if (count) count.textContent = String(selectedClientIds.size);
-    if (bar) bar.classList.toggle('show', selectedClientIds.size > 0);
+    const rowChecks = Array.from(document.querySelectorAll('#clientsTableBody .client-row-check'));
+
+    // Reconcile state from the actual checkboxes so individual and select-all
+    // interactions always show the same bulk-action toolbar.
+    rowChecks.forEach(el => {
+        const id = String(el.dataset.clientId || '');
+        if (!id) return;
+        if (el.checked) selectedClientIds.add(id);
+        else selectedClientIds.delete(id);
+    });
+
+    const selectedCount = selectedClientIds.size;
+    if (count) count.textContent = String(selectedCount);
+    if (bar) {
+        bar.classList.toggle('show', selectedCount > 0);
+        bar.style.display = selectedCount > 0 ? 'flex' : 'none';
+    }
+
     const selectAll = document.getElementById('selectAllClients');
-    const visible = getVisibleClientRows();
+    const visible = rowChecks.map(el => String(el.dataset.clientId || ''));
     if (selectAll) {
         selectAll.checked = visible.length > 0 && visible.every(id => selectedClientIds.has(id));
         selectAll.indeterminate = visible.some(id => selectedClientIds.has(id)) && !selectAll.checked;
@@ -3404,7 +3422,7 @@ function renderClients() {
         const clientId = client._id || client.id;
         tbody.innerHTML += `
             <tr>
-                <td class="followup-select-cell"><input type="checkbox" class="client-row-check" data-client-id="${escapeHtml(String(clientId))}" ${selectedClientIds.has(String(clientId)) ? 'checked' : ''} onchange="toggleClientSelection(${JSON.stringify(String(clientId))}, this.checked)"></td>
+                <td class="followup-select-cell"><input type="checkbox" class="client-row-check" data-client-id="${escapeHtml(String(clientId))}" ${selectedClientIds.has(String(clientId)) ? 'checked' : ''} onchange="toggleClientSelection(this.dataset.clientId, this.checked)"></td>
                 <td><span class="badge bg-dark">${escapeHtml(clientCodeOf(client) || 'RT-PENDING')}</span></td>
                 <td><strong>${client.name}</strong></td>
                 <td><span class="badge bg-secondary">${client.source || '-'}</span></td>
