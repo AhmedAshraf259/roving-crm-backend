@@ -947,7 +947,9 @@
     <input type="hidden" id="supplierPaymentBillId">
     <div id="supplierPaymentBillSummary" class="alert alert-light border mb-3"></div>
     <div class="row g-3">
-     <div class="col-md-4"><label class="form-label fw-semibold">Payment Amount *</label><input id="supplierPaymentAmount" type="number" class="form-control" min="0.01" step="0.01" required></div>
+     <div class="col-md-4"><label class="form-label fw-semibold">Equivalent Amount Applied to Bill *</label><input id="supplierPaymentAmount" type="number" class="form-control" min="0.01" step="0.01" required><small id="supplierPaymentEquivalentHint" class="text-muted">Value in the bill currency</small></div>
+     <div class="col-md-4"><label class="form-label fw-semibold">Actually Paid Amount *</label><input id="supplierPaymentPaidAmount" type="number" class="form-control" min="0.01" step="0.01" required></div>
+     <div class="col-md-4"><label class="form-label fw-semibold">Paid Currency *</label><select id="supplierPaymentPaidCurrency" class="form-select"><option>EGP</option><option>USD</option><option>EUR</option><option>GBP</option><option>AED</option><option>SAR</option><option>TRY</option><option>GEL</option><option>AZN</option><option>OMR</option><option>QAR</option><option>BHD</option><option>ALL</option><option>IDR</option><option>MYR</option></select></div>
      <div class="col-md-4"><label class="form-label fw-semibold">Payment Date *</label><input id="supplierPaymentDate" type="date" class="form-control" required></div>
      <div class="col-md-4"><label class="form-label fw-semibold">Payment Method *</label><select id="supplierPaymentMethod" class="form-select" required><option value="Bank Transfer">Bank Transfer</option><option value="Cash">Cash</option><option value="Credit / Debit Card">Credit / Debit Card</option><option value="Mobile Wallet">Mobile Wallet</option><option value="Online Payment">Online Payment</option><option value="Other">Other</option></select></div>
      <div class="col-md-6"><label class="form-label fw-semibold">Transaction / Reference Number</label><input id="supplierPaymentReference" class="form-control" placeholder="Transfer reference / receipt no."></div>
@@ -1009,18 +1011,43 @@
  </div></div>
 </div>
 
+<!-- Supplier account totals correction modal -->
+<div class="modal fade" id="supplierAccountAdjustModal" tabindex="-1">
+ <div class="modal-dialog modal-lg"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title fw-bold text-roving-green">Correct Supplier Account Totals</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body">
+   <form id="supplierAccountAdjustForm" onsubmit="handleSaveSupplierAccountAdjustment(event)">
+    <input type="hidden" id="supplierAccountAdjustSupplierId">
+    <div id="supplierAccountAdjustInfo" class="alert alert-info small"></div>
+    <div class="mb-3"><label class="form-label fw-semibold">Currency</label><select id="supplierAccountAdjustCurrency" class="form-select" onchange="refreshSupplierAccountAdjustSummary()"></select></div>
+    <div class="row g-3">
+     <div class="col-md-4"><label class="form-label">Correct Total Bills</label><input id="supplierAdjustBillsTarget" type="number" min="0" step="0.01" class="form-control" required></div>
+     <div class="col-md-4"><label class="form-label">Correct Total Paid</label><input id="supplierAdjustPaidTarget" type="number" min="0" step="0.01" class="form-control" required></div>
+     <div class="col-md-4"><label class="form-label">Correct Total Received</label><input id="supplierAdjustReceivedTarget" type="number" min="0" step="0.01" class="form-control" required></div>
+     <div class="col-12"><label class="form-label">Reason for correction *</label><textarea id="supplierAdjustReason" class="form-control" rows="2" required placeholder="Explain why these totals need correction"></textarea></div>
+    </div>
+    <div class="alert alert-warning small mt-3">This creates an auditable correction entry. It does not erase existing invoices, payments or receipts.</div>
+    <button type="submit" class="btn btn-success w-100">Save Corrected Totals</button>
+   </form>
+  </div>
+ </div></div>
+</div>
+
 <!-- Supplier prepaid wallet transaction modal -->
 <div class="modal fade" id="supplierWalletModal" tabindex="-1">
  <div class="modal-dialog modal-lg"><div class="modal-content">
   <div class="modal-header"><h5 class="modal-title fw-bold text-roving-green">Supplier Prepaid Wallet</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
   <div class="modal-body">
    <form id="supplierWalletForm" onsubmit="handleSaveSupplierWalletTransaction(event)">
-    <input type="hidden" id="supplierWalletLinkedBillId">
+    <input type="hidden" id="supplierWalletLinkedBillId"><input type="hidden" id="supplierWalletEditingId">
     <div class="row g-3">
      <div class="col-md-6"><label class="form-label fw-semibold">Supplier *</label><select id="supplierWalletSupplier" class="form-select" required></select></div>
      <div class="col-md-6"><label class="form-label fw-semibold">Transaction Type *</label><select id="supplierWalletType" class="form-select" onchange="handleSupplierWalletTypeChange()"><option value="deposit">Add Advance / Deposit</option><option value="consume">Consume Wallet for Service</option></select></div>
-     <div class="col-md-4"><label class="form-label fw-semibold">Amount *</label><input id="supplierWalletAmount" type="number" min="0.01" step="0.01" class="form-control" required></div>
-     <div class="col-md-4"><label class="form-label fw-semibold">Currency *</label><select id="supplierWalletCurrency" class="form-select"><option>EGP</option><option>USD</option><option>EUR</option><option>GBP</option><option>AED</option><option>SAR</option><option>TRY</option><option>GEL</option><option>AZN</option><option>OMR</option><option>QAR</option><option>BHD</option><option>ALL</option><option>IDR</option><option>MYR</option></select></div>
+     <div class="col-md-4"><label class="form-label fw-semibold">Equivalent Amount in Wallet Currency *</label><input id="supplierWalletAmount" type="number" min="0.01" step="0.01" class="form-control" required><small class="text-muted">This is the amount that changes the wallet balance.</small></div>
+     <div class="col-md-4"><label class="form-label fw-semibold">Actual Transaction Amount *</label><input id="supplierWalletSourceAmount" type="number" min="0.01" step="0.01" class="form-control" required></div>
+     <div class="col-md-4"><label class="form-label fw-semibold">Actual Transaction Currency *</label><select id="supplierWalletSourceCurrency" class="form-select"><option>EGP</option><option>USD</option><option>EUR</option><option>GBP</option><option>AED</option><option>SAR</option><option>TRY</option><option>GEL</option><option>AZN</option><option>OMR</option><option>QAR</option><option>BHD</option><option>ALL</option><option>IDR</option><option>MYR</option></select></div>
+     <div class="col-md-6" id="supplierWalletBillEquivalentWrap" style="display:none"><label class="form-label fw-semibold">Equivalent Applied to Supplier Bill</label><input id="supplierWalletBillEquivalentAmount" type="number" min="0.01" step="0.01" class="form-control"><small id="supplierWalletBillEquivalentHint" class="text-muted">Enter the equivalent amount in the supplier bill currency.</small></div>
+     <div class="col-md-4"><label class="form-label fw-semibold">Wallet Currency *</label><select id="supplierWalletCurrency" class="form-select"><option>EGP</option><option>USD</option><option>EUR</option><option>GBP</option><option>AED</option><option>SAR</option><option>TRY</option><option>GEL</option><option>AZN</option><option>OMR</option><option>QAR</option><option>BHD</option><option>ALL</option><option>IDR</option><option>MYR</option></select></div>
      <div class="col-md-4"><label class="form-label fw-semibold">Transaction Date *</label><input id="supplierWalletDate" type="date" class="form-control" required></div>
      <div class="col-md-6"><label class="form-label fw-semibold">Related Booking / File</label><select id="supplierWalletBooking" class="form-select"><option value="">Not linked</option></select></div>
      <div class="col-md-6"><label class="form-label fw-semibold">Payment Method</label><select id="supplierWalletMethod" class="form-select"><option>Bank Transfer</option><option>Cash</option><option>Credit / Debit Card</option><option>Mobile Wallet</option><option>Online Payment</option><option>Other</option></select></div>
@@ -1169,6 +1196,7 @@ let supplierBills = [];
 let supplierPayments = [];
 let supplierReceipts = JSON.parse(localStorage.getItem('roving_supplier_receipts') || '[]');
 let supplierWalletTransactions = JSON.parse(localStorage.getItem('roving_supplier_wallet_transactions') || '[]');
+let supplierAccountAdjustments = JSON.parse(localStorage.getItem('roving_supplier_account_adjustments') || '[]');
 let packageCostRows = [];
 let pendingNotifications = JSON.parse(localStorage.getItem('roving_user_notifications')) || [];
 let bookingsChartInstance = null;
@@ -1723,6 +1751,7 @@ async function loadSuppliers(){
     await syncCollection('supplierPayments','roving_supplier_payments',supplierPayments,v=>supplierPayments=v);
     await syncCollection('supplierReceipts','roving_supplier_receipts',supplierReceipts,v=>supplierReceipts=v);
     await syncCollection('supplierWalletTransactions','roving_supplier_wallet_transactions',supplierWalletTransactions,v=>supplierWalletTransactions=v);
+    await syncCollection('supplierAccountAdjustments','roving_supplier_account_adjustments',supplierAccountAdjustments,v=>supplierAccountAdjustments=v);
     renderSuppliers(); renderSupplierWallet(); renderSupplierBills(); populateSupplierSelects(); populateSupplierBillSelects();
 }
 async function saveSuppliersToStorage(){localStorage.setItem('roving_suppliers',JSON.stringify(suppliers));}
@@ -1756,6 +1785,54 @@ async function handleSaveSupplier(e){
     const modal=bootstrap.Modal.getInstance(document.getElementById('supplierModal'));
     if(modal)modal.hide();
     showNotification('Supplier saved successfully!','success');
+}
+function openSupplierAccountAdjustModal(supplierId){
+    const supplier=suppliers.find(s=>String(s.id??s._id)===String(supplierId));if(!supplier)return;
+    const currencies=[...new Set([
+        supplier.currency||'EGP',
+        ...supplierBills.filter(x=>String(x.supplierId)===String(supplierId)).map(x=>x.currency),
+        ...supplierPayments.filter(x=>String(x.supplierId)===String(supplierId)).map(x=>x.currency),
+        ...supplierReceipts.filter(x=>String(x.supplierId)===String(supplierId)).map(x=>x.currency),
+        ...supplierAccountAdjustments.filter(x=>String(x.supplierId)===String(supplierId)).map(x=>x.currency)
+    ].filter(Boolean))];
+    document.getElementById('supplierAccountAdjustForm').reset();
+    document.getElementById('supplierAccountAdjustSupplierId').value=String(supplierId);
+    document.getElementById('supplierAccountAdjustCurrency').innerHTML=currencies.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+    document.getElementById('supplierAccountAdjustInfo').innerHTML=`Correct the totals for <strong>${escapeHtml(supplier.name)}</strong>. Enter the accurate cumulative figures, not the difference.`;
+    refreshSupplierAccountAdjustSummary();
+    new bootstrap.Modal(document.getElementById('supplierAccountAdjustModal')).show();
+}
+function refreshSupplierAccountAdjustSummary(){
+    const sid=document.getElementById('supplierAccountAdjustSupplierId').value;
+    const cur=document.getElementById('supplierAccountAdjustCurrency').value;
+    document.getElementById('supplierAdjustBillsTarget').value=supplierBillsTotalFor(sid,cur).toFixed(2);
+    document.getElementById('supplierAdjustPaidTarget').value=supplierPaidToFor(sid,cur).toFixed(2);
+    document.getElementById('supplierAdjustReceivedTarget').value=supplierReceivedFor(sid,cur).toFixed(2);
+}
+async function handleSaveSupplierAccountAdjustment(e){
+    e.preventDefault();
+    try{
+        const supplierId=document.getElementById('supplierAccountAdjustSupplierId').value;
+        const supplier=suppliers.find(s=>String(s.id??s._id)===String(supplierId));if(!supplier)throw new Error('Supplier not found.');
+        const currency=document.getElementById('supplierAccountAdjustCurrency').value;
+        const targetBills=Number(document.getElementById('supplierAdjustBillsTarget').value);
+        const targetPaid=Number(document.getElementById('supplierAdjustPaidTarget').value);
+        const targetReceived=Number(document.getElementById('supplierAdjustReceivedTarget').value);
+        const reason=document.getElementById('supplierAdjustReason').value.trim();
+        if([targetBills,targetPaid,targetReceived].some(x=>!Number.isFinite(x)||x<0))throw new Error('Enter valid non-negative totals.');
+        if(!reason)throw new Error('Please enter a reason for the correction.');
+        const deltaBills=Number((targetBills-supplierBillsTotalFor(supplierId,currency)).toFixed(2));
+        const deltaPaid=Number((targetPaid-supplierPaidToFor(supplierId,currency)).toFixed(2));
+        const deltaReceived=Number((targetReceived-supplierReceivedFor(supplierId,currency)).toFixed(2));
+        if(Math.abs(deltaBills)+Math.abs(deltaPaid)+Math.abs(deltaReceived)<0.009)throw new Error('No changes to save.');
+        const adjustment={id:`SA-${Date.now()}`,supplierId:String(supplierId),supplierName:supplier.name,currency,deltaBills,deltaPaid,deltaReceived,reason,createdAt:new Date().toISOString(),createdBy:currentUser?.name||''};
+        supplierAccountAdjustments.unshift(adjustment);
+        localStorage.setItem('roving_supplier_account_adjustments',JSON.stringify(supplierAccountAdjustments));
+        await saveRecord('supplierAccountAdjustments','roving_supplier_account_adjustments',adjustment);
+        const modal=bootstrap.Modal.getInstance(document.getElementById('supplierAccountAdjustModal'));if(modal)modal.hide();
+        renderSuppliers();renderSupplierBills();
+        showNotification('Supplier account totals corrected. Original records were preserved.','success');
+    }catch(err){showNotification(err.message||'Could not correct supplier account.','danger');}
 }
 function supplierWalletDeposited(supplierId,currency){
     return supplierWalletTransactions.filter(t=>String(t.supplierId)===String(supplierId)&&String(t.currency)===String(currency)&&t.type==='deposit')
@@ -1800,10 +1877,10 @@ function renderSupplierWallet(){
         return `<tr><td>${escapeHtml(t.date||'—')}</td><td>${escapeHtml(supplier?.name||t.supplierName||'Supplier')}</td>
         <td><span class="badge bg-${t.type==='deposit'?'success':'primary'}">${t.type==='deposit'?'Advance Deposit':'Service Consumption'}</span></td>
         <td>${escapeHtml(t.bookingInvoice||booking?.invoiceNumber||booking?.invoiceNo||'—')}${booking?`<br><small class="text-muted">${escapeHtml(bookingRTCode(booking)||'')}</small>`:''}</td>
-        <td class="text-success">${t.type==='deposit'?supplierMoney(t.amount,t.currency):'—'}</td>
-        <td class="text-primary">${t.type==='consume'?supplierMoney(t.amount,t.currency):'—'}</td>
+        <td class="text-success">${t.type==='deposit'?`${supplierMoney(t.sourceAmount??t.amount,t.sourceCurrency||t.currency)}<br><small class="text-muted">Wallet credit: ${supplierMoney(t.amount,t.currency)}</small>`:'—'}</td>
+        <td class="text-primary">${t.type==='consume'?`${supplierMoney(t.sourceAmount??t.amount,t.sourceCurrency||t.currency)}<br><small class="text-muted">Wallet deduction: ${supplierMoney(t.amount,t.currency)}</small>`:'—'}</td>
         <td class="fw-semibold">${supplierMoney(t._walletBalanceAfter,t.currency)}</td>
-        <td>${escapeHtml(t.reference||'—')}${t.notes?`<br><small class="text-muted">${escapeHtml(t.notes)}</small>`:''}${t.attachment?`<br><a href="${t.attachment.data}" download="${escapeHtml(t.attachment.name)}">Attachment</a>`:''}</td></tr>`;
+        <td>${escapeHtml(t.reference||'—')}${t.billEquivalentAmount?`<br><small class="text-muted">Applied to bill: ${supplierMoney(t.billEquivalentAmount,t.billCurrency)}</small>`:''}${t.notes?`<br><small class="text-muted">${escapeHtml(t.notes)}</small>`:''}${t.attachment?`<br><a href="${t.attachment.data}" download="${escapeHtml(t.attachment.name)}">Attachment</a>`:''}<div class="mt-1 text-nowrap"><button class="btn btn-sm btn-outline-primary me-1" onclick="editSupplierWalletTransaction('${String(t.id).replace(/'/g,"\\'")}')" title="Edit transaction"><i class="fa-solid fa-pen-to-square"></i></button><button class="btn btn-sm btn-outline-danger" onclick="deleteSupplierWalletTransaction('${String(t.id).replace(/'/g,"\\'")}')" title="Delete transaction"><i class="fa-solid fa-trash"></i></button></div></td></tr>`;
     }).join(''):'<tr><td colspan="8" class="text-center text-muted py-3">No wallet transactions recorded</td></tr>';
 }
 function populateSupplierWalletSelects(){
@@ -1816,16 +1893,60 @@ function openSupplierWalletForBill(billId){
     const bill=supplierBills.find(b=>String(b.id)===String(billId));if(!bill)return;
     openSupplierWalletModal(String(bill.supplierId),'consume',bill.currency);
     document.getElementById('supplierWalletLinkedBillId').value=String(bill.id);
+    document.getElementById('supplierWalletBillEquivalentWrap').style.display='block';
+    document.getElementById('supplierWalletBillEquivalentAmount').value=Math.max(0,supplierBillRemaining(bill)).toFixed(2);
+    document.getElementById('supplierWalletBillEquivalentHint').textContent=`Equivalent applied to this bill in ${bill.currency}. Enter the correct converted amount.`;
     document.getElementById('supplierWalletAmount').value=Math.min(supplierBillRemaining(bill),Math.max(0,supplierWalletBalance(bill.supplierId,bill.currency))).toFixed(2);
     if(bill.bookingId)document.getElementById('supplierWalletBooking').value=String(bill.bookingId);
     document.getElementById('supplierWalletReference').value=bill.reference||`Booking invoice ${bill.bookingInvoice||''}`;
     document.getElementById('supplierWalletNotes').value=`Wallet used for ${bill.description||'booking service'}`;
     handleSupplierWalletTypeChange();
 }
+function editSupplierWalletTransaction(transactionId){
+    const tx=supplierWalletTransactions.find(t=>String(t.id)===String(transactionId));if(!tx)return;
+    openSupplierWalletModal(String(tx.supplierId),tx.type,tx.currency);
+    document.getElementById('supplierWalletEditingId').value=String(tx.id);
+    if(tx.linkedBillId){
+        const linkedBill=supplierBills.find(b=>String(b.id)===String(tx.linkedBillId));
+        if(linkedBill){
+            document.getElementById('supplierWalletBillEquivalentWrap').style.display='block';
+            document.getElementById('supplierWalletBillEquivalentAmount').value=Number(tx.billEquivalentAmount??tx.amount).toFixed(2);
+            document.getElementById('supplierWalletBillEquivalentHint').textContent=`Equivalent applied to this bill in ${linkedBill.currency}.`;
+        }
+    }
+    document.querySelector('#supplierWalletModal .modal-title').textContent='Edit Wallet Transaction';
+    document.getElementById('supplierWalletAmount').value=Number(tx.amount).toFixed(2);
+    document.getElementById('supplierWalletSourceAmount').value=Number(tx.sourceAmount??tx.amount).toFixed(2);
+    document.getElementById('supplierWalletSourceCurrency').value=tx.sourceCurrency||tx.currency;
+    document.getElementById('supplierWalletDate').value=tx.date||'';
+    document.getElementById('supplierWalletBooking').value=tx.bookingId||'';
+    document.getElementById('supplierWalletMethod').value=tx.method||'Other';
+    document.getElementById('supplierWalletReference').value=tx.reference||'';
+    document.getElementById('supplierWalletNotes').value=tx.notes||'';
+    document.getElementById('supplierWalletBalanceHint').innerHTML='Editing an existing wallet transaction. Saving will update the wallet balance and its linked booking payment.';
+}
+async function deleteSupplierWalletTransaction(transactionId){
+    const tx=supplierWalletTransactions.find(t=>String(t.id)===String(transactionId));if(!tx)return;
+    if(!confirm('Delete this wallet transaction? The wallet balance and any linked booking payment will be recalculated.'))return;
+    supplierWalletTransactions=supplierWalletTransactions.filter(t=>String(t.id)!==String(transactionId));
+    localStorage.setItem('roving_supplier_wallet_transactions',JSON.stringify(supplierWalletTransactions));
+    await deleteRecord('supplierWalletTransactions','roving_supplier_wallet_transactions',transactionId);
+    const linkedPayments=supplierPayments.filter(p=>String(p.walletTransactionId)===String(transactionId));
+    for(const payment of linkedPayments){
+        supplierPayments=supplierPayments.filter(p=>String(p.id)!==String(payment.id));
+        await deleteRecord('supplierPayments','roving_supplier_payments',payment.id);
+    }
+    localStorage.setItem('roving_supplier_payments',JSON.stringify(supplierPayments));
+    renderSupplierWallet();renderSuppliers();renderSupplierBills();
+    showNotification('Wallet transaction deleted and balances recalculated.','success');
+}
 function openSupplierWalletModal(supplierId='',type='deposit',currency=''){
     if(!suppliers.length){showNotification('Add a supplier first.','warning');return;}
     document.getElementById('supplierWalletForm').reset();
     document.getElementById('supplierWalletLinkedBillId').value='';
+    document.getElementById('supplierWalletBillEquivalentWrap').style.display='none';
+    document.getElementById('supplierWalletBillEquivalentAmount').value='';
+    document.getElementById('supplierWalletEditingId').value='';
     populateSupplierWalletSelects();
     document.getElementById('supplierWalletSupplier').value=String(supplierId||'');
     document.getElementById('supplierWalletType').value=type;
@@ -1833,7 +1954,10 @@ function openSupplierWalletModal(supplierId='',type='deposit',currency=''){
     document.getElementById('supplierWalletCurrency').value=currency||supplier?.currency||'EGP';
     document.getElementById('supplierWalletDate').value=new Date().toISOString().slice(0,10);
     document.getElementById('supplierWalletAmount').value='';
+    document.getElementById('supplierWalletSourceAmount').value='';
+    document.getElementById('supplierWalletSourceCurrency').value=currency||supplier?.currency||'EGP';
     handleSupplierWalletTypeChange();
+    document.querySelector('#supplierWalletModal .modal-title').textContent=document.getElementById('supplierWalletEditingId').value?'Edit Wallet Transaction':'Supplier Prepaid Wallet';
     new bootstrap.Modal(document.getElementById('supplierWalletModal')).show();
 }
 function handleSupplierWalletTypeChange(){
@@ -1842,9 +1966,10 @@ function handleSupplierWalletTypeChange(){
     const currency=document.getElementById('supplierWalletCurrency').value;
     const balance=supplierWalletBalance(supplierId,currency);
     const hint=document.getElementById('supplierWalletBalanceHint');
+    const amountLabel=document.querySelector('label[for="supplierWalletAmount"]');
     hint.innerHTML=type==='deposit'
-        ?`This advance deposit will increase the wallet. Current balance: <strong>${supplierMoney(balance,currency)}</strong>.`
-        :`This service consumption will reduce the wallet. Available balance: <strong>${supplierMoney(balance,currency)}</strong>.`;
+        ?`Enter the amount you actually transferred and its currency, then enter its equivalent in <strong>${escapeHtml(currency)}</strong>. That equivalent amount will be added to the wallet. Current balance: <strong>${supplierMoney(balance,currency)}</strong>.`
+        :`Enter the service amount and its original currency, then enter the equivalent amount to deduct in <strong>${escapeHtml(currency)}</strong>. Available balance: <strong>${supplierMoney(balance,currency)}</strong>.`;
 }
 async function handleSaveSupplierWalletTransaction(e){
     e.preventDefault();
@@ -1854,31 +1979,65 @@ async function handleSaveSupplierWalletTransaction(e){
         if(!supplier)throw new Error('Please select a supplier.');
         const type=document.getElementById('supplierWalletType').value;
         const amount=Number(document.getElementById('supplierWalletAmount').value);
+        const sourceAmount=Number(document.getElementById('supplierWalletSourceAmount').value);
+        const sourceCurrency=document.getElementById('supplierWalletSourceCurrency').value;
         const currency=document.getElementById('supplierWalletCurrency').value;
-        if(!(amount>0))throw new Error('Enter an amount greater than zero.');
+        const linkedBillId=document.getElementById('supplierWalletLinkedBillId').value||document.getElementById('supplierWalletEditingId').value&&supplierWalletTransactions.find(t=>String(t.id)===String(document.getElementById('supplierWalletEditingId').value))?.linkedBillId||'';
+        const billEquivalentAmount=Number(document.getElementById('supplierWalletBillEquivalentAmount').value);
+        if(!(amount>0)||!(sourceAmount>0))throw new Error('Enter valid actual and equivalent transaction amounts.');
+        if(type==='consume'&&linkedBillId&&!(billEquivalentAmount>0))throw new Error('Enter the equivalent amount applied to the supplier bill.');
         const available=supplierWalletBalance(supplierId,currency);
-        if(type==='consume'&&amount>available+0.009)throw new Error(`Insufficient wallet balance. Available: ${supplierMoney(available,currency)}.`);
         const bookingId=document.getElementById('supplierWalletBooking').value;
         const booking=(bookings||[]).find(b=>String(b.id??b._id)===String(bookingId));
+        const editingId=document.getElementById('supplierWalletEditingId').value;
+        const existing=editingId?supplierWalletTransactions.find(t=>String(t.id)===String(editingId)):null;
+        const availableWithoutCurrent=existing&&existing.type==='deposit'
+            ? available-Number(existing.amount||0)
+            : existing&&existing.type==='consume' ? available+Number(existing.amount||0) : available;
+        if(type==='consume'&&amount>availableWithoutCurrent+0.009)throw new Error(`Insufficient wallet balance. Available after excluding this transaction: ${supplierMoney(availableWithoutCurrent,currency)}.`);
         const attachment=await readSupplierAttachment('supplierWalletFile');
         const tx={
-            id:`SW-${Date.now()}`,supplierId:String(supplierId),supplierName:supplier.name,
-            type,amount,currency,date:document.getElementById('supplierWalletDate').value,
+            ...(existing||{}),
+            id:existing?existing.id:`SW-${Date.now()}`,supplierId:String(supplierId),supplierName:supplier.name,
+            type,amount,currency,sourceAmount,sourceCurrency,billEquivalentAmount:linkedBillId?billEquivalentAmount:0,billCurrency:linkedBillId?(supplierBills.find(b=>String(b.id)===String(linkedBillId))?.currency||''): '',date:document.getElementById('supplierWalletDate').value,
             bookingId:bookingId||'',bookingInvoice:booking?.invoiceNumber||booking?.invoiceNo||'',
             method:document.getElementById('supplierWalletMethod').value,
             reference:document.getElementById('supplierWalletReference').value.trim(),
-            attachment,notes:document.getElementById('supplierWalletNotes').value.trim(),
-            createdAt:new Date().toISOString(),createdBy:currentUser?.name||''
+            attachment:attachment||existing?.attachment||null,notes:document.getElementById('supplierWalletNotes').value.trim(),
+            createdAt:existing?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString(),createdBy:existing?.createdBy||currentUser?.name||''
         };
-        supplierWalletTransactions.unshift(tx);
+        if(existing){
+            const idx=supplierWalletTransactions.findIndex(t=>String(t.id)===String(editingId));
+            if(idx>=0)supplierWalletTransactions[idx]=tx;
+        }else supplierWalletTransactions.unshift(tx);
         localStorage.setItem('roving_supplier_wallet_transactions',JSON.stringify(supplierWalletTransactions));
         await saveRecord('supplierWalletTransactions','roving_supplier_wallet_transactions',tx);
-        const linkedBillId=document.getElementById('supplierWalletLinkedBillId').value;
+        tx.linkedBillId=linkedBillId;
+        await saveRecord('supplierWalletTransactions','roving_supplier_wallet_transactions',tx);
+        if(existing&&linkedBillId){
+            const linkedPayment=supplierPayments.find(p=>String(p.walletTransactionId)===String(editingId));
+            if(linkedPayment){
+                linkedPayment.amount=billEquivalentAmount;linkedPayment.currency=linkedPayment.currency||tx.billCurrency||currency;linkedPayment.paidAmount=sourceAmount;linkedPayment.paidCurrency=sourceCurrency;linkedPayment.paymentDate=tx.date;
+                linkedPayment.reference=tx.reference||tx.id;linkedPayment.notes=`Paid using supplier prepaid wallet. ${tx.notes||''}`;
+                await saveRecord('supplierPayments','roving_supplier_payments',linkedPayment);
+            }
+        }
+        if(type!=='consume'&&existing&&linkedBillId){
+            const oldWalletPayment=supplierPayments.find(p=>String(p.walletTransactionId)===String(existing.id));
+            if(oldWalletPayment){supplierPayments=supplierPayments.filter(p=>String(p.id)!==String(oldWalletPayment.id));await deleteRecord('supplierPayments','roving_supplier_payments',oldWalletPayment.id);localStorage.setItem('roving_supplier_payments',JSON.stringify(supplierPayments));}
+        }
         if(type==='consume'&&linkedBillId){
             const linkedBill=supplierBills.find(b=>String(b.id)===String(linkedBillId));
             if(linkedBill){
-                const walletPayment={id:`SWP-${Date.now()}`,billId:linkedBill.id,supplierId:linkedBill.supplierId,supplierName:linkedBill.supplierName,amount,currency,paymentDate:tx.date,method:'Supplier Prepaid Wallet',reference:tx.reference||tx.id,attachment:tx.attachment,notes:`Paid using supplier prepaid wallet. ${tx.notes||''}`,createdAt:new Date().toISOString(),createdBy:currentUser?.name||'',walletTransactionId:tx.id};
-                supplierPayments.unshift(walletPayment);
+                let walletPayment=supplierPayments.find(p=>String(p.walletTransactionId)===String(tx.id));
+                if(walletPayment){
+                    walletPayment.amount=billEquivalentAmount;walletPayment.currency=linkedBill.currency||currency;walletPayment.paidAmount=sourceAmount;walletPayment.paidCurrency=sourceCurrency;walletPayment.paymentDate=tx.date;
+                    walletPayment.reference=tx.reference||tx.id;walletPayment.attachment=tx.attachment;
+                    walletPayment.notes=`Paid using supplier prepaid wallet. ${tx.notes||''}`;
+                }else{
+                    walletPayment={id:`SWP-${Date.now()}`,billId:linkedBill.id,supplierId:linkedBill.supplierId,supplierName:linkedBill.supplierName,amount:billEquivalentAmount,currency:linkedBill.currency||currency,paidAmount:tx.sourceAmount??amount,paidCurrency:tx.sourceCurrency||currency,paymentDate:tx.date,method:'Supplier Prepaid Wallet',reference:tx.reference||tx.id,attachment:tx.attachment,notes:`Paid using supplier prepaid wallet. ${tx.notes||''}`,createdAt:new Date().toISOString(),createdBy:currentUser?.name||'',walletTransactionId:tx.id};
+                    supplierPayments.unshift(walletPayment);
+                }
                 await saveRecord('supplierPayments','roving_supplier_payments',walletPayment);
                 delete linkedBill.paymentStatusOverride;
                 await saveRecord('supplierBills','roving_supplier_bills',linkedBill);
@@ -1964,16 +2123,19 @@ function supplierBillPaid(bill){return supplierBillPayments(bill.id).reduce((sum
 function supplierBillRemaining(bill){if(bill.status==='Cancelled')return 0;return (Number(bill.totalAmount)||0)-supplierBillPaid(bill);}
 function supplierMoney(amount,currency){return `${(Number(amount)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} ${escapeHtml(currency||'')}`;}
 function supplierBillsTotalFor(supplierId,currency){
-    return supplierBills.filter(b=>b.status!=='Cancelled'&&String(b.supplierId)===String(supplierId)&&String(b.currency)===String(currency))
-        .reduce((sum,b)=>sum+(Number(b.totalAmount)||0),0);
+    const base=supplierBills.filter(b=>b.status!=='Cancelled'&&String(b.supplierId)===String(supplierId)&&String(b.currency)===String(currency)).reduce((sum,b)=>sum+(Number(b.totalAmount)||0),0);
+    const corrections=supplierAccountAdjustments.filter(a=>String(a.supplierId)===String(supplierId)&&String(a.currency)===String(currency)).reduce((sum,a)=>sum+(Number(a.deltaBills)||0),0);
+    return Math.max(0,base+corrections);
 }
 function supplierPaidToFor(supplierId,currency){
-    return supplierPayments.filter(p=>String(p.supplierId)===String(supplierId)&&String(p.currency)===String(currency))
-        .reduce((sum,p)=>sum+(Number(p.amount)||0),0);
+    const base=supplierPayments.filter(p=>String(p.supplierId)===String(supplierId)&&String(p.currency)===String(currency)).reduce((sum,p)=>sum+(Number(p.amount)||0),0);
+    const corrections=supplierAccountAdjustments.filter(a=>String(a.supplierId)===String(supplierId)&&String(a.currency)===String(currency)).reduce((sum,a)=>sum+(Number(a.deltaPaid)||0),0);
+    return Math.max(0,base+corrections);
 }
 function supplierReceivedFor(supplierId,currency){
-    return supplierReceipts.filter(r=>String(r.supplierId)===String(supplierId)&&String(r.currency)===String(currency))
-        .reduce((sum,r)=>sum+(Number(r.amount)||0),0);
+    const base=supplierReceipts.filter(r=>String(r.supplierId)===String(supplierId)&&String(r.currency)===String(currency)).reduce((sum,r)=>sum+(Number(r.amount)||0),0);
+    const corrections=supplierAccountAdjustments.filter(a=>String(a.supplierId)===String(supplierId)&&String(a.currency)===String(currency)).reduce((sum,a)=>sum+(Number(a.deltaReceived)||0),0);
+    return Math.max(0,base+corrections);
 }
 function supplierOutstandingFor(supplierId,currency){
     // Positive = amount we still owe the supplier; negative = available supplier credit.
@@ -1987,7 +2149,8 @@ function renderSuppliers(){
         const currencies=[...new Set([
             ...supplierBills.filter(b=>String(b.supplierId)===sid).map(b=>b.currency||s.currency||'USD'),
             ...supplierPayments.filter(p=>String(p.supplierId)===sid).map(p=>p.currency||s.currency||'USD'),
-            ...supplierReceipts.filter(r=>String(r.supplierId)===sid).map(r=>r.currency||s.currency||'USD')
+            ...supplierReceipts.filter(r=>String(r.supplierId)===sid).map(r=>r.currency||s.currency||'USD'),
+            ...supplierAccountAdjustments.filter(a=>String(a.supplierId)===sid).map(a=>a.currency||s.currency||'USD')
         ])];
         if(!currencies.includes(s.currency||'USD'))currencies.push(s.currency||'USD');
         const metric=(fn,cur)=>supplierMoney(fn(sid,cur),cur);
@@ -2012,6 +2175,7 @@ function renderSuppliers(){
             <td class="text-nowrap">
                 <button class="btn btn-sm btn-outline-success me-1" onclick="openSupplierBillModal('${sid.replace(/'/g,"\\'")}')" title="Add bill"><i class="fa-solid fa-file-invoice-dollar"></i></button>
                 <button class="btn btn-sm btn-outline-info me-1" onclick="openSupplierReceiptModal('${sid.replace(/'/g,"\\'")}')" title="Record money received / credit withdrawal"><i class="fa-solid fa-hand-holding-dollar"></i></button><button class="btn btn-sm btn-outline-success me-1" onclick="openSupplierWalletModal('${sid.replace(/'/g,"\\'")}','deposit')" title="Supplier prepaid wallet"><i class="fa-solid fa-wallet"></i></button>
+                <button class="btn btn-sm btn-outline-warning me-1" onclick="openSupplierAccountAdjustModal('${sid.replace(/'/g,"\\'")}')" title="Correct supplier account totals"><i class="fa-solid fa-calculator"></i></button>
                 <button class="btn btn-sm btn-outline-primary me-1" onclick="editSupplier('${sid.replace(/'/g,"\\'")}')" title="Edit supplier"><i class="fa-solid fa-pen-to-square"></i></button>
                 <button class="btn btn-sm btn-outline-danger" onclick="deleteSupplier('${sid.replace(/'/g,"\\'")}')" title="Delete supplier"><i class="fa-solid fa-trash"></i></button>
             </td>
@@ -2089,6 +2253,9 @@ function openSupplierPaymentModal(billId){
     document.getElementById('supplierPaymentDate').value=new Date().toISOString().slice(0,10);
     document.getElementById('supplierPaymentAmount').removeAttribute('max');
     document.getElementById('supplierPaymentAmount').value=Math.max(0,remaining).toFixed(2);
+    document.getElementById('supplierPaymentPaidAmount').value=Math.max(0,remaining).toFixed(2);
+    document.getElementById('supplierPaymentPaidCurrency').value=bill.currency||'EGP';
+    document.getElementById('supplierPaymentEquivalentHint').textContent=`Equivalent in ${bill.currency||'EGP'} (this reduces the bill balance)`;
     document.getElementById('supplierPaymentBillSummary').innerHTML=`<strong>${escapeHtml(bill.supplierName)}</strong> · Total: ${supplierMoney(bill.totalAmount,bill.currency)} · Paid: ${supplierMoney(paid,bill.currency)} · Balance: <strong class="${remaining>=0?'text-danger':'text-success'}">${remaining>=0?'We owe supplier: ':'Supplier credit: '}${supplierMoney(Math.abs(remaining),bill.currency)}</strong>`;
     new bootstrap.Modal(document.getElementById('supplierPaymentModal')).show();
 }
@@ -2098,9 +2265,11 @@ async function handleSaveSupplierPayment(e){
         const billId=document.getElementById('supplierPaymentBillId').value;
         const bill=supplierBills.find(b=>String(b.id)===String(billId));if(!bill)throw new Error('Supplier bill not found.');
         const amount=Number(document.getElementById('supplierPaymentAmount').value),remaining=supplierBillRemaining(bill);
-        if(!(amount>0))throw new Error('Payment must be greater than zero.');
+        const paidAmount=Number(document.getElementById('supplierPaymentPaidAmount').value);
+        const paidCurrency=document.getElementById('supplierPaymentPaidCurrency').value;
+        if(!(amount>0)||!(paidAmount>0))throw new Error('Enter valid actual and equivalent payment amounts.');
         const attachment=await readSupplierAttachment('supplierPaymentFile');
-        const payment={id:Date.now(),billId:bill.id,supplierId:bill.supplierId,supplierName:bill.supplierName,amount,currency:bill.currency,paymentDate:document.getElementById('supplierPaymentDate').value,method:document.getElementById('supplierPaymentMethod').value,reference:document.getElementById('supplierPaymentReference').value.trim(),attachment,notes:document.getElementById('supplierPaymentNotes').value.trim(),createdAt:new Date().toISOString(),createdBy:currentUser?.name||''};
+        const payment={id:Date.now(),billId:bill.id,supplierId:bill.supplierId,supplierName:bill.supplierName,amount,currency:bill.currency,paidAmount,paidCurrency,paymentDate:document.getElementById('supplierPaymentDate').value,method:document.getElementById('supplierPaymentMethod').value,reference:document.getElementById('supplierPaymentReference').value.trim(),attachment,notes:document.getElementById('supplierPaymentNotes').value.trim(),createdAt:new Date().toISOString(),createdBy:currentUser?.name||''};
         supplierPayments.unshift(payment);await saveRecord('supplierPayments','roving_supplier_payments',payment);
         delete bill.paymentStatusOverride;bill.updatedAt=new Date().toISOString();await saveRecord('supplierBills','roving_supplier_bills',bill);
         bootstrap.Modal.getInstance(document.getElementById('supplierPaymentModal')).hide();
@@ -2218,7 +2387,7 @@ function viewSupplierBillHistory(billId){
     document.getElementById('supplierBillHistoryTitle').textContent=`Payment History · ${bill.supplierName}`;
     document.getElementById('supplierBillHistorySummary').innerHTML=`<div class="row g-2"><div class="col-md-4">Bill: <strong>${supplierMoney(bill.totalAmount,bill.currency)}</strong></div><div class="col-md-4 text-success">Paid: <strong>${supplierMoney(supplierBillPaid(bill),bill.currency)}</strong></div><div class="col-md-4 text-danger">Remaining: <strong>${supplierMoney(supplierBillRemaining(bill),bill.currency)}</strong></div></div>`;
     const body=document.getElementById('supplierBillPaymentsBody');
-    body.innerHTML=payments.length?payments.map(p=>`<tr><td>${escapeHtml(p.paymentDate||'—')}</td><td class="${Number(p.amount)>=0?'text-success':'text-danger'} fw-semibold">${Number(p.amount)<0?'Adjustment: ':''}${supplierMoney(Math.abs(Number(p.amount)||0),p.currency)}</td><td>${escapeHtml(p.method||'—')}</td><td>${escapeHtml(p.reference||'—')}</td><td>${p.attachment?`<a class="btn btn-sm btn-outline-secondary" href="${p.attachment.data}" download="${escapeHtml(p.attachment.name)}"><i class="fa-solid fa-download me-1"></i>File</a>`:'—'}</td><td>${escapeHtml(p.notes||'—')}</td></tr>`).join(''):'<tr><td colspan="6" class="text-center text-muted py-3">No payments recorded yet</td></tr>';
+    body.innerHTML=payments.length?payments.map(p=>`<tr><td>${escapeHtml(p.paymentDate||'—')}</td><td class="fw-semibold"><span class="text-success">${supplierMoney(Math.abs(Number(p.paidAmount??p.amount)||0),p.paidCurrency||p.currency)}</span><br><small class="text-muted">Applied to bill: ${supplierMoney(Math.abs(Number(p.amount)||0),p.currency)}</small></td><td>${escapeHtml(p.method||'—')}</td><td>${escapeHtml(p.reference||'—')}</td><td>${p.attachment?`<a class="btn btn-sm btn-outline-secondary" href="${p.attachment.data}" download="${escapeHtml(p.attachment.name)}"><i class="fa-solid fa-download me-1"></i>File</a>`:'—'}</td><td>${escapeHtml(p.notes||'—')}</td></tr>`).join(''):'<tr><td colspan="6" class="text-center text-muted py-3">No payments recorded yet</td></tr>';
     new bootstrap.Modal(document.getElementById('supplierBillHistoryModal')).show();
 }
 function editSupplier(id){
