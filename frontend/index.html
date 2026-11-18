@@ -457,9 +457,17 @@
                     <h2 class="fw-bold text-roving-green">Suppliers</h2>
                     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#supplierModal" onclick="openSupplierModal()"><i class="fa-solid fa-plus me-1"></i> Add Supplier</button>
                 </div>
-                <div class="card card-custom p-3"><div class="table-responsive"><table class="table table-hover align-middle">
-                    <thead class="table-light"><tr><th>Supplier</th><th>Type</th><th>Contact</th><th>Default Currency</th><th>Notes</th><th>Actions</th></tr></thead>
+                <div class="card card-custom p-3 mb-4"><div class="table-responsive"><table class="table table-hover align-middle">
+                    <thead class="table-light"><tr><th>Supplier</th><th>Type</th><th>Contact</th><th>Currency</th><th>Outstanding</th><th>Actions</th></tr></thead>
                     <tbody id="suppliersTableBody"><tr><td colspan="6" class="text-center text-muted py-4">No suppliers recorded</td></tr></tbody>
+                </table></div></div>
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                    <div><h4 class="fw-bold text-roving-green mb-1">Supplier Bills & Payments</h4><small class="text-muted">Track supplier invoices, partial payments, balances and payment receipts per booking/file.</small></div>
+                    <button class="btn btn-success" onclick="openSupplierBillModal()"><i class="fa-solid fa-file-invoice-dollar me-1"></i> Add Supplier Bill</button>
+                </div>
+                <div class="card card-custom p-3"><div class="table-responsive"><table class="table table-hover align-middle">
+                    <thead class="table-light"><tr><th>Supplier / File</th><th>Booking Invoice</th><th>Supplier Invoice</th><th>Bill Date</th><th>Total</th><th>Paid</th><th>Balance</th><th>Status</th><th>Documents / Actions</th></tr></thead>
+                    <tbody id="supplierBillsTableBody"><tr><td colspan="9" class="text-center text-muted py-4">No supplier bills recorded</td></tr></tbody>
                 </table></div></div>
             </div>
 
@@ -889,6 +897,62 @@
  </form></div></div></div>
 </div>
 
+<!-- Supplier Bill / File modal -->
+<div class="modal fade" id="supplierBillModal" tabindex="-1">
+ <div class="modal-dialog modal-lg"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title fw-bold text-roving-green">Add Supplier Bill / File Cost</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body">
+   <form id="supplierBillForm" onsubmit="handleSaveSupplierBill(event)">
+    <div class="row g-3">
+     <div class="col-md-6"><label class="form-label fw-semibold">Supplier *</label><select id="supplierBillSupplier" class="form-select" required></select></div>
+     <div class="col-md-6"><label class="form-label fw-semibold">Related Booking / File</label><select id="supplierBillBooking" class="form-select"><option value="">Not linked to a booking</option></select></div>
+     <div class="col-md-6"><label class="form-label fw-semibold">Supplier Invoice / Reference</label><input id="supplierBillReference" class="form-control" placeholder="Supplier invoice number"></div>
+     <div class="col-md-3"><label class="form-label fw-semibold">Bill Date *</label><input id="supplierBillDate" type="date" class="form-control" required></div>
+     <div class="col-md-3"><label class="form-label fw-semibold">Due Date</label><input id="supplierBillDueDate" type="date" class="form-control"></div>
+     <div class="col-md-4"><label class="form-label fw-semibold">Total Amount *</label><input id="supplierBillAmount" type="number" class="form-control" min="0.01" step="0.01" required></div>
+     <div class="col-md-3"><label class="form-label fw-semibold">Currency *</label><select id="supplierBillCurrency" class="form-select"><option>EGP</option><option>USD</option><option>EUR</option><option>GBP</option><option>AED</option><option>SAR</option><option>TRY</option><option>GEL</option><option>AZN</option><option>OMR</option><option>QAR</option><option>BHD</option><option>ALL</option><option>IDR</option><option>MYR</option></select></div>
+     <div class="col-md-5"><label class="form-label fw-semibold">Supplier Invoice / File Attachment</label><input id="supplierBillFile" type="file" class="form-control" accept=".pdf,.png,.jpg,.jpeg,.webp"></div>
+     <div class="col-12"><label class="form-label fw-semibold">Notes</label><textarea id="supplierBillNotes" class="form-control" rows="2" placeholder="What does this bill cover?"></textarea></div>
+    </div>
+    <div class="alert alert-info mt-3 mb-3 small">You can record a partial payment now or add payments later. The outstanding balance is calculated automatically.</div>
+    <button class="btn btn-success w-100 fw-bold" type="submit">Save Supplier Bill</button>
+   </form>
+  </div>
+ </div></div>
+</div>
+
+<!-- Supplier Payment modal -->
+<div class="modal fade" id="supplierPaymentModal" tabindex="-1">
+ <div class="modal-dialog modal-lg"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title fw-bold text-roving-green">Record Supplier Payment</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body">
+   <form id="supplierPaymentForm" onsubmit="handleSaveSupplierPayment(event)">
+    <input type="hidden" id="supplierPaymentBillId">
+    <div id="supplierPaymentBillSummary" class="alert alert-light border mb-3"></div>
+    <div class="row g-3">
+     <div class="col-md-4"><label class="form-label fw-semibold">Payment Amount *</label><input id="supplierPaymentAmount" type="number" class="form-control" min="0.01" step="0.01" required></div>
+     <div class="col-md-4"><label class="form-label fw-semibold">Payment Date *</label><input id="supplierPaymentDate" type="date" class="form-control" required></div>
+     <div class="col-md-4"><label class="form-label fw-semibold">Payment Method *</label><select id="supplierPaymentMethod" class="form-select" required><option value="Bank Transfer">Bank Transfer</option><option value="Cash">Cash</option><option value="Credit / Debit Card">Credit / Debit Card</option><option value="Mobile Wallet">Mobile Wallet</option><option value="Online Payment">Online Payment</option><option value="Other">Other</option></select></div>
+     <div class="col-md-6"><label class="form-label fw-semibold">Transaction / Reference Number</label><input id="supplierPaymentReference" class="form-control" placeholder="Transfer reference / receipt no."></div>
+     <div class="col-md-6"><label class="form-label fw-semibold">Payment Receipt / Proof</label><input id="supplierPaymentFile" type="file" class="form-control" accept=".pdf,.png,.jpg,.jpeg,.webp"></div>
+     <div class="col-12"><label class="form-label fw-semibold">Notes</label><textarea id="supplierPaymentNotes" class="form-control" rows="2"></textarea></div>
+    </div>
+    <button class="btn btn-success w-100 fw-bold mt-3" type="submit">Save Payment</button>
+   </form>
+  </div>
+ </div></div>
+</div>
+
+<!-- Supplier Bill Payment History modal -->
+<div class="modal fade" id="supplierBillHistoryModal" tabindex="-1">
+ <div class="modal-dialog modal-xl"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title fw-bold text-roving-green" id="supplierBillHistoryTitle">Supplier File Payments</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body"><div id="supplierBillHistorySummary" class="mb-3"></div>
+   <div class="table-responsive"><table class="table table-hover align-middle"><thead class="table-light"><tr><th>Date</th><th>Amount</th><th>Method</th><th>Reference</th><th>Receipt</th><th>Notes</th></tr></thead><tbody id="supplierBillPaymentsBody"></tbody></table></div>
+  </div>
+ </div></div>
+</div>
+
 <!-- Modal: Add New User (Admin Only) -->
 <div class="modal fade" id="addUserModal" tabindex="-1">
     <div class="modal-dialog">
@@ -1009,6 +1073,8 @@ let selectedFollowupIds = new Set();
 let selectedClientIds = new Set(); 
 let bookings = [];
 let suppliers = JSON.parse(localStorage.getItem('roving_suppliers') || '[]');
+let supplierBills = [];
+let supplierPayments = [];
 let packageCostRows = [];
 let pendingNotifications = JSON.parse(localStorage.getItem('roving_user_notifications')) || [];
 let bookingsChartInstance = null;
@@ -1394,6 +1460,8 @@ function switchTab(tabName) {
         document.getElementById('tabSuppliers').classList.remove('d-none');
         document.getElementById('navSuppliers').classList.add('active');
         renderSuppliers();
+        renderSupplierBills();
+        populateSupplierBillSelects();
     } else if (tabName === 'commissions') { 
         document.getElementById('tabCommissions').classList.remove('d-none'); 
         document.getElementById('navCommissions').classList.add('active'); 
@@ -1543,7 +1611,7 @@ function handleBookingCategoryChange() {
 }
 function escapeHtml(value){return String(value??'').replace(/[&<>'"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));}
 function populateSupplierSelects(){const main=document.getElementById('bookingSupplier');if(main){const v=main.value;main.innerHTML='<option value="">-- Select Supplier --</option>'+suppliers.map(s=>`<option value="${s.id}">${escapeHtml(s.name)} · ${escapeHtml(s.type||'Other')}</option>`).join('');main.value=v||'';}document.querySelectorAll('.package-supplier-select').forEach(sel=>{const v=sel.value;sel.innerHTML='<option value="">-- Select Supplier --</option>'+suppliers.map(s=>`<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');sel.value=v||'';});}
-function addPackageCostRow(type='Other'){packageCostRows.push({type,name:'',nights:type==='Hotel'?1:1,rate:0,supplierId:'',currency:document.getElementById('bookingCurrency').value||'USD',fx:1,notes:''});renderPackageCostRows();calculateBookingFinancials();}
+function addPackageCostRow(type='Other'){packageCostRows.push({id:'cost_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),type,name:'',nights:type==='Hotel'?1:1,rate:0,supplierId:'',currency:document.getElementById('bookingCurrency').value||'USD',fx:1,notes:''});renderPackageCostRows();calculateBookingFinancials();}
 function removePackageCostRow(i){packageCostRows.splice(i,1);renderPackageCostRows();calculateBookingFinancials();}
 function updatePackageRow(i,field,value){if(!packageCostRows[i])return;packageCostRows[i][field]=['rate','nights','fx'].includes(field)?(parseFloat(value)||0):value;if(field==='type'&&value!=='Hotel')packageCostRows[i].nights=1;if(field==='supplierId'&&value){const supplier=suppliers.find(x=>String(x.id)===String(value));if(supplier&&supplier.currency)packageCostRows[i].currency=supplier.currency;renderPackageCostRows();}if(field==='type'||field==='currency')renderPackageCostRows();calculateBookingFinancials();}
 function packageRowConvertedTotal(r){const base=r.type==='Hotel'?(Number(r.nights)||0)*(Number(r.rate)||0):(Number(r.rate)||0);return base*(Number(r.fx)||0);}
@@ -1553,13 +1621,202 @@ function renderPackageCostRows(){const wrap=document.getElementById('packageCost
 function calculateBookingFinancials(){const net=parseFloat(document.getElementById('bookingNetPrice').value)||0;let cost=parseFloat(document.getElementById('bookingCostPrice').value)||0;const paid=parseFloat(document.getElementById('bookingPaidAmount').value)||0;const cat=document.getElementById('bookingCategory').value;const cur=document.getElementById('bookingCurrency').value||'EGP';if(cat==='Full Package'){cost=packageCostRows.reduce((sum,r)=>sum+packageRowConvertedTotal(r),0);document.getElementById('bookingCostPrice').value=cost.toFixed(2);document.getElementById('packageCostTotalDisplay').value=`${formatMoney(cost)} ${cur}`;}const profit=net-cost,remaining=net-paid;document.getElementById('bookingProfitDisplay').value=`${formatMoney(profit)} ${cur}`;document.getElementById('bookingRemainingDisplay').value=`${formatMoney(remaining)} ${cur}`;document.getElementById('bookingStatus').value=remaining>0?'Installments Due':'Paid in Full';}
 async function loadBookings(){await syncCollection('bookings','roving_bookings',bookings,v=>bookings=v);await cleanupEmptyBookings();await ensureInvoiceNumbers();renderBookings();renderCommissions();}
 async function saveBookingsToStorage(){localStorage.setItem('roving_bookings',JSON.stringify(bookings)); for(const b of bookings){try{await apiRequest('/api/bookings',{method:'POST',body:JSON.stringify(b)});}catch(e){break;}}}
-async function loadSuppliers(){await syncCollection('suppliers','roving_suppliers',suppliers,v=>suppliers=v);renderSuppliers();populateSupplierSelects();}
+async function loadSuppliers(){
+    await syncCollection('suppliers','roving_suppliers',suppliers,v=>suppliers=v);
+    await syncCollection('supplierBills','roving_supplier_bills',supplierBills,v=>supplierBills=v);
+    await syncCollection('supplierPayments','roving_supplier_payments',supplierPayments,v=>supplierPayments=v);
+    renderSuppliers(); renderSupplierBills(); populateSupplierSelects(); populateSupplierBillSelects();
+}
 async function saveSuppliersToStorage(){localStorage.setItem('roving_suppliers',JSON.stringify(suppliers));}
 function openSupplierModal(){document.getElementById('supplierModalTitle').innerText='Add Supplier';document.getElementById('editingSupplierId').value='';document.getElementById('supplierForm').reset();document.getElementById('supplierCurrency').value='USD';}
-async function handleSaveSupplier(e){e.preventDefault();const id=document.getElementById('editingSupplierId').value;const obj={id:id?Number(id):Date.now(),name:document.getElementById('supplierName').value.trim(),type:document.getElementById('supplierType').value,currency:document.getElementById('supplierCurrency').value,contact:document.getElementById('supplierContact').value.trim(),notes:document.getElementById('supplierNotes').value.trim()};if(!obj.name)return;if(id){const idx=suppliers.findIndex(s=>s.id==id);if(idx!==-1)suppliers[idx]=obj;}else suppliers.unshift(obj);await saveRecord('suppliers','roving_suppliers',obj);renderSuppliers();populateSupplierSelects();bootstrap.Modal.getInstance(document.getElementById('supplierModal')).hide();showNotification('Supplier saved successfully!','success');}
-function renderSuppliers(){const tbody=document.getElementById('suppliersTableBody');if(!tbody)return;if(!suppliers.length){tbody.innerHTML='<tr><td colspan="6" class="text-center text-muted py-4">No suppliers recorded</td></tr>';return;}tbody.innerHTML=suppliers.map(s=>`<tr><td><strong>${escapeHtml(s.name)}</strong></td><td><span class="badge bg-secondary">${escapeHtml(s.type||'-')}</span></td><td>${escapeHtml(s.contact||'-')}</td><td><strong>${escapeHtml(s.currency||'-')}</strong></td><td><small>${escapeHtml(s.notes||'-')}</small></td><td><button class="btn btn-sm btn-outline-primary me-1" onclick="editSupplier(${s.id})"><i class="fa-solid fa-pen-to-square"></i></button><button class="btn btn-sm btn-outline-danger" onclick="deleteSupplier(${s.id})"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');}
+async function handleSaveSupplier(e){e.preventDefault();const id=document.getElementById('editingSupplierId').value;const obj={id:id?Number(id):Date.now(),name:document.getElementById('supplierName').value.trim(),type:document.getElementById('supplierType').value,currency:document.getElementById('supplierCurrency').value,contact:document.getElementById('supplierContact').value.trim(),notes:document.getElementById('supplierNotes').value.trim()};if(!obj.name)return;if(id){const idx=suppliers.findIndex(s=>s.id==id);if(idx!==-1)suppliers[idx]=obj;}else suppliers.unshift(obj);await saveRecord('suppliers','roving_suppliers',obj);renderSuppliers();populateSupplierSelects();populateSupplierBillSelects();bootstrap.Modal.getInstance(document.getElementById('supplierModal')).hide();showNotification('Supplier saved successfully!','success');}
+function supplierBillSourceKey(bookingId, partKey){return `booking:${String(bookingId)}:${String(partKey)}`;}
+function supplierBillAmountForPackageRow(row){
+    const base=row?.type==='Hotel'?(Number(row.nights)||0)*(Number(row.rate)||0):(Number(row.rate)||0);
+    return Math.max(0,base);
+}
+async function syncBookingSupplierAccounts(booking){
+    if(!booking)return;
+    const activeKeys=new Set();
+    const billDate=(bookingDateValue(booking)||new Date()).toISOString().slice(0,10);
+    const bookingInvoice=String(booking.invoiceNumber||booking.invoiceNo||'');
+    const bookingId=booking.id??booking._id;
+    const clientFile=`${booking.clientCode||''} · ${booking.clientName||''}`.trim();
+
+    const entries=[];
+    if(booking.category==='Full Package' && Array.isArray(booking.packageCosts)){
+        booking.packageCosts.forEach((row,index)=>{
+            const amount=supplierBillAmountForPackageRow(row);
+            if(!row?.supplierId || amount<=0)return;
+            const supplier=suppliers.find(x=>String(x.id)===String(row.supplierId));
+            if(!supplier)return;
+            entries.push({
+                partKey:row.id||`package-row-${index}`,
+                supplier, amount, currency:row.currency||supplier.currency||booking.currency||'EGP',
+                description:`${row.type||'Package cost'}${row.name?' · '+row.name:''}`,
+                supplierInvoice:row.supplierInvoice||'', supplierBillDate:row.billDate||billDate,
+                supplierDueDate:row.dueDate||'', attachment:row.invoiceAttachment||null
+            });
+        });
+    } else if(booking.supplierId && Number(booking.costPrice)>0){
+        const supplier=suppliers.find(x=>String(x.id)===String(booking.supplierId));
+        if(supplier)entries.push({
+            partKey:'main-booking-cost',supplier,amount:Number(booking.costPrice),
+            currency:booking.costCurrency||supplier.currency||booking.currency||'EGP',
+            description:`${booking.category||'Booking'}${booking.details?' · '+booking.details:''}`,
+            supplierInvoice:booking.supplierInvoice||'',supplierBillDate:billDate,
+            supplierDueDate:'',attachment:booking.supplierInvoiceAttachment||null
+        });
+    }
+
+    for(const entry of entries){
+        const sourceKey=supplierBillSourceKey(bookingId,entry.partKey);
+        activeKeys.add(sourceKey);
+        const existing=supplierBills.find(x=>x.sourceKey===sourceKey);
+        const bill={
+            ...(existing||{}),
+            id:existing?.id||`SB-${String(bookingInvoice||bookingId)}-${String(entry.partKey).replace(/[^a-zA-Z0-9_-]/g,'-')}`,
+            source:'booking',sourceKey,bookingId:String(bookingId),
+            bookingInvoice,bookingNumber:booking.bookingNumber||'',
+            clientCode:booking.clientCode||'',clientName:booking.clientName||'',
+            supplierId:entry.supplier.id,supplierName:entry.supplier.name,
+            reference:entry.supplierInvoice||existing?.reference||`Auto · ${bookingInvoice}`,
+            billDate:entry.supplierBillDate||billDate,dueDate:entry.supplierDueDate||'',
+            totalAmount:entry.amount,currency:entry.currency,
+            description:entry.description,attachment:entry.attachment||existing?.attachment||null,
+            status:'Active',updatedAt:new Date().toISOString()
+        };
+        const idx=supplierBills.findIndex(x=>x.sourceKey===sourceKey);
+        if(idx>=0)supplierBills[idx]=bill;else supplierBills.unshift(bill);
+        await saveRecord('supplierBills','roving_supplier_bills',bill);
+    }
+
+    // Keep history, but cancel auto-bills removed from the booking or whose supplier was changed.
+    const obsolete=supplierBills.filter(x=>x.source==='booking'&&String(x.bookingId)===String(bookingId)&&!activeKeys.has(x.sourceKey)&&x.status!=='Cancelled');
+    for(const bill of obsolete){
+        bill.status='Cancelled';bill.cancelledAt=new Date().toISOString();
+        await saveRecord('supplierBills','roving_supplier_bills',bill);
+    }
+    localStorage.setItem('roving_supplier_bills',JSON.stringify(supplierBills));
+    renderSupplierBills();
+}
+function supplierBillPayments(billId){return supplierPayments.filter(p=>String(p.billId)===String(billId));}
+function supplierBillPaid(bill){return supplierBillPayments(bill.id).reduce((sum,p)=>sum+(Number(p.amount)||0),0);}
+function supplierBillRemaining(bill){if(bill.status==='Cancelled')return 0;return (Number(bill.totalAmount)||0)-supplierBillPaid(bill);}
+function supplierMoney(amount,currency){return `${(Number(amount)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} ${escapeHtml(currency||'')}`;}
+function supplierOutstandingFor(supplierId,currency){
+    return supplierBills.filter(b=>b.status!=='Cancelled'&&String(b.supplierId)===String(supplierId)&&String(b.currency)===String(currency))
+        .reduce((sum,b)=>sum+supplierBillRemaining(b),0);
+}
+function renderSuppliers(){
+    const tbody=document.getElementById('suppliersTableBody');if(!tbody)return;
+    if(!suppliers.length){tbody.innerHTML='<tr><td colspan="6" class="text-center text-muted py-4">No suppliers recorded</td></tr>';return;}
+    tbody.innerHTML=suppliers.map(s=>{
+        const currencies=[...new Set(supplierBills.filter(b=>b.status!=='Cancelled'&&String(b.supplierId)===String(s.id)).map(b=>b.currency||s.currency||'USD'))];
+        if(!currencies.includes(s.currency||'USD'))currencies.push(s.currency||'USD');
+        const balances=currencies.map(cur=>({cur,value:supplierOutstandingFor(s.id,cur)}));
+        const balanceHtml=balances.map(x=>`<div class="${x.value>0.009?'text-danger':x.value< -0.009?'text-success':'text-muted'} fw-bold small">${x.value>0.009?'We owe: ':x.value< -0.009?'Supplier credit: ':'Settled: '}${supplierMoney(Math.abs(x.value),x.cur)}</div>`).join('');
+        return `<tr><td><strong>${escapeHtml(s.name)}</strong></td><td><span class="badge bg-secondary">${escapeHtml(s.type||'-')}</span></td><td>${escapeHtml(s.contact||'-')}</td><td><strong>${escapeHtml(s.currency||'-')}</strong></td><td>${balanceHtml}</td><td><button class="btn btn-sm btn-outline-success me-1" onclick="openSupplierBillModal(${Number(s.id)})" title="Add bill"><i class="fa-solid fa-file-invoice-dollar"></i></button><button class="btn btn-sm btn-outline-primary me-1" onclick="editSupplier(${Number(s.id)})"><i class="fa-solid fa-pen-to-square"></i></button><button class="btn btn-sm btn-outline-danger" onclick="deleteSupplier(${Number(s.id)})"><i class="fa-solid fa-trash"></i></button></td></tr>`;
+    }).join('');
+}
+function populateSupplierBillSelects(){
+    const supplierSelect=document.getElementById('supplierBillSupplier');
+    if(supplierSelect){const previous=supplierSelect.value;supplierSelect.innerHTML='<option value="">-- Select Supplier --</option>'+suppliers.map(s=>`<option value="${escapeHtml(String(s.id))}">${escapeHtml(s.name)}</option>`).join('');if(previous)supplierSelect.value=previous;}
+    const bookingSelect=document.getElementById('supplierBillBooking');
+    if(bookingSelect){const previous=bookingSelect.value;bookingSelect.innerHTML='<option value="">Not linked to a booking</option>'+(Array.isArray(bookings)?bookings:[]).map(b=>`<option value="${escapeHtml(String(b.id??b._id))}">${escapeHtml(bookingRTCode(b)||b.clientCode||'')} · Invoice ${escapeHtml(String(b.invoiceNumber||b.invoiceNo||'—'))} · ${escapeHtml(b.clientName||'Client')} · ${escapeHtml(b.category||'Service')}</option>`).join('');if(previous)bookingSelect.value=previous;}
+}
+function renderSupplierBills(){
+    const tbody=document.getElementById('supplierBillsTableBody');if(!tbody)return;
+    if(!supplierBills.length){tbody.innerHTML='<tr><td colspan="9" class="text-center text-muted py-4">No supplier bills recorded</td></tr>';renderSuppliers();return;}
+    const sorted=supplierBills.slice().sort((a,b)=>String(b.billDate||'').localeCompare(String(a.billDate||'')));
+    tbody.innerHTML=sorted.map(b=>{
+        const supplier=suppliers.find(s=>String(s.id)===String(b.supplierId));
+        const paid=supplierBillPaid(b), remaining=supplierBillRemaining(b);
+        const status=b.status==='Cancelled'?'Cancelled':remaining<=0.009?'Paid':paid>0?'Partially Paid':'Unpaid';
+        const badge=status==='Paid'?'success':status==='Partially Paid'?'warning':status==='Cancelled'?'secondary':'danger';
+        const booking=(bookings||[]).find(x=>String(x.id??x._id)===String(b.bookingId));
+        const attachment=b.attachment?`<a href="${b.attachment.data}" download="${escapeHtml(b.attachment.name)}" class="btn btn-sm btn-outline-secondary me-1" title="Download supplier invoice"><i class="fa-solid fa-paperclip"></i></a>`:'';
+        return `<tr>
+            <td><strong>${escapeHtml(supplier?.name||b.supplierName||'Unknown supplier')}</strong><br><small class="text-muted">${escapeHtml(b.description||'')}${booking?` · ${escapeHtml(bookingRTCode(booking)||'')} · ${escapeHtml(booking.clientName||'')}`:''}</small></td>
+            <td><strong>${escapeHtml(b.bookingInvoice||booking?.invoiceNumber||booking?.invoiceNo||'—')}</strong></td>
+            <td>${escapeHtml(b.reference||'—')}</td><td>${escapeHtml(b.billDate||'—')}${b.dueDate?`<br><small class="text-muted">Due: ${escapeHtml(b.dueDate)}</small>`:''}</td>
+            <td class="fw-semibold">${supplierMoney(b.totalAmount,b.currency)}</td><td class="text-success fw-semibold">${supplierMoney(paid,b.currency)}</td><td class="${remaining>0.009?'text-danger':'text-success'} fw-semibold">${supplierMoney(Math.abs(remaining),b.currency)}${remaining< -0.009?' credit':''}</td>
+            <td><span class="badge bg-${badge}">${status}</span></td>
+            <td>${attachment}<button class="btn btn-sm btn-success me-1" onclick="openSupplierPaymentModal('${String(b.id)}')" ${(remaining<=0.009||b.status==='Cancelled')?'disabled':''} title="Record payment"><i class="fa-solid fa-money-bill-transfer"></i></button><button class="btn btn-sm btn-outline-primary" onclick="viewSupplierBillHistory('${String(b.id)}')" title="Payment history"><i class="fa-solid fa-clock-rotate-left"></i></button></td>
+        </tr>`;
+    }).join('');
+    renderSuppliers();
+}
+async function readSupplierAttachment(fileInputId){
+    const input=document.getElementById(fileInputId),file=input?.files?.[0];
+    if(!file)return null;
+    if(file.size>3*1024*1024)throw new Error('Attachment exceeds 3 MB. Please upload a smaller PDF or image.');
+    return await new Promise((resolve,reject)=>{
+        const reader=new FileReader();reader.onload=()=>resolve({name:file.name,type:file.type||'application/octet-stream',size:file.size,data:String(reader.result)});reader.onerror=()=>reject(new Error('Could not read attachment.'));
+        reader.readAsDataURL(file);
+    });
+}
+function openSupplierBillModal(supplierId=''){
+    if(!suppliers.length){showNotification('Add a supplier first.','warning');return;}
+    document.getElementById('supplierBillForm').reset();populateSupplierBillSelects();
+    document.getElementById('supplierBillDate').value=new Date().toISOString().slice(0,10);
+    document.getElementById('supplierBillSupplier').value=supplierId?String(supplierId):'';
+    const supplier=suppliers.find(s=>String(s.id)===String(supplierId));
+    document.getElementById('supplierBillCurrency').value=supplier?.currency||'USD';
+    new bootstrap.Modal(document.getElementById('supplierBillModal')).show();
+}
+async function handleSaveSupplierBill(e){
+    e.preventDefault();
+    try{
+        const supplierId=document.getElementById('supplierBillSupplier').value;
+        const supplier=suppliers.find(s=>String(s.id)===String(supplierId));
+        if(!supplier)throw new Error('Please select a supplier.');
+        const amount=Number(document.getElementById('supplierBillAmount').value);
+        if(!(amount>0))throw new Error('Bill amount must be greater than zero.');
+        const attachment=await readSupplierAttachment('supplierBillFile');
+        const bookingId=document.getElementById('supplierBillBooking').value;
+        const booking=(bookings||[]).find(b=>String(b.id??b._id)===String(bookingId));
+        const bill={id:Date.now(),supplierId:supplier.id,supplierName:supplier.name,bookingId:bookingId||'',clientCode:booking?bookingRTCode(booking):'',clientName:booking?.clientName||'',bookingInvoice:booking?.invoiceNumber||booking?.invoiceNo||'',reference:document.getElementById('supplierBillReference').value.trim(),billDate:document.getElementById('supplierBillDate').value,dueDate:document.getElementById('supplierBillDueDate').value,totalAmount:amount,currency:document.getElementById('supplierBillCurrency').value,attachment,notes:document.getElementById('supplierBillNotes').value.trim(),createdAt:new Date().toISOString(),createdBy:currentUser?.name||''};
+        supplierBills.unshift(bill);await saveRecord('supplierBills','roving_supplier_bills',bill);
+        bootstrap.Modal.getInstance(document.getElementById('supplierBillModal')).hide();
+        renderSupplierBills();showNotification('Supplier bill saved successfully. You can now record one or more payments.','success');
+    }catch(err){showNotification(err.message||'Could not save supplier bill.','danger');}
+}
+function openSupplierPaymentModal(billId){
+    const bill=supplierBills.find(b=>String(b.id)===String(billId));if(!bill)return;
+    const paid=supplierBillPaid(bill),remaining=supplierBillRemaining(bill);
+    document.getElementById('supplierPaymentForm').reset();document.getElementById('supplierPaymentBillId').value=String(bill.id);
+    document.getElementById('supplierPaymentDate').value=new Date().toISOString().slice(0,10);
+    document.getElementById('supplierPaymentAmount').removeAttribute('max');
+    document.getElementById('supplierPaymentAmount').value=Math.max(0,remaining).toFixed(2);
+    document.getElementById('supplierPaymentBillSummary').innerHTML=`<strong>${escapeHtml(bill.supplierName)}</strong> · Total: ${supplierMoney(bill.totalAmount,bill.currency)} · Paid: ${supplierMoney(paid,bill.currency)} · Balance: <strong class="${remaining>=0?'text-danger':'text-success'}">${remaining>=0?'We owe supplier: ':'Supplier credit: '}${supplierMoney(Math.abs(remaining),bill.currency)}</strong>`;
+    new bootstrap.Modal(document.getElementById('supplierPaymentModal')).show();
+}
+async function handleSaveSupplierPayment(e){
+    e.preventDefault();
+    try{
+        const billId=document.getElementById('supplierPaymentBillId').value;
+        const bill=supplierBills.find(b=>String(b.id)===String(billId));if(!bill)throw new Error('Supplier bill not found.');
+        const amount=Number(document.getElementById('supplierPaymentAmount').value),remaining=supplierBillRemaining(bill);
+        if(!(amount>0))throw new Error('Payment must be greater than zero.');
+        const attachment=await readSupplierAttachment('supplierPaymentFile');
+        const payment={id:Date.now(),billId:bill.id,supplierId:bill.supplierId,supplierName:bill.supplierName,amount,currency:bill.currency,paymentDate:document.getElementById('supplierPaymentDate').value,method:document.getElementById('supplierPaymentMethod').value,reference:document.getElementById('supplierPaymentReference').value.trim(),attachment,notes:document.getElementById('supplierPaymentNotes').value.trim(),createdAt:new Date().toISOString(),createdBy:currentUser?.name||''};
+        supplierPayments.unshift(payment);await saveRecord('supplierPayments','roving_supplier_payments',payment);
+        bootstrap.Modal.getInstance(document.getElementById('supplierPaymentModal')).hide();
+        renderSupplierBills();showNotification('Supplier payment recorded successfully.','success');
+    }catch(err){showNotification(err.message||'Could not record payment.','danger');}
+}
+function viewSupplierBillHistory(billId){
+    const bill=supplierBills.find(b=>String(b.id)===String(billId));if(!bill)return;
+    const payments=supplierBillPayments(bill.id).slice().sort((a,b)=>String(b.paymentDate||'').localeCompare(String(a.paymentDate||'')));
+    document.getElementById('supplierBillHistoryTitle').textContent=`Payment History · ${bill.supplierName}`;
+    document.getElementById('supplierBillHistorySummary').innerHTML=`<div class="row g-2"><div class="col-md-4">Bill: <strong>${supplierMoney(bill.totalAmount,bill.currency)}</strong></div><div class="col-md-4 text-success">Paid: <strong>${supplierMoney(supplierBillPaid(bill),bill.currency)}</strong></div><div class="col-md-4 text-danger">Remaining: <strong>${supplierMoney(supplierBillRemaining(bill),bill.currency)}</strong></div></div>`;
+    const body=document.getElementById('supplierBillPaymentsBody');
+    body.innerHTML=payments.length?payments.map(p=>`<tr><td>${escapeHtml(p.paymentDate||'—')}</td><td class="text-success fw-semibold">${supplierMoney(p.amount,p.currency)}</td><td>${escapeHtml(p.method||'—')}</td><td>${escapeHtml(p.reference||'—')}</td><td>${p.attachment?`<a class="btn btn-sm btn-outline-secondary" href="${p.attachment.data}" download="${escapeHtml(p.attachment.name)}"><i class="fa-solid fa-download me-1"></i>File</a>`:'—'}</td><td>${escapeHtml(p.notes||'—')}</td></tr>`).join(''):'<tr><td colspan="6" class="text-center text-muted py-3">No payments recorded yet</td></tr>';
+    new bootstrap.Modal(document.getElementById('supplierBillHistoryModal')).show();
+}
 function editSupplier(id){const s=suppliers.find(x=>x.id===id);if(!s)return;document.getElementById('editingSupplierId').value=s.id;document.getElementById('supplierName').value=s.name;document.getElementById('supplierType').value=s.type||'Other';document.getElementById('supplierCurrency').value=s.currency||'USD';document.getElementById('supplierContact').value=s.contact||'';document.getElementById('supplierNotes').value=s.notes||'';document.getElementById('supplierModalTitle').innerText='Edit Supplier';new bootstrap.Modal(document.getElementById('supplierModal')).show();}
-async function deleteSupplier(id){suppliers=suppliers.filter(x=>x.id!==id);await deleteRecord('suppliers','roving_suppliers',id);renderSuppliers();populateSupplierSelects();}
+async function deleteSupplier(id){if(supplierBills.some(b=>String(b.supplierId)===String(id))){showNotification('This supplier has bills and payment history. Archive/delete the bills first to avoid losing financial records.','warning');return;}suppliers=suppliers.filter(x=>x.id!==id);await deleteRecord('suppliers','roving_suppliers',id);renderSuppliers();populateSupplierSelects();populateSupplierBillSelects();}
 
 function normalizeRTCode(value) {
     const raw=String(value||'').trim().toUpperCase();
@@ -1791,6 +2048,7 @@ async function handleSaveBooking(e) {
         showNotification('Booking added successfully!', 'success');
     }
     await saveRecord('bookings', 'roving_bookings', bookingObj);
+    await syncBookingSupplierAccounts(bookingObj);
     const sourceFollowupId = document.getElementById('sourceFollowupId')?.value || '';
     if (sourceFollowupId) {
         const source = followups.find(f => String(f.id) === String(sourceFollowupId));
@@ -2292,6 +2550,7 @@ function editBooking(id) {
     document.getElementById('bookingDetails').value = b.details || '';
     document.getElementById('bookingNotes').value = b.notes || '';
     packageCostRows = Array.isArray(b.packageCosts) ? JSON.parse(JSON.stringify(b.packageCosts)) : [];
+    packageCostRows.forEach((row,index)=>{if(!row.id)row.id=`legacy-cost-${b.id}-${index}`;});
     handleBookingCategoryChange(); calculateBookingFinancials();
     new bootstrap.Modal(document.getElementById('addBookingModal')).show();
 }
