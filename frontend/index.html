@@ -495,6 +495,14 @@
                                 </select>
                             </div>
                             <div class="col-lg-3 col-md-6">
+                                <label class="form-label small fw-semibold">Customer</label>
+                                <select id="reportClientFilter" class="form-select" onchange="renderReportsCharts()"><option value="">All customers</option></select>
+                            </div>
+                            <div class="col-lg-3 col-md-6">
+                                <label class="form-label small fw-semibold">Booking / Service type</label>
+                                <select id="reportTypeFilter" class="form-select" onchange="renderReportsCharts()"><option value="">All types</option></select>
+                            </div>
+                            <div class="col-lg-3 col-md-6">
                                 <label class="form-label small fw-semibold">From booking date</label>
                                 <input type="date" id="reportFromDate" class="form-control" onchange="renderReportsCharts()">
                             </div>
@@ -530,6 +538,13 @@
                     <div class="card border shadow-sm">
                         <div class="card-header bg-light"><strong class="text-roving-green"><i class="fa-solid fa-users me-2"></i>Sales by Employee & Category</strong></div>
                         <div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead><tr><th>Employee</th><th>Category</th><th>Currency</th><th>Bookings</th><th>People</th><th>Sales</th><th>Profit</th></tr></thead><tbody id="reportEmployeeTableBody"></tbody></table></div>
+                    </div>
+                    <div class="card border shadow-sm mt-4">
+                        <div class="card-header bg-light"><strong class="text-roving-green"><i class="fa-solid fa-address-card me-2"></i>Customer Booking Details</strong></div>
+                        <div class="table-responsive"><table class="table table-hover align-middle mb-0">
+                            <thead><tr><th>Customer Code</th><th>Customer</th><th>Invoice</th><th>Service / Booking Type</th><th>Booking Date</th><th>Sales Person</th><th>Currency</th><th>Sales</th><th>Cost</th><th>Profit</th><th>Collected</th><th>Remaining</th></tr></thead>
+                            <tbody id="reportCustomerBookingBody"></tbody>
+                        </table></div>
                     </div>
                 </div>
             </div>
@@ -1063,6 +1078,7 @@ async function fetchClients() {
         clients = localClients;
     }
 
+    await ensureClientCodes();
     renderClients();
     if (typeof populateClientDropdowns === 'function') {
         populateClientDropdowns();
@@ -1463,7 +1479,7 @@ function formatMoney(n){return Number(n||0).toLocaleString(undefined,{minimumFra
 function currencyLabel(currency){const code=String(currency||'EGP').toUpperCase();return code==='EGP'?'ج.م':code;}
 function renderPackageCostRows(){const wrap=document.getElementById('packageCostRows');if(!wrap)return;if(!packageCostRows.length){wrap.innerHTML='<div class="text-muted small p-2">No package costs added yet.</div>';return;}const bc=document.getElementById('bookingCurrency')?.value||'EGP';wrap.innerHTML=packageCostRows.map((r,i)=>`<div class="border rounded p-2 mb-2 bg-white"><div class="row g-2 align-items-end"><div class="col-md-2"><label class="form-label small fw-semibold">Cost Type</label><select class="form-select form-select-sm" onchange="updatePackageRow(${i},'type',this.value)">${['Hotel','Flight','Visa','Transportation','Tour / Activities','Other'].map(t=>`<option ${r.type===t?'selected':''}>${t}</option>`).join('')}</select></div><div class="col-md-2"><label class="form-label small fw-semibold">Name / Details</label><input class="form-control form-control-sm" value="${escapeHtml(r.name)}" placeholder="Hotel / Airline / Visa..." oninput="updatePackageRow(${i},'name',this.value)"></div><div class="col-md-1"><label class="form-label small fw-semibold">Nights</label><input type="number" min="1" class="form-control form-control-sm" value="${r.type==='Hotel'?(r.nights||1):1}" ${r.type==='Hotel'?'':'disabled'} oninput="updatePackageRow(${i},'nights',this.value)"></div><div class="col-md-2"><label class="form-label small fw-semibold">Rate / Total</label><input type="number" min="0" step="0.01" class="form-control form-control-sm" value="${r.rate||0}" oninput="updatePackageRow(${i},'rate',this.value)"></div><div class="col-md-2"><label class="form-label small fw-semibold">Supplier</label><select class="form-select form-select-sm package-supplier-select" onchange="updatePackageRow(${i},'supplierId',this.value)"><option value="">-- Select Supplier --</option>${suppliers.map(s=>`<option value="${s.id}" ${String(r.supplierId)===String(s.id)?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}</select></div><div class="col-md-1"><label class="form-label small fw-semibold">Currency</label><select class="form-select form-select-sm" onchange="updatePackageRow(${i},'currency',this.value);updatePackageRow(${i},'fx',1)">${['EGP','USD','EUR','GBP','AED','SAR','TRY','GEL','AZN','OMR','QAR','BHD','ALL','IDR','MYR'].map(c=>`<option ${r.currency===c?'selected':''}>${c}</option>`).join('')}</select></div><div class="col-md-1"><label class="form-label small fw-semibold">FX → ${bc}</label><input type="number" min="0" step="0.000001" class="form-control form-control-sm" value="${r.fx??1}" oninput="updatePackageRow(${i},'fx',this.value)"></div><div class="col-md-1"><button type="button" class="btn btn-sm btn-outline-danger" onclick="removePackageCostRow(${i})"><i class="fa-solid fa-trash"></i></button></div><div class="col-12 small text-muted">${r.type==='Hotel'?'Hotel total = nights × rate':'Cost = entered rate/total'} · Converted: <strong>${formatMoney(packageRowConvertedTotal(r))} ${bc}</strong></div></div></div>`).join('');}
 function calculateBookingFinancials(){const net=parseFloat(document.getElementById('bookingNetPrice').value)||0;let cost=parseFloat(document.getElementById('bookingCostPrice').value)||0;const paid=parseFloat(document.getElementById('bookingPaidAmount').value)||0;const cat=document.getElementById('bookingCategory').value;const cur=document.getElementById('bookingCurrency').value||'EGP';if(cat==='Full Package'){cost=packageCostRows.reduce((sum,r)=>sum+packageRowConvertedTotal(r),0);document.getElementById('bookingCostPrice').value=cost.toFixed(2);document.getElementById('packageCostTotalDisplay').value=`${formatMoney(cost)} ${cur}`;}const profit=net-cost,remaining=net-paid;document.getElementById('bookingProfitDisplay').value=`${formatMoney(profit)} ${cur}`;document.getElementById('bookingRemainingDisplay').value=`${formatMoney(remaining)} ${cur}`;document.getElementById('bookingStatus').value=remaining>0?'Installments Due':'Paid in Full';}
-async function loadBookings(){await syncCollection('bookings','roving_bookings',bookings,v=>bookings=v);await ensureBookingNumbers();renderBookings();renderCommissions();}
+async function loadBookings(){await syncCollection('bookings','roving_bookings',bookings,v=>bookings=v);await ensureInvoiceNumbers();renderBookings();renderCommissions();}
 async function saveBookingsToStorage(){localStorage.setItem('roving_bookings',JSON.stringify(bookings)); for(const b of bookings){try{await apiRequest('/api/bookings',{method:'POST',body:JSON.stringify(b)});}catch(e){break;}}}
 async function loadSuppliers(){await syncCollection('suppliers','roving_suppliers',suppliers,v=>suppliers=v);renderSuppliers();populateSupplierSelects();}
 async function saveSuppliersToStorage(){localStorage.setItem('roving_suppliers',JSON.stringify(suppliers));}
@@ -1472,6 +1488,79 @@ async function handleSaveSupplier(e){e.preventDefault();const id=document.getEle
 function renderSuppliers(){const tbody=document.getElementById('suppliersTableBody');if(!tbody)return;if(!suppliers.length){tbody.innerHTML='<tr><td colspan="6" class="text-center text-muted py-4">No suppliers recorded</td></tr>';return;}tbody.innerHTML=suppliers.map(s=>`<tr><td><strong>${escapeHtml(s.name)}</strong></td><td><span class="badge bg-secondary">${escapeHtml(s.type||'-')}</span></td><td>${escapeHtml(s.contact||'-')}</td><td><strong>${escapeHtml(s.currency||'-')}</strong></td><td><small>${escapeHtml(s.notes||'-')}</small></td><td><button class="btn btn-sm btn-outline-primary me-1" onclick="editSupplier(${s.id})"><i class="fa-solid fa-pen-to-square"></i></button><button class="btn btn-sm btn-outline-danger" onclick="deleteSupplier(${s.id})"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');}
 function editSupplier(id){const s=suppliers.find(x=>x.id===id);if(!s)return;document.getElementById('editingSupplierId').value=s.id;document.getElementById('supplierName').value=s.name;document.getElementById('supplierType').value=s.type||'Other';document.getElementById('supplierCurrency').value=s.currency||'USD';document.getElementById('supplierContact').value=s.contact||'';document.getElementById('supplierNotes').value=s.notes||'';document.getElementById('supplierModalTitle').innerText='Edit Supplier';new bootstrap.Modal(document.getElementById('supplierModal')).show();}
 async function deleteSupplier(id){suppliers=suppliers.filter(x=>x.id!==id);await deleteRecord('suppliers','roving_suppliers',id);renderSuppliers();populateSupplierSelects();}
+
+function normalizeRTCode(value) {
+    const raw=String(value||'').trim().toUpperCase();
+    if (!raw) return '';
+    return raw.startsWith('RT-') ? raw : `RT-${raw}`;
+}
+function clientCodeOf(client) {
+    return normalizeRTCode(client?.clientCode || client?.client_code || client?.code || '');
+}
+function nextClientCode() {
+    const max=(Array.isArray(clients)?clients:[]).reduce((m,c)=>{
+        const match=clientCodeOf(c).match(/^RT-(\d+)$/);
+        return match?Math.max(m,Number(match[1])):m;
+    },349);
+    return `RT-${String(max+1).padStart(5,'0')}`;
+}
+async function ensureClientCodes() {
+    if (!Array.isArray(clients)) return;
+    const used=new Set(clients.map(clientCodeOf).filter(Boolean));
+    let next=350;
+    const pending=[];
+    // Keep old visible order for first-time migration; then code is stored on each record.
+    for (const c of clients) {
+        let code=clientCodeOf(c);
+        if (!code) {
+            while (used.has(`RT-${String(next).padStart(5,'0')}`)) next++;
+            code=`RT-${String(next++).padStart(5,'0')}`;
+            c.clientCode=code; used.add(code); pending.push(c);
+        } else c.clientCode=code;
+    }
+    for (const c of pending) {
+        const id=c._id??c.id;
+        if (!id || String(id).startsWith('local_')) continue;
+        try {
+            const saved=await apiRequest(`/api/clients/${encodeURIComponent(String(id))}`,{
+                method:'PUT',body:JSON.stringify({clientCode:c.clientCode})
+            });
+            if (saved && typeof saved==='object') Object.assign(c,saved,{clientCode:c.clientCode});
+        } catch(err) { console.warn('Could not save RT customer code',err); }
+    }
+    localStorage.setItem('roving_local_clients',JSON.stringify(clients));
+}
+function resolveBookingClient(b) {
+    const id=String(b?.clientId??b?.client_id??'');
+    return (Array.isArray(clients)?clients:[]).find(c=>
+        [c?._id,c?.id,c?.clientId,c?.client_id].some(v=>v!=null&&String(v)===id)
+    ) || (Array.isArray(clients)?clients:[]).find(c=>
+        String(c?.name||'').trim().toLowerCase()===String(b?.clientName||'').trim().toLowerCase()
+    ) || null;
+}
+function bookingRTCode(b) {
+    return clientCodeOf(resolveBookingClient(b)) || normalizeRTCode(b?.clientCode||'');
+}
+function usedInvoiceNumbers() {
+    return new Set((Array.isArray(bookings)?bookings:[]).map(b=>String(b.invoiceNumber||b.invoiceNo||'').trim()).filter(Boolean));
+}
+function generateUniqueInvoiceNumber() {
+    const used=usedInvoiceNumbers();
+    if (used.size>=900000) throw new Error('Invoice number range exhausted.');
+    let candidate;
+    do { candidate=String(Math.floor(100000+Math.random()*900000)); } while(used.has(candidate));
+    return candidate;
+}
+async function ensureInvoiceNumbers() {
+    const missing=(Array.isArray(bookings)?bookings:[]).filter(b=>!String(b.invoiceNumber||b.invoiceNo||'').trim());
+    for (const b of missing) {
+        b.invoiceNumber=generateUniqueInvoiceNumber();
+        try { await saveRecord('bookings','roving_bookings',b); }
+        catch(err) { console.warn('Could not persist invoice number migration',err); }
+    }
+    if (missing.length) localStorage.setItem('roving_bookings',JSON.stringify(bookings));
+}
+
 function bookingDateValue(b) {
     if (b?.createdAt || b?.created_at || b?.bookingDate || b?.createdDate) {
         const d = new Date(b.createdAt || b.created_at || b.bookingDate || b.createdDate);
@@ -1539,7 +1628,8 @@ async function handleSaveBooking(e) {
     const bookingObj = {
         ...(oldBooking || {}),
         id: editingId !== '' ? (oldBooking?.id ?? Number(editingId)) : Date.now(),
-        bookingNumber: editingId !== '' ? (oldBooking?.bookingNumber ?? oldBooking?.bookingNo ?? null) : getNextBookingNumber(),
+        invoiceNumber: editingId !== '' ? (oldBooking?.invoiceNumber || oldBooking?.invoiceNo || generateUniqueInvoiceNumber()) : generateUniqueInvoiceNumber(),
+        clientCode: clientCodeOf(client),
         createdAt: oldBooking?.createdAt || oldBooking?.created_at || (editingId === '' ? new Date().toISOString() : ''),
         clientId: client._id || client.id, clientName: client.name, clientPhone: client.phone || 'N/A',
         category: document.getElementById('bookingCategory').value,
@@ -1606,10 +1696,11 @@ function renderBookings() {
     }
 
     list.forEach(b => {
-        const number = b.bookingNumber ?? b.bookingNo ?? b.bookingCode ?? b.number ?? '—';
+        const rtCode = bookingRTCode(b) || 'RT-PENDING';
+        const invoice = b.invoiceNumber || b.invoiceNo || 'PENDING';
         tbody.innerHTML += `
             <tr>
-                <td><span class="badge bg-dark">BK-${escapeHtml(String(number))}</span></td>
+                <td><span class="badge bg-dark">${escapeHtml(rtCode)}</span><br><small class="text-muted">Invoice: ${escapeHtml(String(invoice))}</small></td>
                 <td><strong>${escapeHtml(b.clientName || '')}</strong><br><small class="text-muted"><i class="fa-solid fa-phone me-1"></i>${escapeHtml(b.clientPhone || '')}</small></td>
                 <td><span class="badge bg-secondary">${escapeHtml(b.category || '')}</span></td>
                 <td><span class="fw-semibold text-primary">${formatMoney(b.netPrice)} ${escapeHtml(b.currency || 'EGP')}</span></td>
@@ -2864,6 +2955,7 @@ async function handleSaveClient(event) {
     const priorClient = editingId !== "" ? clients.find(c => String(c._id || c.id) === String(editingId)) : null;
     const clientData = {
         _id: editingId !== "" ? editingId : 'local_' + Date.now(),
+        clientCode: priorClient ? (clientCodeOf(priorClient) || nextClientCode()) : nextClientCode(),
         createdBy: priorClient ? (priorClient.createdBy || priorClient.createdByName || '') : (currentUser?.name || ''),
         createdById: priorClient ? (priorClient.createdById || '') : (currentUser?.id || currentUser?._id || currentUser?.email || ''),
         name: document.getElementById('clientName').value.trim(),
@@ -3098,11 +3190,11 @@ function renderClients() {
         return;
     }
 
-    list.forEach((client, index) => {
+    list.forEach((client) => {
         const clientId = client._id || client.id;
         tbody.innerHTML += `
             <tr>
-                <td><span class="badge bg-dark">RT-${(350 + index).toString().padStart(5, '0')}</span></td>
+                <td><span class="badge bg-dark">${escapeHtml(clientCodeOf(client) || 'RT-PENDING')}</span></td>
                 <td><strong>${client.name}</strong></td>
                 <td><span class="badge bg-secondary">${client.source || '-'}</span></td>
                 <td><small><i class="fa-solid fa-phone me-1"></i>${client.phone || '-'}</small></td>
@@ -3122,7 +3214,7 @@ function renderClients() {
 
 // Reports & Charts: Admin sees all data, Sales sees their own analytics
 function resetReportFilters() {
-    ['reportEmployeeFilter','reportFromDate','reportToDate'].forEach(id => {
+    ['reportEmployeeFilter','reportClientFilter','reportTypeFilter','reportFromDate','reportToDate'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
@@ -3147,6 +3239,24 @@ function renderReportsCharts() {
     }
 
     const selectedEmployee = isAdmin ? (employeeSelect?.value || '') : (currentUser?.name || '');
+    const clientSelect = document.getElementById('reportClientFilter');
+    if (clientSelect) {
+        const previousClient = clientSelect.value;
+        const visibleClients = (Array.isArray(clients)?clients:[]).filter(c => isAdmin || c.assignedTo === currentUser?.name);
+        clientSelect.innerHTML = '<option value="">All customers</option>' + visibleClients
+            .slice().sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')))
+            .map(c=>`<option value="${escapeHtml(String(c._id??c.id??''))}">${escapeHtml(clientCodeOf(c))} · ${escapeHtml(c.name||'Unnamed')}</option>`).join('');
+        if ([...clientSelect.options].some(o=>o.value===previousClient)) clientSelect.value=previousClient;
+    }
+    const typeSelect = document.getElementById('reportTypeFilter');
+    if (typeSelect) {
+        const previousType=typeSelect.value;
+        const types=[...new Set((Array.isArray(bookings)?bookings:[]).map(b=>String(b.category||'Other')))].sort();
+        typeSelect.innerHTML='<option value="">All types</option>'+types.map(t=>`<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+        if (types.includes(previousType)) typeSelect.value=previousType;
+    }
+    const selectedClientId = clientSelect?.value || '';
+    const selectedType = typeSelect?.value || '';
     const fromDate = document.getElementById('reportFromDate')?.value || '';
     const toDate = document.getElementById('reportToDate')?.value || '';
 
@@ -3157,6 +3267,16 @@ function renderReportsCharts() {
         filteredClients = filteredClients.filter(c => c.assignedTo === currentUser.name);
     }
     if (selectedEmployee) filteredBookings = filteredBookings.filter(b => String(b.assignedTo || 'Unassigned') === selectedEmployee);
+    if (selectedClientId) {
+        const selectedClient = getClientByAnyId(selectedClientId);
+        const clientCode = clientCodeOf(selectedClient);
+        filteredBookings = filteredBookings.filter(b =>
+            String(b.clientId ?? b.client_id ?? '') === String(selectedClientId) ||
+            (clientCode && bookingRTCode(b) === clientCode) ||
+            String(b.clientName||'').trim().toLowerCase() === String(selectedClient?.name||'').trim().toLowerCase()
+        );
+    }
+    if (selectedType) filteredBookings = filteredBookings.filter(b => String(b.category||'Other') === selectedType);
     if (fromDate || toDate) {
         filteredBookings = filteredBookings.filter(b => {
             const d = bookingDateValue(b);
@@ -3168,8 +3288,11 @@ function renderReportsCharts() {
     const summary = document.getElementById('reportFilterSummary');
     if (summary) {
         const who = selectedEmployee || 'All employees';
+        const selectedClient = selectedClientId ? getClientByAnyId(selectedClientId) : null;
+        const customerLabel = selectedClient ? `${clientCodeOf(selectedClient)} ${selectedClient.name}` : 'All customers';
+        const typeLabel = selectedType || 'All service types';
         const period = fromDate || toDate ? `${fromDate || 'Beginning'} → ${toDate || 'Today'}` : 'All dates';
-        summary.textContent = `Showing ${filteredBookings.length} booking(s) · ${who} · ${period}`;
+        summary.textContent = `Showing ${filteredBookings.length} booking(s) · ${who} · ${customerLabel} · ${typeLabel} · ${period}`;
     }
 
     const fmt = n => Number(n || 0).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
@@ -3208,6 +3331,27 @@ function renderReportsCharts() {
     const employeeBody = document.getElementById('reportEmployeeTableBody');
     if (employeeBody) {
         employeeBody.innerHTML = employeeRows.length ? employeeRows.map(r => `<tr><td><strong>${escapeHtml(r.employee)}</strong></td><td>${escapeHtml(r.category)}</td><td><span class="badge bg-light text-dark border">${escapeHtml(r.currency)}</span></td><td>${r.bookings}</td><td>${r.people}</td><td>${fmt(r.sales)}</td><td class="text-success fw-bold">${fmt(r.profit)}</td></tr>`).join('') : '<tr><td colspan="7" class="text-center text-muted py-4">No sales data</td></tr>';
+    }
+
+    const customerBody = document.getElementById('reportCustomerBookingBody');
+    if (customerBody) {
+        const rows = filteredBookings.slice().sort((a,b)=>(bookingDateValue(b)?.getTime()||0)-(bookingDateValue(a)?.getTime()||0));
+        customerBody.innerHTML = rows.length ? rows.map(b => {
+            const client=resolveBookingClient(b);
+            const d=bookingDateValue(b);
+            const dateLabel=d?d.toLocaleDateString('en-GB'):'—';
+            const currency=b.currency||'EGP';
+            const money=v=>fmt(v);
+            return `<tr>
+                <td><span class="badge bg-dark">${escapeHtml(bookingRTCode(b)||'RT-PENDING')}</span></td>
+                <td><strong>${escapeHtml(b.clientName||client?.name||'')}</strong></td>
+                <td><span class="badge bg-light text-dark border">${escapeHtml(String(b.invoiceNumber||b.invoiceNo||'—'))}</span></td>
+                <td>${escapeHtml(b.category||'Other')}${b.details?`<br><small class="text-muted">${escapeHtml(b.details)}</small>`:''}</td>
+                <td>${dateLabel}</td><td>${escapeHtml(b.assignedTo||'Unassigned')}</td><td>${escapeHtml(currency)}</td>
+                <td>${money(b.netPrice)}</td><td>${money(b.costPrice)}</td>
+                <td class="text-success fw-bold">${money(b.profit)}</td><td>${money(b.paidAmount)}</td><td class="text-danger">${money(b.remaining)}</td>
+            </tr>`;
+        }).join('') : '<tr><td colspan="12" class="text-center text-muted py-4">No matching customer bookings</td></tr>';
     }
 
     const kpi = document.getElementById('adminReportKpis');
