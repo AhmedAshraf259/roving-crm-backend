@@ -943,6 +943,31 @@
  </div></div>
 </div>
 
+<!-- Set supplier paid total / payment status -->
+<div class="modal fade" id="supplierPaidTotalModal" tabindex="-1">
+ <div class="modal-dialog"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title fw-bold text-roving-green">Update Supplier Payment Status</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body">
+   <form id="supplierPaidTotalForm" onsubmit="handleSetSupplierPaidTotal(event)">
+    <input type="hidden" id="supplierPaidTotalBillId">
+    <div id="supplierPaidTotalSummary" class="alert alert-light border small mb-3"></div>
+    <div class="mb-3"><label class="form-label fw-semibold">Payment Status *</label>
+     <select id="supplierPaidTotalStatus" class="form-select" onchange="handleSupplierPaidStatusChange()">
+      <option value="Unpaid">Unpaid</option><option value="Partially Paid">Partially Paid</option><option value="Paid">Paid</option>
+     </select>
+    </div>
+    <div class="mb-3"><label class="form-label fw-semibold">Total Paid to Supplier *</label><input id="supplierPaidTotalAmount" type="number" min="0" step="0.01" class="form-control" required></div>
+    <div class="mb-3"><label class="form-label fw-semibold">Adjustment Date *</label><input id="supplierPaidTotalDate" type="date" class="form-control" required></div>
+    <div class="mb-3"><label class="form-label fw-semibold">Payment Method</label><select id="supplierPaidTotalMethod" class="form-select"><option>Bank Transfer</option><option>Cash</option><option>Credit / Debit Card</option><option>Mobile Wallet</option><option>Online Payment</option><option>Other</option><option>Manual Reconciliation</option></select></div>
+    <div class="mb-3"><label class="form-label fw-semibold">Reference / Notes</label><textarea id="supplierPaidTotalNotes" class="form-control" rows="2" placeholder="Receipt number or reason for changing the paid total"></textarea></div>
+    <div class="mb-3"><label class="form-label fw-semibold">Receipt / Proof</label><input id="supplierPaidTotalFile" type="file" class="form-control" accept=".pdf,.png,.jpg,.jpeg,.webp"></div>
+    <div class="alert alert-info small">The system records only the difference from the previously recorded paid total, preserving the full payment and adjustment history.</div>
+    <button type="submit" class="btn btn-success w-100 fw-bold">Save Payment Status</button>
+   </form>
+  </div>
+ </div></div>
+</div>
+
 <!-- Supplier Bill Payment History modal -->
 <div class="modal fade" id="supplierBillHistoryModal" tabindex="-1">
  <div class="modal-dialog modal-xl"><div class="modal-content">
@@ -1629,7 +1654,36 @@ async function loadSuppliers(){
 }
 async function saveSuppliersToStorage(){localStorage.setItem('roving_suppliers',JSON.stringify(suppliers));}
 function openSupplierModal(){document.getElementById('supplierModalTitle').innerText='Add Supplier';document.getElementById('editingSupplierId').value='';document.getElementById('supplierForm').reset();document.getElementById('supplierCurrency').value='USD';}
-async function handleSaveSupplier(e){e.preventDefault();const id=document.getElementById('editingSupplierId').value;const obj={id:id?Number(id):Date.now(),name:document.getElementById('supplierName').value.trim(),type:document.getElementById('supplierType').value,currency:document.getElementById('supplierCurrency').value,contact:document.getElementById('supplierContact').value.trim(),notes:document.getElementById('supplierNotes').value.trim()};if(!obj.name)return;if(id){const idx=suppliers.findIndex(s=>s.id==id);if(idx!==-1)suppliers[idx]=obj;}else suppliers.unshift(obj);await saveRecord('suppliers','roving_suppliers',obj);renderSuppliers();populateSupplierSelects();populateSupplierBillSelects();bootstrap.Modal.getInstance(document.getElementById('supplierModal')).hide();showNotification('Supplier saved successfully!','success');}
+async function handleSaveSupplier(e){
+    e.preventDefault();
+    const id=document.getElementById('editingSupplierId').value;
+    const existing=id?suppliers.find(s=>String(s.id??s._id)===String(id)):null;
+    const obj={
+        ...(existing||{}),
+        id:existing?(existing.id??existing._id):Date.now(),
+        name:document.getElementById('supplierName').value.trim(),
+        type:document.getElementById('supplierType').value,
+        currency:document.getElementById('supplierCurrency').value,
+        contact:document.getElementById('supplierContact').value.trim(),
+        notes:document.getElementById('supplierNotes').value.trim()
+    };
+    if(!obj.name){showNotification('Supplier name is required.','warning');return;}
+    if(existing){
+        const idx=suppliers.findIndex(s=>String(s.id??s._id)===String(id));
+        if(idx>=0)suppliers[idx]=obj;
+    }else suppliers.unshift(obj);
+    localStorage.setItem('roving_suppliers',JSON.stringify(suppliers));
+    await saveRecord('suppliers','roving_suppliers',obj);
+    // Keep the supplier name in historical ledger rows in sync after an edit.
+    for(const bill of supplierBills.filter(b=>String(b.supplierId)===String(obj.id))){
+        bill.supplierName=obj.name;
+        await saveRecord('supplierBills','roving_supplier_bills',bill);
+    }
+    renderSuppliers();renderSupplierBills();populateSupplierSelects();populateSupplierBillSelects();
+    const modal=bootstrap.Modal.getInstance(document.getElementById('supplierModal'));
+    if(modal)modal.hide();
+    showNotification('Supplier saved successfully!','success');
+}
 function supplierBillSourceKey(bookingId, partKey){return `booking:${String(bookingId)}:${String(partKey)}`;}
 function supplierBillAmountForPackageRow(row){
     const base=row?.type==='Hotel'?(Number(row.nights)||0)*(Number(row.rate)||0):(Number(row.rate)||0);
@@ -1716,7 +1770,7 @@ function renderSuppliers(){
         if(!currencies.includes(s.currency||'USD'))currencies.push(s.currency||'USD');
         const balances=currencies.map(cur=>({cur,value:supplierOutstandingFor(s.id,cur)}));
         const balanceHtml=balances.map(x=>`<div class="${x.value>0.009?'text-danger':x.value< -0.009?'text-success':'text-muted'} fw-bold small">${x.value>0.009?'We owe: ':x.value< -0.009?'Supplier credit: ':'Settled: '}${supplierMoney(Math.abs(x.value),x.cur)}</div>`).join('');
-        return `<tr><td><strong>${escapeHtml(s.name)}</strong></td><td><span class="badge bg-secondary">${escapeHtml(s.type||'-')}</span></td><td>${escapeHtml(s.contact||'-')}</td><td><strong>${escapeHtml(s.currency||'-')}</strong></td><td>${balanceHtml}</td><td><button class="btn btn-sm btn-outline-success me-1" onclick="openSupplierBillModal(${Number(s.id)})" title="Add bill"><i class="fa-solid fa-file-invoice-dollar"></i></button><button class="btn btn-sm btn-outline-primary me-1" onclick="editSupplier(${Number(s.id)})"><i class="fa-solid fa-pen-to-square"></i></button><button class="btn btn-sm btn-outline-danger" onclick="deleteSupplier(${Number(s.id)})"><i class="fa-solid fa-trash"></i></button></td></tr>`;
+        return `<tr><td><strong>${escapeHtml(s.name)}</strong></td><td><span class="badge bg-secondary">${escapeHtml(s.type||'-')}</span></td><td>${escapeHtml(s.contact||'-')}</td><td><strong>${escapeHtml(s.currency||'-')}</strong></td><td>${balanceHtml}</td><td><button class="btn btn-sm btn-outline-success me-1" onclick="openSupplierBillModal('${String(s.id).replace(/'/g, "\\'")}')" title="Add bill"><i class="fa-solid fa-file-invoice-dollar"></i></button><button class="btn btn-sm btn-outline-primary me-1" onclick="editSupplier('${String(s.id).replace(/'/g, "\\'")}')"><i class="fa-solid fa-pen-to-square"></i></button><button class="btn btn-sm btn-outline-danger" onclick="deleteSupplier('${String(s.id).replace(/'/g, "\\'")}')"><i class="fa-solid fa-trash"></i></button></td></tr>`;
     }).join('');
 }
 function populateSupplierBillSelects(){
@@ -1732,7 +1786,7 @@ function renderSupplierBills(){
     tbody.innerHTML=sorted.map(b=>{
         const supplier=suppliers.find(s=>String(s.id)===String(b.supplierId));
         const paid=supplierBillPaid(b), remaining=supplierBillRemaining(b);
-        const status=b.status==='Cancelled'?'Cancelled':remaining<=0.009?'Paid':paid>0?'Partially Paid':'Unpaid';
+        const status=b.status==='Cancelled'?'Cancelled':(b.paymentStatusOverride||supplierBillStatus(b));
         const badge=status==='Paid'?'success':status==='Partially Paid'?'warning':status==='Cancelled'?'secondary':'danger';
         const booking=(bookings||[]).find(x=>String(x.id??x._id)===String(b.bookingId));
         const attachment=b.attachment?`<a href="${b.attachment.data}" download="${escapeHtml(b.attachment.name)}" class="btn btn-sm btn-outline-secondary me-1" title="Download supplier invoice"><i class="fa-solid fa-paperclip"></i></a>`:'';
@@ -1742,7 +1796,7 @@ function renderSupplierBills(){
             <td>${escapeHtml(b.reference||'—')}</td><td>${escapeHtml(b.billDate||'—')}${b.dueDate?`<br><small class="text-muted">Due: ${escapeHtml(b.dueDate)}</small>`:''}</td>
             <td class="fw-semibold">${supplierMoney(b.totalAmount,b.currency)}</td><td class="text-success fw-semibold">${supplierMoney(paid,b.currency)}</td><td class="${remaining>0.009?'text-danger':'text-success'} fw-semibold">${supplierMoney(Math.abs(remaining),b.currency)}${remaining< -0.009?' credit':''}</td>
             <td><span class="badge bg-${badge}">${status}</span></td>
-            <td>${attachment}<button class="btn btn-sm btn-success me-1" onclick="openSupplierPaymentModal('${String(b.id)}')" ${(remaining<=0.009||b.status==='Cancelled')?'disabled':''} title="Record payment"><i class="fa-solid fa-money-bill-transfer"></i></button><button class="btn btn-sm btn-outline-primary" onclick="viewSupplierBillHistory('${String(b.id)}')" title="Payment history"><i class="fa-solid fa-clock-rotate-left"></i></button></td>
+            <td>${attachment}<button class="btn btn-sm btn-outline-primary me-1" onclick="openSupplierPaidTotalModal('${String(b.id)}')" title="Set total paid / payment status"><i class="fa-solid fa-sliders"></i></button><button class="btn btn-sm btn-success me-1" onclick="openSupplierPaymentModal('${String(b.id)}')" ${(remaining<=0.009||b.status==='Cancelled')?'disabled':''} title="Record payment"><i class="fa-solid fa-money-bill-transfer"></i></button><button class="btn btn-sm btn-outline-primary" onclick="viewSupplierBillHistory('${String(b.id)}')" title="Payment history"><i class="fa-solid fa-clock-rotate-left"></i></button></td>
         </tr>`;
     }).join('');
     renderSuppliers();
@@ -1802,9 +1856,75 @@ async function handleSaveSupplierPayment(e){
         const attachment=await readSupplierAttachment('supplierPaymentFile');
         const payment={id:Date.now(),billId:bill.id,supplierId:bill.supplierId,supplierName:bill.supplierName,amount,currency:bill.currency,paymentDate:document.getElementById('supplierPaymentDate').value,method:document.getElementById('supplierPaymentMethod').value,reference:document.getElementById('supplierPaymentReference').value.trim(),attachment,notes:document.getElementById('supplierPaymentNotes').value.trim(),createdAt:new Date().toISOString(),createdBy:currentUser?.name||''};
         supplierPayments.unshift(payment);await saveRecord('supplierPayments','roving_supplier_payments',payment);
+        delete bill.paymentStatusOverride;bill.updatedAt=new Date().toISOString();await saveRecord('supplierBills','roving_supplier_bills',bill);
         bootstrap.Modal.getInstance(document.getElementById('supplierPaymentModal')).hide();
         renderSupplierBills();showNotification('Supplier payment recorded successfully.','success');
     }catch(err){showNotification(err.message||'Could not record payment.','danger');}
+}
+function supplierBillStatus(bill){
+    if(bill.status==='Cancelled')return 'Cancelled';
+    const paid=supplierBillPaid(bill),total=Number(bill.totalAmount)||0;
+    if(paid<=0.009)return 'Unpaid';
+    if(paid+0.009>=total)return 'Paid';
+    return 'Partially Paid';
+}
+function handleSupplierPaidStatusChange(){
+    const status=document.getElementById('supplierPaidTotalStatus').value;
+    const amount=document.getElementById('supplierPaidTotalAmount');
+    const bill=supplierBills.find(b=>String(b.id)===String(document.getElementById('supplierPaidTotalBillId').value));
+    if(!bill)return;
+    if(status==='Unpaid')amount.value='0';
+    else if(status==='Paid')amount.value=Number(bill.totalAmount||0).toFixed(2);
+    else if(Number(amount.value)<=0||Number(amount.value)>=Number(bill.totalAmount||0))amount.value=(Number(bill.totalAmount||0)/2).toFixed(2);
+}
+function openSupplierPaidTotalModal(billId){
+    const bill=supplierBills.find(b=>String(b.id)===String(billId));if(!bill)return;
+    const paid=supplierBillPaid(bill),status=supplierBillStatus(bill);
+    document.getElementById('supplierPaidTotalForm').reset();
+    document.getElementById('supplierPaidTotalBillId').value=String(bill.id);
+    document.getElementById('supplierPaidTotalStatus').value=status==='Cancelled'?'Unpaid':status;
+    document.getElementById('supplierPaidTotalAmount').value=paid.toFixed(2);
+    document.getElementById('supplierPaidTotalDate').value=new Date().toISOString().slice(0,10);
+    document.getElementById('supplierPaidTotalSummary').innerHTML=`<strong>${escapeHtml(bill.supplierName||'Supplier')}</strong><br>Total: ${supplierMoney(bill.totalAmount,bill.currency)} · Currently paid: ${supplierMoney(paid,bill.currency)} · Balance: ${supplierMoney(supplierBillRemaining(bill),bill.currency)}`;
+    new bootstrap.Modal(document.getElementById('supplierPaidTotalModal')).show();
+}
+async function handleSetSupplierPaidTotal(e){
+    e.preventDefault();
+    try{
+        const billId=document.getElementById('supplierPaidTotalBillId').value;
+        const bill=supplierBills.find(b=>String(b.id)===String(billId));if(!bill)throw new Error('Supplier bill not found.');
+        if(bill.status==='Cancelled')throw new Error('This supplier bill is cancelled.');
+        const target=Number(document.getElementById('supplierPaidTotalAmount').value);
+        const status=document.getElementById('supplierPaidTotalStatus').value;
+        const total=Number(bill.totalAmount)||0;
+        if(!Number.isFinite(target)||target<0)throw new Error('Enter a valid paid amount.');
+        if(target>total+0.009)throw new Error('Paid amount cannot exceed the bill total. Record a supplier advance separately.');
+        if(status==='Paid'&&Math.abs(target-total)>0.009)throw new Error('For Paid status, the paid amount must equal the total.');
+        if(status==='Unpaid'&&target>0.009)throw new Error('For Unpaid status, the paid amount must be zero.');
+        if(status==='Partially Paid'&&(target<=0.009||target>=total-0.009))throw new Error('For Partially Paid, enter an amount between zero and the total.');
+        const current=supplierBillPaid(bill),delta=Number((target-current).toFixed(2));
+        if(Math.abs(delta)>0.009){
+            const attachment=await readSupplierAttachment('supplierPaidTotalFile');
+            const payment={
+                id:`reconcile_${Date.now()}`,billId:bill.id,supplierId:bill.supplierId,
+                supplierName:bill.supplierName,amount:delta,currency:bill.currency,
+                paymentDate:document.getElementById('supplierPaidTotalDate').value,
+                method:document.getElementById('supplierPaidTotalMethod').value,
+                reference:'Paid total adjustment',
+                attachment,notes:document.getElementById('supplierPaidTotalNotes').value.trim()||`Paid total adjusted from ${current.toFixed(2)} to ${target.toFixed(2)}`,
+                createdAt:new Date().toISOString(),createdBy:currentUser?.name||'',isAdjustment:true
+            };
+            supplierPayments.unshift(payment);
+            await saveRecord('supplierPayments','roving_supplier_payments',payment);
+        }
+        bill.paymentStatusOverride=status;
+        bill.updatedAt=new Date().toISOString();
+        await saveRecord('supplierBills','roving_supplier_bills',bill);
+        localStorage.setItem('roving_supplier_payments',JSON.stringify(supplierPayments));
+        localStorage.setItem('roving_supplier_bills',JSON.stringify(supplierBills));
+        const modal=bootstrap.Modal.getInstance(document.getElementById('supplierPaidTotalModal'));if(modal)modal.hide();
+        renderSupplierBills();showNotification('Supplier payment status and paid total updated.','success');
+    }catch(err){showNotification(err.message||'Could not update supplier paid total.','danger');}
 }
 function viewSupplierBillHistory(billId){
     const bill=supplierBills.find(b=>String(b.id)===String(billId));if(!bill)return;
@@ -1812,11 +1932,32 @@ function viewSupplierBillHistory(billId){
     document.getElementById('supplierBillHistoryTitle').textContent=`Payment History · ${bill.supplierName}`;
     document.getElementById('supplierBillHistorySummary').innerHTML=`<div class="row g-2"><div class="col-md-4">Bill: <strong>${supplierMoney(bill.totalAmount,bill.currency)}</strong></div><div class="col-md-4 text-success">Paid: <strong>${supplierMoney(supplierBillPaid(bill),bill.currency)}</strong></div><div class="col-md-4 text-danger">Remaining: <strong>${supplierMoney(supplierBillRemaining(bill),bill.currency)}</strong></div></div>`;
     const body=document.getElementById('supplierBillPaymentsBody');
-    body.innerHTML=payments.length?payments.map(p=>`<tr><td>${escapeHtml(p.paymentDate||'—')}</td><td class="text-success fw-semibold">${supplierMoney(p.amount,p.currency)}</td><td>${escapeHtml(p.method||'—')}</td><td>${escapeHtml(p.reference||'—')}</td><td>${p.attachment?`<a class="btn btn-sm btn-outline-secondary" href="${p.attachment.data}" download="${escapeHtml(p.attachment.name)}"><i class="fa-solid fa-download me-1"></i>File</a>`:'—'}</td><td>${escapeHtml(p.notes||'—')}</td></tr>`).join(''):'<tr><td colspan="6" class="text-center text-muted py-3">No payments recorded yet</td></tr>';
+    body.innerHTML=payments.length?payments.map(p=>`<tr><td>${escapeHtml(p.paymentDate||'—')}</td><td class="${Number(p.amount)>=0?'text-success':'text-danger'} fw-semibold">${Number(p.amount)<0?'Adjustment: ':''}${supplierMoney(Math.abs(Number(p.amount)||0),p.currency)}</td><td>${escapeHtml(p.method||'—')}</td><td>${escapeHtml(p.reference||'—')}</td><td>${p.attachment?`<a class="btn btn-sm btn-outline-secondary" href="${p.attachment.data}" download="${escapeHtml(p.attachment.name)}"><i class="fa-solid fa-download me-1"></i>File</a>`:'—'}</td><td>${escapeHtml(p.notes||'—')}</td></tr>`).join(''):'<tr><td colspan="6" class="text-center text-muted py-3">No payments recorded yet</td></tr>';
     new bootstrap.Modal(document.getElementById('supplierBillHistoryModal')).show();
 }
-function editSupplier(id){const s=suppliers.find(x=>x.id===id);if(!s)return;document.getElementById('editingSupplierId').value=s.id;document.getElementById('supplierName').value=s.name;document.getElementById('supplierType').value=s.type||'Other';document.getElementById('supplierCurrency').value=s.currency||'USD';document.getElementById('supplierContact').value=s.contact||'';document.getElementById('supplierNotes').value=s.notes||'';document.getElementById('supplierModalTitle').innerText='Edit Supplier';new bootstrap.Modal(document.getElementById('supplierModal')).show();}
-async function deleteSupplier(id){if(supplierBills.some(b=>String(b.supplierId)===String(id))){showNotification('This supplier has bills and payment history. Archive/delete the bills first to avoid losing financial records.','warning');return;}suppliers=suppliers.filter(x=>x.id!==id);await deleteRecord('suppliers','roving_suppliers',id);renderSuppliers();populateSupplierSelects();populateSupplierBillSelects();}
+function editSupplier(id){
+    const s=suppliers.find(x=>String(x.id??x._id)===String(id));
+    if(!s){showNotification('Supplier not found. Refresh the page and try again.','warning');return;}
+    document.getElementById('editingSupplierId').value=String(s.id??s._id);
+    document.getElementById('supplierName').value=s.name||'';
+    document.getElementById('supplierType').value=s.type||'Other';
+    document.getElementById('supplierCurrency').value=s.currency||'USD';
+    document.getElementById('supplierContact').value=s.contact||'';
+    document.getElementById('supplierNotes').value=s.notes||'';
+    document.getElementById('supplierModalTitle').innerText='Edit Supplier';
+    new bootstrap.Modal(document.getElementById('supplierModal')).show();
+}
+async function deleteSupplier(id){
+    const supplier=suppliers.find(x=>String(x.id??x._id)===String(id));
+    if(!supplier){showNotification('Supplier not found. Refresh the page and try again.','warning');return;}
+    if(!confirm(`Delete supplier "${supplier.name}" from the supplier list? Existing bookings, bills and payment history will be preserved for accounting.`))return;
+    const supplierId=String(supplier.id??supplier._id);
+    suppliers=suppliers.filter(x=>String(x.id??x._id)!==supplierId);
+    localStorage.setItem('roving_suppliers',JSON.stringify(suppliers));
+    await deleteRecord('suppliers','roving_suppliers',supplierId);
+    renderSuppliers();populateSupplierSelects();populateSupplierBillSelects();
+    showNotification('Supplier removed. Historical bills and payments were preserved.','success');
+}
 
 function normalizeRTCode(value) {
     const raw=String(value||'').trim().toUpperCase();
