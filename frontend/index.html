@@ -816,7 +816,8 @@
       <div id="newFollowupFields" class="d-none">
         <div class="row g-3">
           <div class="col-md-6"><label class="form-label fw-semibold">Last Contact Date</label><input type="datetime-local" id="followupLastContactAt" class="form-control" readonly></div>
-          <div class="col-md-6"><label class="form-label fw-semibold">Result</label><input type="text" id="followupResult" class="form-control" placeholder="Client result / response"></div>
+          <div class="col-md-6"><label class="form-label fw-semibold">Result / What happened?</label><select id="followupResult" class="form-select"><option value="">Select result</option><option value="Booked">Booked</option><option value="Quotation Sent">Quotation Sent</option><option value="Program Sent">Program Sent</option><option value="Interested">Interested</option><option value="Requested Callback">Requested Callback</option><option value="No Answer">No Answer</option><option value="Not Interested">Not Interested</option><option value="Other">Other</option></select></div>
+          <div class="col-md-6"><label class="form-label fw-semibold">Customer Priority</label><select id="followupActionPriority" class="form-select"><option value="High">High</option><option value="Medium">Medium</option><option value="Low">Low</option><option value="Normal">Normal</option></select></div>
           <div class="col-12"><label class="form-label fw-semibold">New Note</label><textarea id="followupNewNote" class="form-control" rows="3" placeholder="Write the new note. This will be saved separately from the previous note."></textarea></div>
           <div class="col-md-6"><label class="form-label fw-semibold">Next Follow-up Date & Time</label><input type="datetime-local" id="followupNextDateTime" class="form-control" required></div>
         </div>
@@ -843,7 +844,8 @@
       <div id="newFollowupFields" class="d-none">
         <div class="row g-3">
           <div class="col-md-6"><label class="form-label fw-semibold">Last Contact Date</label><input type="datetime-local" id="followupLastContactAt" class="form-control" readonly></div>
-          <div class="col-md-6"><label class="form-label fw-semibold">Result</label><input type="text" id="followupResult" class="form-control" placeholder="Client result / response"></div>
+          <div class="col-md-6"><label class="form-label fw-semibold">Result / What happened?</label><select id="followupResult" class="form-select"><option value="">Select result</option><option value="Booked">Booked</option><option value="Quotation Sent">Quotation Sent</option><option value="Program Sent">Program Sent</option><option value="Interested">Interested</option><option value="Requested Callback">Requested Callback</option><option value="No Answer">No Answer</option><option value="Not Interested">Not Interested</option><option value="Other">Other</option></select></div>
+          <div class="col-md-6"><label class="form-label fw-semibold">Customer Priority</label><select id="followupActionPriority" class="form-select"><option value="High">High</option><option value="Medium">Medium</option><option value="Low">Low</option><option value="Normal">Normal</option></select></div>
           <div class="col-12"><label class="form-label fw-semibold">New Note</label><textarea id="followupNewNote" class="form-control" rows="3" placeholder="Write the new note. This will be saved separately from the previous note."></textarea></div>
           <div class="col-md-6"><label class="form-label fw-semibold">Next Follow-up Date & Time</label><input type="datetime-local" id="followupNextDateTime" class="form-control" required></div>
         </div>
@@ -2904,7 +2906,12 @@ function renderFollowups() {
                 <td><span class="badge bg-light text-dark border">${escapeHtml(f.assignedTo || '')}</span></td>
                 <td><span class="badge bg-secondary">${escapeHtml(f.priority || '')}</span></td>
                 <td><span class="badge bg-primary">${escapeHtml(f.status || '')}</span></td>
-                <td><small class="text-muted">${escapeHtml(f.notes || '-')}</small>${f.attachmentData ? `<br><a href="${f.attachmentData}" target="_blank" rel="noopener">📎 ${escapeHtml(f.attachmentName || 'View attachment')}</a>` : ''}${f.dateTime && new Date(f.dateTime) < new Date() ? '<br><span class="badge bg-danger">Overdue · Action needed</span>' : ''}</td>
+                <td>
+                    <small class="text-muted">${escapeHtml(f.notes || '-')}</small>
+                    ${Array.isArray(f.history) && f.history.length ? `<details class="mt-1"><summary class="small text-primary" style="cursor:pointer">Interaction history (${f.history.length})</summary><div class="border rounded p-2 mt-2 bg-light">${[...f.history].slice().reverse().map(h=>`<div class="small py-1 border-bottom"><div class="d-flex flex-wrap gap-2 align-items-center"><strong>${escapeHtml(h.result||'Update')}</strong><span class="badge bg-secondary">${escapeHtml(h.priority||'Normal')}</span></div><div>${escapeHtml(h.note||'-')}</div><div class="text-muted">${escapeHtml(h.contactAt ? new Date(h.contactAt).toLocaleString() : 'Date not set')}${h.assignedTo ? ` · ${escapeHtml(h.assignedTo)}` : ''}</div></div>`).join('')}</div></details>` : ''}
+                    ${f.attachmentData ? `<br><a href="${f.attachmentData}" target="_blank" rel="noopener">📎 ${escapeHtml(f.attachmentName || 'View attachment')}</a>` : ''}
+                    ${f.dateTime && new Date(f.dateTime) < new Date() ? '<br><span class="badge bg-danger">Overdue · Action needed</span>' : ''}
+                </td>
                 <td>
                     <button class="btn btn-sm btn-outline-primary me-1" title="Edit / Reschedule / Reassign" onclick="editFollowup('${escapeHtml(fid)}')"><i class="fa-solid fa-pen-to-square"></i></button>
                     <button class="btn btn-sm btn-outline-success me-1" title="Choose follow-up result" onclick="openFollowupAction('${escapeHtml(fid)}')"><i class="fa-solid fa-check"></i></button>
@@ -3064,10 +3071,10 @@ function dismissFollowupAlert(encodedSignature) {
 function openFollowupAction(id) {
     const f=followups.find(x=>String(x.id)===String(id)); if(!f)return;
     document.getElementById('actionFollowupId').value=f.id;
-    document.getElementById('followupActionClientInfo').innerHTML=`<strong>${escapeHtml(f.clientName||'')}</strong><br><small>${escapeHtml(f.clientPhone||'')}</small><br><span class="text-muted">Previous note: ${escapeHtml(f.notes||'-')}</span>`;
+    document.getElementById('followupActionClientInfo').innerHTML=`<div class="d-flex flex-wrap align-items-center gap-2"><strong>${escapeHtml(f.clientName||'')}</strong><span class="badge bg-secondary">${escapeHtml(f.priority||'Normal')}</span></div><small>${escapeHtml(f.clientPhone||'')}</small><div class="small text-muted mt-2">Previous note: ${escapeHtml(f.notes||'-')}</div>`;
     const now=new Date(); now.setMinutes(now.getMinutes()-now.getTimezoneOffset());
     document.getElementById('followupLastContactAt').value=now.toISOString().slice(0,16);
-    document.getElementById('followupResult').value=''; document.getElementById('followupNewNote').value=''; document.getElementById('followupNextDateTime').value='';
+    document.getElementById('followupResult').value=''; document.getElementById('followupNewNote').value=''; document.getElementById('followupNextDateTime').value=''; document.getElementById('followupActionPriority').value=f.priority||'Normal';
     document.getElementById('newFollowupFields').classList.add('d-none');
     new bootstrap.Modal(document.getElementById('followupActionModal')).show();
 }
@@ -3098,13 +3105,85 @@ async function handleFollowupOutcome(outcome){
     }
 }
 async function saveNewFollowupFromAction(){
-    const id=document.getElementById('actionFollowupId').value, old=followups.find(x=>String(x.id)===String(id)); if(!old)return;
-    const newNote=document.getElementById('followupNewNote').value.trim(), result=document.getElementById('followupResult').value.trim(), next=document.getElementById('followupNextDateTime').value;
-    if(!newNote||!result||!next){showNotification('Please enter the new note, result, and next follow-up date.','warning');return;}
+    const id=document.getElementById('actionFollowupId').value;
+    const old=followups.find(x=>String(x.id)===String(id));
+    if(!old)return;
+
+    const newNote=document.getElementById('followupNewNote').value.trim();
+    const result=document.getElementById('followupResult').value.trim();
+    const next=document.getElementById('followupNextDateTime').value;
+    const nextPriority=document.getElementById('followupActionPriority').value||'Normal';
+    if(!newNote||!result||!next){
+        showNotification('Please enter the result, new note, and next follow-up date.','warning');
+        return;
+    }
+
     const last=document.getElementById('followupLastContactAt').value||new Date().toISOString();
-    old.status='Completed'; old.actionOutcome='Follow-up'; old.lastContactAt=last; old.result=result; old.lastActionAt=new Date().toISOString(); await saveRecord('followups','roving_followups',old);
-    const nf={id:Date.now(),clientId:old.clientId,clientName:old.clientName,clientPhone:old.clientPhone||'N/A',type:old.type||'Phone Call',status:'Scheduled',dateTime:next,assignedTo:old.assignedTo,priority:old.priority||'Normal',notes:newNote,attachmentData:'',attachmentName:'',notified:false,lastActionAt:'',lastContactAt:last,result,previousFollowupId:old.id,history:[...(Array.isArray(old.history)?old.history:[]),{contactAt:last,result,note:newNote,previousFollowupId:old.id}]};
-    followups.unshift(nf); await saveRecord('followups','roving_followups',nf); const m=bootstrap.Modal.getInstance(document.getElementById('followupActionModal'));if(m)m.hide();renderFollowups();showNotification('New follow-up added successfully. The previous note was kept separately.','success');
+    const stamp=new Date().toISOString();
+
+    // Carry forward all prior interaction history and snapshot the current follow-up before closing it.
+    const history=Array.isArray(old.history)?JSON.parse(JSON.stringify(old.history)):[];
+    const currentSnapshot={
+        contactAt:last,
+        result:old.result||old.actionOutcome||'Previous follow-up',
+        note:old.notes||'',
+        priority:old.priority||'Normal',
+        followupId:old.id,
+        assignedTo:old.assignedTo||''
+    };
+    const alreadyCaptured=history.some(h=>
+        String(h.followupId??h.previousFollowupId??'')===String(old.id) &&
+        String(h.note||'')===String(old.notes||'') &&
+        String(h.contactAt||'')===String(last||'')
+    );
+    if((old.notes||old.result||old.lastContactAt)&&!alreadyCaptured) history.push(currentSnapshot);
+
+    const newInteraction={
+        contactAt:last,
+        result,
+        note:newNote,
+        priority:nextPriority,
+        followupId:Date.now(),
+        assignedTo:old.assignedTo||''
+    };
+    history.push(newInteraction);
+
+    old.status='Completed';
+    old.actionOutcome='Follow-up';
+    old.lastContactAt=last;
+    old.result=result;
+    old.lastActionAt=stamp;
+    old.priority=nextPriority;
+    old.history=history;
+    await saveRecord('followups','roving_followups',old);
+
+    const nf={
+        id:newInteraction.followupId,
+        clientId:old.clientId,
+        clientName:old.clientName,
+        clientPhone:old.clientPhone||'N/A',
+        type:old.type||'Phone Call',
+        status:'Scheduled',
+        dateTime:next,
+        assignedTo:old.assignedTo,
+        priority:nextPriority,
+        notes:newNote,
+        attachmentData:'',
+        attachmentName:'',
+        notified:false,
+        lastActionAt:'',
+        lastContactAt:last,
+        result,
+        previousFollowupId:old.id,
+        history
+    };
+    followups.unshift(nf);
+    await saveRecord('followups','roving_followups',nf);
+
+    const m=bootstrap.Modal.getInstance(document.getElementById('followupActionModal'));
+    if(m)m.hide();
+    renderFollowups();
+    showNotification('تم إنشاء متابعة جديدة مع الاحتفاظ بسجل الملاحظات والتغييرات السابقة.','success');
 }
 
 async function completeFollowup(id) {
