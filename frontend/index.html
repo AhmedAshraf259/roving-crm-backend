@@ -4504,14 +4504,25 @@ function renderClients() {
         return;
     }
 
-    // Newest customer code first: RT-00353, RT-00352, RT-00351...
-    // Numeric comparison avoids incorrect lexical ordering when code lengths differ.
+    // Newest customers first. RT file numbers are assigned sequentially,
+    // so the highest numeric RT code is the newest customer. Use creation
+    // timestamps as a fallback for records without a valid RT code.
     list.sort((a, b) => {
         const getNumber = client => {
-            const match = clientCodeOf(client).match(/^RT-(\\d+)$/i);
-            return match ? Number(match[1]) : -1;
+            const code = String(clientCodeOf(client) || '');
+            const match = code.match(/RT-(\\d+)/i);
+            return match ? Number(match[1]) : null;
         };
-        return getNumber(b) - getNumber(a);
+        const numberA = getNumber(a);
+        const numberB = getNumber(b);
+
+        if (numberA !== null && numberB !== null) return numberB - numberA;
+        if (numberA !== null) return -1;
+        if (numberB !== null) return 1;
+
+        const dateA = new Date(a.createdAt || a.created_at || a.dateCreated || 0).getTime() || 0;
+        const dateB = new Date(b.createdAt || b.created_at || b.dateCreated || 0).getTime() || 0;
+        return dateB - dateA;
     });
 
     list.forEach((client) => {
