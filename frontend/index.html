@@ -297,10 +297,42 @@
                 <div class="card card-custom p-3 mb-3 bg-light">
                     <div class="row align-items-center">
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold mb-1"><i class="fa-solid fa-magnifying-glass me-1 text-roving-orange"></i> Search by Phone</label>
-                            <input type="text" id="clientPhoneSearch" class="form-control" placeholder="Type phone number..." oninput="renderClients()">
+                            <label class="form-label fw-semibold mb-1"><i class="fa-solid fa-magnifying-glass me-1 text-roving-orange"></i> Search by Name, Phone or File #</label>
+                            <input type="search" id="clientPhoneSearch" class="form-control" placeholder="Enter customer name, phone number, RT file code or ID..." oninput="renderClients()">
                         </div>
                     </div>
+                </div>
+
+                <div class="card card-custom p-3">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="followup-select-cell"><input type="checkbox" id="selectAllClients" title="Select all visible clients" onchange="toggleAllClients(this.checked)"></th>
+                                    <th>File #</th>
+                                    <th>Name *</th>
+                                    <th>Source *</th>
+                                    <th>Contact Info</th>
+                                    <th>Passport Info</th>
+                                    <th>Assigned To</th>
+                                    <th>Status *</th>
+                                    <th>Notes</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="clientsTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 2: Follow-ups -->
+            <div id="tabFollowups" class="tab-content-item d-none">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2 class="fw-bold text-roving-green">Follow-ups & Tasks Schedule</h2>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addFollowupModal" onclick="openAddFollowupModal()">
+                        <i class="fa-solid fa-plus me-1"></i> Add Follow-up Task
+                    </button>
                 </div>
 
                 <div class="card card-custom p-3 mb-3">
@@ -351,39 +383,8 @@
                         <table class="table table-hover align-middle">
                             <thead class="table-light">
                                 <tr>
-                                    <th class="followup-select-cell"><input type="checkbox" id="selectAllClients" title="Select all visible clients" onchange="toggleAllClients(this.checked)"></th>
-                                    <th>File #</th>
-                                    <th>Name *</th>
-                                    <th>Source *</th>
-                                    <th>Contact Info</th>
-                                    <th>Passport Info</th>
-                                    <th>Assigned To</th>
-                                    <th>Status *</th>
-                                    <th>Notes</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="clientsTableBody"></tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Tab 2: Follow-ups -->
-            <div id="tabFollowups" class="tab-content-item d-none">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h2 class="fw-bold text-roving-green">Follow-ups & Tasks Schedule</h2>
-                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addFollowupModal" onclick="openAddFollowupModal()">
-                        <i class="fa-solid fa-plus me-1"></i> Add Follow-up Task
-                    </button>
-                </div>
-
-                <div class="card card-custom p-3">
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle">
-                            <thead class="table-light">
-                                <tr>
                                     <th class="followup-select-cell"><input type="checkbox" id="selectAllFollowups" title="Select all visible follow-ups" onchange="toggleAllFollowups(this.checked)"></th>
+                                    <th>File #</th>
                                     <th>Client Name</th>
                                     <th>Phone</th>
                                     <th>Task Type</th>
@@ -396,7 +397,7 @@
                                 </tr>
                             </thead>
                             <tbody id="followupsTableBody">
-                                <tr><td colspan="10" class="text-center text-muted py-4">No follow-ups recorded</td></tr>
+                                <tr><td colspan="11" class="text-center text-muted py-4">No follow-ups recorded</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -2780,6 +2781,7 @@ async function handleSaveFollowup(e) {
         ...(oldFollowup || {}),
         id: editingId !== "" ? Number(editingId) : Date.now(),
         clientId: client._id ?? client.id,
+        clientCode: clientCodeOf(client),
         clientName: client.name,
         clientPhone: client.phone || 'N/A',
         type: document.getElementById('followupType').value,
@@ -2928,7 +2930,7 @@ function renderFollowups() {
     const visibleIds = new Set(list.map(f => String(f.id ?? f._id)));
     selectedFollowupIds = new Set([...selectedFollowupIds].filter(id => visibleIds.has(id)));
     if (list.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="10" class="text-center text-muted py-4">No active follow-ups. Completed and Lost items remain in the client history.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="11" class="text-center text-muted py-4">No active follow-ups. Completed and Lost items remain in the client history.</td></tr>`;
         updateFollowupBulkBar();
         const selectAll = document.getElementById('selectAllFollowups');
         if (selectAll) selectAll.checked = false;
@@ -2941,6 +2943,7 @@ function renderFollowups() {
         tbody.innerHTML += `
             <tr>
                 <td class="followup-select-cell"><input class="followup-row-check" type="checkbox" value="${escapeHtml(fid)}" ${checked} aria-label="Select ${escapeHtml(f.clientName || 'client')}" onchange="toggleFollowupSelection('${escapeHtml(fid)}', this.checked)"></td>
+                <td><span class="badge bg-dark">${escapeHtml(f.clientCode || getFollowupClientCode(f) || '—')}</span></td>
                 <td><strong>${escapeHtml(f.clientName || '')}</strong></td>
                 <td><small><i class="fa-solid fa-phone me-1"></i>${escapeHtml(f.clientPhone || '')}</small></td>
                 <td><span class="badge bg-dark">${escapeHtml(f.type || '')}</span></td>
@@ -2955,6 +2958,7 @@ function renderFollowups() {
                     ${f.dateTime && new Date(f.dateTime) < new Date() ? '<br><span class="badge bg-danger">Overdue · Action needed</span>' : ''}
                 </td>
                 <td>
+                    <button class="btn btn-sm btn-outline-dark me-1" title="Open complete customer workspace" onclick="openClientWorkspaceFromFollowup('${escapeHtml(fid)}')"><i class="fa-solid fa-folder-open"></i></button>
                     <button class="btn btn-sm btn-outline-primary me-1" title="Edit / Reschedule / Reassign" onclick="editFollowup('${escapeHtml(fid)}')"><i class="fa-solid fa-pen-to-square"></i></button>
                     <button class="btn btn-sm btn-outline-success me-1" title="Choose follow-up result" onclick="openFollowupAction('${escapeHtml(fid)}')"><i class="fa-solid fa-check"></i></button>
                 </td>
@@ -4021,6 +4025,7 @@ async function deleteClient(clientId) {
 
     showNotification('تم حذف العميل بنجاح.', 'success');
     await fetchClients();
+    if (activeClientWorkspaceId) renderClientWorkspace();
 }
 
 function markNotificationsOpened() {
@@ -4377,6 +4382,25 @@ function clientWorkspaceDate(value) {
     const d=new Date(value);
     return Number.isNaN(d.getTime())?escapeHtml(String(value)):escapeHtml(d.toLocaleString());
 }
+function getFollowupClientCode(followup) {
+    const client=(Array.isArray(clients)?clients:[]).find(c=>clientWorkspaceMatches(followup,c));
+    return client ? clientCodeOf(client) : (followup?.clientCode || '');
+}
+function openClientWorkspaceFromFollowup(followupId) {
+    const followup=(Array.isArray(followups)?followups:[]).find(f=>String(f.id??f._id)===String(followupId));
+    if(!followup){showNotification('Follow-up not found.','warning');return;}
+    const client=(Array.isArray(clients)?clients:[]).find(c=>clientWorkspaceMatches(followup,c));
+    if(client){
+        openClientWorkspace(String(client._id??client.id??client.clientId??client.client_id));
+        return;
+    }
+    const fallbackId=followup.clientId??followup.client_id;
+    if(fallbackId!==undefined&&fallbackId!==null){
+        openClientWorkspace(String(fallbackId));
+        return;
+    }
+    showNotification('No linked customer record was found for this follow-up.','warning');
+}
 function openClientWorkspace(id) {
     const client=getClientByAnyId(id);
     if(!client){showNotification('Customer not found. Refresh the client list and try again.','warning');return;}
@@ -4456,9 +4480,21 @@ function renderClients() {
 
     const phoneSearchInput = document.getElementById('clientPhoneSearch');
     if (phoneSearchInput) {
-        const phoneQuery = phoneSearchInput.value.trim();
-        if (phoneQuery !== "") {
-            list = list.filter(c => c.phone && c.phone.includes(phoneQuery));
+        const customerQuery = phoneSearchInput.value.trim().toLowerCase();
+        if (customerQuery !== "") {
+            const normalizedQuery = customerQuery.replace(/[^a-z0-9]/gi, '');
+            list = list.filter(c => {
+                const name = String(c.name || '').toLowerCase();
+                const phone = String(c.phone || '').toLowerCase();
+                const code = String(clientCodeOf(c) || '').toLowerCase();
+                const id = String(c._id ?? c.id ?? c.clientId ?? c.client_id ?? '').toLowerCase();
+                const normalizedCode = code.replace(/[^a-z0-9]/gi, '');
+                return name.includes(customerQuery) ||
+                    phone.includes(customerQuery) ||
+                    code.includes(customerQuery) ||
+                    id.includes(customerQuery) ||
+                    (normalizedQuery && (phone.replace(/\D/g, '').includes(normalizedQuery) || normalizedCode.includes(normalizedQuery)));
+            });
         }
     }
 
